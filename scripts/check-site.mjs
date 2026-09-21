@@ -44,6 +44,10 @@ try {
   await page.locator('[data-chapter="1"]').click();
   await page.waitForFunction(() => __portrait.selected === 1 && __portrait.camera.position.z < 32);
   await page.screenshot({ path: 'artifacts/desktop-entrance.png' });
+  assert.equal(await page.evaluate(() => __portrait.architecture.doors.every(({ pivot }) =>
+    pivot.getObjectByName('Solid timber leaf')?.material.map && pivot.getObjectByName('Timber panels') &&
+    !pivot.children.some(child => child.material === __portrait.architecture.materials.glass)
+  )), true, 'Entrance leaves must be paneled timber, with glazing confined to the fixed sidelights');
   await page.locator('#door').click();
   assert.equal(await page.evaluate(() => __portrait.doorsOpen), true);
   await page.waitForFunction(() => __portrait.architecture.doors.every(d => Math.abs(d.pivot.rotation.y + d.side * Math.PI) < .002));

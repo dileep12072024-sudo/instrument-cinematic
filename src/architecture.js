@@ -61,6 +61,18 @@ function weatherMap() {
   return texture(c);
 }
 
+function woodGrain() {
+  const c = canvas(256, 512), x = c.getContext('2d');
+  x.fillStyle = '#997452'; x.fillRect(0, 0, 256, 512);
+  for (let i = 0; i < 256; i++) {
+    x.strokeStyle = `rgba(51,26,13,${.06 + (Math.sin(i * 12.9898) + 1) * .055})`;
+    x.lineWidth = 1; x.beginPath(); x.moveTo(i, 0);
+    for (let y = 0; y <= 512; y += 16) x.lineTo(i + Math.sin(y * .018 + i * .3) * 1.5, y);
+    x.stroke();
+  }
+  return texture(c);
+}
+
 export function buildArchitecture(scene) {
   const group = new T.Group(); group.name = 'Reference-built department'; scene.add(group);
   const plasterMap = plaster();
@@ -76,6 +88,9 @@ export function buildArchitecture(scene) {
     weather: mat('#ffffff', { map: weatherMap(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }),
   };
   m.rearGlass = m.glass.clone(); m.rearGlass.name = 'Rear glass';
+  const grain = woodGrain();
+  m.entranceWood = mat('#d9b890', { name: 'Entrance timber', map: grain, bumpMap: grain, bumpScale: .006, roughness: .48 });
+  m.doorPanel = m.entranceWood.clone(); m.doorPanel.color.set('#b69372');
   m.paving.bumpMap = m.paving.map;
   const batches = new Map(), matrix = new T.Matrix4(), quaternion = new T.Quaternion();
   function box(x, y, z, w, h, d, material, parent = null) {
@@ -195,19 +210,28 @@ export function buildArchitecture(scene) {
   box(0, 3.78, 7, 8, .44, .35, m.wall);
   for (const x of [-3.85, 3.85]) box(x, 1.75, 7, .3, 3.5, .45, m.blue);
   box(0, 1.7, 3, 7.5, 3.4, .25, m.dark);
-  box(0, 3.43, 7, 7.5, .3, .28, m.wood);
-  for (const x of [-1.715, 1.715]) box(x, 1.7, 7, .075, 3.25, .28, m.wood);
+  box(0, 3.43, 7, 7.5, .3, .28, m.entranceWood);
+  for (const x of [-1.715, 1.715]) box(x, 1.7, 7, .075, 3.25, .28, m.entranceWood);
   for (const x of [-2.75, 2.75]) {
-    box(x, 1.7, 7, 2.05, 3.2, .08, m.wood);
+    box(x, 1.7, 7, 2.05, 3.2, .08, m.entranceWood);
     box(x, 2.2, 7.06, 1.88, 1.98, .045, m.glass);
+    for (const offset of [-.49, .49]) box(x + offset, .63, 7.05, .83, .83, .025, m.doorPanel);
+    box(x, 1.17, 7.09, 2.05, .12, .1, m.entranceWood);
   }
   const doors = [];
   for (const side of [-1, 1]) {
     const pivot = new T.Group(); pivot.name = side < 0 ? 'Left entrance door' : 'Right entrance door'; pivot.position.set(side * 1.7, .1, 6.82); group.add(pivot);
-    const leaf = new T.Mesh(new T.BoxGeometry(1.7, 3.2, .12), m.wood); leaf.position.set(-side * .85, 1.6, 0); pivot.add(leaf);
-    const glazing = new T.Mesh(new T.BoxGeometry(1.52, 1.94, .14), m.glass); glazing.position.set(-side * .85, 2.14, 0); pivot.add(glazing);
-    const handle = new T.Mesh(new T.CylinderGeometry(.025, .025, .56, 8), m.metal); handle.position.set(-side * 1.53, 1.66, .12); pivot.add(handle);
-    leaf.castShadow = true; glazing.castShadow = true;
+    const leaf = new T.Mesh(new T.BoxGeometry(1.68, 3.2, .14), m.entranceWood); leaf.name = 'Solid timber leaf'; leaf.position.set(-side * .85, 1.6, 0); pivot.add(leaf);
+    // Inset-style panel fields on both sides keep the folded-open doors finished too.
+    const panels = [];
+    for (const offset of [-.37, .37]) for (const [y, h] of [[.54, .78], [2.05, 1.94]]) for (const z of [-.074, .074]) {
+      const panel = new T.BoxGeometry(.62, h, .018); panel.translate(-side * .85 + offset, y, z); panels.push(panel);
+    }
+    const panelMesh = new T.Mesh(mergeGeometries(panels), m.doorPanel); panelMesh.name = 'Timber panels'; pivot.add(panelMesh); panels.forEach(g => g.dispose());
+    for (const z of [-.15, .15]) {
+      const handle = new T.Mesh(new T.CylinderGeometry(.022, .022, .4, 8), m.metal); handle.position.set(-side * 1.49, 1.5, z); pivot.add(handle);
+    }
+    leaf.castShadow = leaf.receiveShadow = panelMesh.castShadow = panelMesh.receiveShadow = true;
     doors.push({ pivot, side, openAngle: -side * Math.PI });
   }
   const sign = new T.Mesh(new T.PlaneGeometry(9.8, .35), mat('white', { map: textMap('DEPARTMENT OF INSTRUMENT TECHNOLOGY', '#eee9da', '#96372e'), roughness: .9 }));
