@@ -70,10 +70,12 @@ export function buildArchitecture(scene) {
     blue: mat('#517694', { map: plasterMap, bumpMap: plasterMap, bumpScale: .016 }),
     trim: mat('#738491', { map: plasterMap }), roof: mat('#96988e', { map: plasterMap }),
     dark: mat('#222a27'), frame: mat('#627976', { metalness: .25 }), wood: mat('#65503c'),
-    glass: mat('#304648', { roughness: .2, metalness: .65 }), metal: mat('#8a928c', { metalness: .65, roughness: .5 }),
+    glass: new T.MeshPhysicalMaterial({ name: 'Courtyard glass', color: '#6d8580', roughness: .055, metalness: .12, clearcoat: 1, clearcoatRoughness: .04, ior: 1.52, envMapIntensity: 1.4 }),
+    metal: mat('#8a928c', { metalness: .65, roughness: .5 }),
     grille: mat('#d1cbb8'), brick: mat('#ae7259'), stain: mat('#ad7c56'), paving: mat('#b4b2a6', { map: noiseMap('#c7c4b8', 7, true), bumpScale: .025 }),
     weather: mat('#ffffff', { map: weatherMap(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }),
   };
+  m.rearGlass = m.glass.clone(); m.rearGlass.name = 'Rear glass';
   m.paving.bumpMap = m.paving.map;
   const batches = new Map(), matrix = new T.Matrix4(), quaternion = new T.Quaternion();
   function box(x, y, z, w, h, d, material, parent = null) {
@@ -81,7 +83,7 @@ export function buildArchitecture(scene) {
     if (parent) geo.applyMatrix4(parent);
     if (!batches.has(material)) batches.set(material, []); batches.get(material).push(geo);
   }
-  function face(cx, cz, rotation, width, height, bays, type) {
+  function face(cx, cz, rotation, width, height, bays, type, closedGround = false) {
     const transform = new T.Matrix4().compose(new T.Vector3(cx, 0, cz), quaternion.setFromAxisAngle(new T.Vector3(0, 1, 0), rotation), new T.Vector3(1, 1, 1));
     const b = (x, y, z, w, h, d, material) => box(x, y, z, w, h, d, material, transform);
     const floors = Math.round((height - 1.4) / 4), floorH = (height - 1.4) / floors, bay = width / bays;
@@ -95,10 +97,15 @@ export function buildArchitecture(scene) {
       b(0, (high + y + floorH) / 2, 0, width, y + floorH - high, .32, m.wall);
       for (let j = 0; j < bays; j++) {
         const x = -width / 2 + bay * (j + .5), ow = bay - .6;
+        const worldZ = cz - Math.sin(rotation) * x;
+        const solid = f === 0 && (closedGround === true || closedGround === 'rear-half' && worldZ < -3.25);
+        const glass = closedGround === true || worldZ < -3.25 ? m.rearGlass : m.glass;
         const lattice = type === 'low-corridor' || type === 'corridor' && f < floors - 1 || type === 'west' && f === 0;
         b(x - bay / 2, y + floorH / 2, 0, .6, floorH, .32, m.wall);
         if (!tower || j === 0) b(x - bay / 2, y + floorH / 2, .05, .3, floorH, .45, m.blue);
-        if (lattice) {
+        if (solid) {
+          b(x, openingY, 0, ow, openingH, .32, m.wall);
+        } else if (lattice) {
           b(x, openingY, -.27, ow, openingH, .05, m.dark);
           if (f === 0) {
             const nx = Math.round(ow / .25), ny = Math.round(openingH / .19);
@@ -125,8 +132,9 @@ export function buildArchitecture(scene) {
           const ww = Math.min(ow - .4, tower ? 2.8 : 2.0), wh = openingH - .13;
           const side = (ow - ww) / 2;
           for (const s of [-1, 1]) b(x + s * (ww + side) / 2, openingY, 0, side, openingH, .32, m.wall);
-          b(x, openingY, -.19, ww, wh, .05, m.glass);
+          b(x, openingY, -.19, ww, wh, .05, glass);
           for (const s of [-1, 1]) {
+            b(x, openingY + s * (wh / 2 + (openingH - wh) / 4), 0, ww, (openingH - wh) / 2, .32, m.wall);
             b(x + s * ww / 2, openingY, .005, .085, wh, .12, type === 'west' ? m.wood : m.frame);
             b(x, openingY + s * wh / 2, .005, ww + .1, .08, .12, m.frame);
           }
@@ -168,10 +176,10 @@ export function buildArchitecture(scene) {
   }
   function block(x, z, w, d, h, bays, type) {
     face(x, z + d / 2, 0, w, h, bays, type === 'tower' ? 'tower-front' : type);
-    face(x, z - d / 2, Math.PI, w, h, bays, 'room');
+    face(x, z - d / 2, Math.PI, w, h, bays, 'room', true);
     if (!type.includes('corridor')) {
-      face(x + w / 2, z, Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'west' ? 'west' : 'room');
-      face(x - w / 2, z, -Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'west' ? 'west' : 'room');
+      face(x + w / 2, z, Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'west' ? 'west' : 'room', 'rear-half');
+      face(x - w / 2, z, -Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'west' ? 'west' : 'room', 'rear-half');
     }
     box(x, .02, z, w, .18, d, m.roof);
     for (let y = 4; y < h - 1.3; y += 4) box(x, y - .07, z, w, .2, d, m.roof);
@@ -181,21 +189,26 @@ export function buildArchitecture(scene) {
   box(0, .04, 8.5, 10, .18, 5.2, m.paving);
   box(0, 3.55, 8.8, 10, .24, 4, m.wall);
   box(0, 3.7, 10.8, 10.1, .48, .18, mat('#1287b7'));
-  for (const x of [-4.5, 4.5]) box(x, 1.75, 10.1, .38, 3.5, .46, mat('#b3a28a'));
+  // Cantilevered rear canopy: half the front canopy's depth, with no freestanding posts.
+  box(0, 3.55, -7.9, 10, .24, 2, m.wall);
+  box(0, 3.63, -8.9, 10.1, .3, .18, m.blue);
   box(0, 3.78, 7, 8, .44, .35, m.wall);
   for (const x of [-3.85, 3.85]) box(x, 1.75, 7, .3, 3.5, .45, m.blue);
   box(0, 1.7, 3, 7.5, 3.4, .25, m.dark);
+  box(0, 3.43, 7, 7.5, .3, .28, m.wood);
+  for (const x of [-1.715, 1.715]) box(x, 1.7, 7, .075, 3.25, .28, m.wood);
   for (const x of [-2.75, 2.75]) {
     box(x, 1.7, 7, 2.05, 3.2, .08, m.wood);
     box(x, 2.2, 7.06, 1.88, 1.98, .045, m.glass);
   }
   const doors = [];
   for (const side of [-1, 1]) {
-    const pivot = new T.Group(); pivot.position.set(side * 1.7, .1, 7.02); group.add(pivot);
+    const pivot = new T.Group(); pivot.name = side < 0 ? 'Left entrance door' : 'Right entrance door'; pivot.position.set(side * 1.7, .1, 6.82); group.add(pivot);
     const leaf = new T.Mesh(new T.BoxGeometry(1.7, 3.2, .12), m.wood); leaf.position.set(-side * .85, 1.6, 0); pivot.add(leaf);
     const glazing = new T.Mesh(new T.BoxGeometry(1.52, 1.94, .14), m.glass); glazing.position.set(-side * .85, 2.14, 0); pivot.add(glazing);
     const handle = new T.Mesh(new T.CylinderGeometry(.025, .025, .56, 8), m.metal); handle.position.set(-side * 1.53, 1.66, .12); pivot.add(handle);
-    doors.push({ pivot, side });
+    leaf.castShadow = true; glazing.castShadow = true;
+    doors.push({ pivot, side, openAngle: -side * Math.PI });
   }
   const sign = new T.Mesh(new T.PlaneGeometry(9.8, .35), mat('white', { map: textMap('DEPARTMENT OF INSTRUMENT TECHNOLOGY', '#eee9da', '#96372e'), roughness: .9 }));
   sign.position.set(0, 3.7, 10.901); group.add(sign);

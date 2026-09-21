@@ -17,4 +17,6 @@ dialog{background:#18221f;color:#edf2e4;border:1px solid #e9f0df29;border-radius
 @media(max-height:700px) and (max-width:699px){.topbar{height:67px}.scene-meta{top:83px}.scene-number{top:79px}.scene-heading{bottom:134px}.scene-heading h1{font-size:36px}.scene-heading .eyebrow{margin-bottom:8px}.heading-actions{margin-top:16px}.chapter-bar{height:103px}.scene-tools{top:35%}.scene-tools #reset,.scene-tools #zoom-out{display:none}.detail-view .scene-heading{bottom:156px}.door-action{bottom:111px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 .mobile-plan{display:none}.footprint-view .scene-heading,.footprint-view .door-action{display:none}
+.light-panel{max-height:calc(100dvh - 220px);overflow-y:auto}#ambient-volume{margin-bottom:4px}
+@media(max-height:680px){.light-panel{top:82px;max-height:calc(100dvh - 100px)}}
 @media(max-width:699px){.mobile-plan{display:grid}}

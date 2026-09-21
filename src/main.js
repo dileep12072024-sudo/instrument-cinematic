@@ -4,12 +4,13 @@ import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { createIcons, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, Images, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check } from 'lucide';
 import { buildArchitecture, buildLandscape } from './architecture.js';
 import { footprint } from './footprint.js';
-import { Map as MapIcon } from 'lucide';
+import { Map as MapIcon, Volume2, VolumeX } from 'lucide';
+import { createAmbience } from './ambience.js';
 import './style.css';
 
 const $ = s => document.querySelector(s);
 const icon = name => `<i data-lucide="${name}"></i>`;
-const icons = { Map: MapIcon, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, Images, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check };
+const icons = { Volume2, VolumeX, Map: MapIcon, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, Images, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check };
 const refreshIcons = () => createIcons({ icons, attrs: { 'stroke-width': 1.5 } });
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const small = () => innerWidth < 700;
@@ -52,7 +53,10 @@ $('#app').innerHTML = `
   <dialog id="archive-dialog" class="archive-dialog"><div class="dialog-top"><span class="eyebrow">FIELD NOTES / NORTH CAMPUS</span><button class="icon-btn close-dialog" aria-label="Close archive">${icon('x')}</button></div><div class="archive-heading"><h2>The original <em>perspectives.</em></h2><button id="archive-film" class="text-btn">${icon('play')} Watch the film</button></div><div class="photo-layout"><figure><img id="archive-image" alt=""/><figcaption><span id="photo-title"></span><span id="photo-index"></span></figcaption></figure><div class="photo-side"><div class="photo-thumbnails"></div><div class="photo-arrows"><button id="photo-prev" class="icon-btn" aria-label="Previous photo">${icon('arrow-left')}</button><span>FROM THE CAMPUS</span><button id="photo-next" class="icon-btn" aria-label="Next photo">${icon('arrow-right')}</button></div></div></div></dialog>
   <dialog id="video-dialog" class="video-dialog"><div class="dialog-top"><span class="eyebrow">THE CAMPUS / ORIGINAL FOOTAGE</span><button class="icon-btn close-dialog" aria-label="Close film">${icon('x')}</button></div><video controls playsinline preload="none" poster="/media/entrance.webp"><source src="/media/campus.mp4" type="video/mp4" /></video></dialog>
   <dialog id="about-dialog" class="about-dialog"><div class="dialog-top"><span class="eyebrow">ABOUT THE PORTRAIT</span><button class="icon-btn close-dialog" aria-label="Close about">${icon('x')}</button></div><h2>Built around<br><em>a real place.</em></h2><p>Department of Instrument Technology.<br>Andhra University, Visakhapatnam.</p><p>This independent architectural portrait is reconstructed from the supplied campus photographs, video, and footprint. The blue structural frame, open corridors, entrance, and different wing heights follow those references.</p><p>Geometry is constructed directly in Three.js. Dimensions, hidden elevations, planting, and materials are interpreted; this is not a measured survey or a photogrammetric scan.</p><a href="https://www.google.com/maps/search/?api=1&query=Andhra+University+Department+of+Instrument+Technology" target="_blank" rel="noopener" class="text-btn">Find the department ${icon('arrow-up-right')}</a><div class="credits">Original photographs & footage supplied by the project owner. Sky lighting: <a href="https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky" target="_blank" rel="noopener">Poly Haven / CC0</a>.</div></dialog>`;
+$('#about').insertAdjacentHTML('afterend', `<button id="sound" class="icon-btn" aria-label="Ambient sound" aria-pressed="false" data-tip="Ambient sound">${icon('volume-x')}</button>`);
+$('#light-panel').insertAdjacentHTML('beforeend', '<label class="range-label" for="ambient-volume">Ambient volume <output id="volume-output">40%</output></label><input id="ambient-volume" type="range" min="0" max="100" value="40" step="1"/>');
 refreshIcons();
+const sound = createAmbience();
 
 let renderer;
 try {
@@ -95,6 +99,7 @@ function updateLighting(h) {
   if (scene.background?.isColor) scene.background.copy(scene.fog.color);
   entranceLight.intensity = evening * 40;
   warm.opacity = evening * .6; warm.emissiveIntensity = evening * 1.4;
+  if (architecture) for (const material of [architecture.materials.glass, architecture.materials.rearGlass]) material.envMapIntensity = THREE.MathUtils.lerp(1.4, .22, evening);
   if (renderer) {
     renderer.toneMappingExposure = THREE.MathUtils.lerp(.94, .8, evening);
     if (performance.now() - lastShadowUpdate > 200 || !ready) { renderer.shadowMap.needsUpdate = true; lastShadowUpdate = performance.now(); }
@@ -203,7 +208,24 @@ async function boot() {
     scene.environment = env.texture; scene.background = hdr; scene.backgroundBlurriness = .02; scene.backgroundRotation.y = 1.9; scene.environmentRotation.y = 1.9;
     pmrem.dispose();
   } catch { console.warn('Sky map unavailable. Using daylight fallback.'); }
-  updateLighting(hour); ready = true; window.__portrait.ready = true;
+  updateLighting(hour);
+  $('#loading-status').textContent = 'Reflecting the courtyards';
+  const probe = new THREE.WebGLCubeRenderTarget(128, { type: THREE.HalfFloatType });
+  const probeCamera = new THREE.CubeCamera(.2, 180, probe);
+  const reflectionFilter = new THREE.PMREMGenerator(renderer);
+  const glass = [architecture.materials.glass, architecture.materials.rearGlass];
+  glass.forEach(material => { material.visible = false; });
+  try {
+    for (const [i, z] of [20, -9].entries()) {
+      probeCamera.position.set(0, 6, z); probeCamera.update(renderer, scene);
+      glass[i].envMap = reflectionFilter.fromCubemap(probe.texture).texture;
+      glass[i].needsUpdate = true;
+    }
+  } finally {
+    glass.forEach(material => { material.visible = true; });
+    probe.dispose(); reflectionFilter.dispose();
+  }
+  ready = true; window.__portrait.ready = true;
   renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
   drawPlan(); resize(); requestAnimationFrame(animate);
 }
@@ -238,7 +260,7 @@ function animate(now) {
   }
   if (Math.abs(hour - targetHour) > .005) { hour = THREE.MathUtils.damp(hour, targetHour, 4, dt); updateLighting(hour); }
   for (const d of architecture.doors) {
-    const a = doorsOpen ? d.side * 1.3 : 0;
+    const a = doorsOpen ? d.openAngle : 0;
     if (Math.abs(d.pivot.rotation.y - a) > .001) {
       d.pivot.rotation.y = reduced ? a : THREE.MathUtils.damp(d.pivot.rotation.y, a, 5, dt); needsRender = true;
       if (Math.abs(d.pivot.rotation.y - a) < .002) renderer.shadowMap.needsUpdate = true;
@@ -257,7 +279,7 @@ function animate(now) {
     needsRender = false; lastRendered = now;
   }
 }
-window.__portrait = { ready: false, scene, camera, footprint, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get lastRendered() { return lastRendered; } };
+window.__portrait = { ready: false, scene, camera, footprint, sound, get architecture() { return architecture; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get lastRendered() { return lastRendered; } };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;
@@ -268,6 +290,22 @@ $('#explore').onclick = () => selectChapter(1);
 $('.brand').onclick = e => { e.preventDefault(); selectChapter(0); };
 $('#reset').onclick = () => selectChapter(0);
 $('#film').onclick = startJourney;
+$('#sound').onclick = async () => {
+  $('#sound').disabled = true;
+  try {
+    await sound.setEnabled(!sound.enabled);
+    $('#sound').setAttribute('aria-pressed', sound.enabled);
+    $('#sound').innerHTML = icon(sound.enabled ? 'volume-2' : 'volume-x'); refreshIcons();
+  } catch { toast('Ambient sound could not start. Please try again.'); }
+  finally { $('#sound').disabled = false; }
+};
+$('#ambient-volume').oninput = e => {
+  sound.setVolume(+e.target.value / 100); $('#volume-output').textContent = `${e.target.value}%`;
+};
+function syncSound() {
+  sound.setMuted(document.hidden || $('#video-dialog').open).catch(() => {});
+}
+document.addEventListener('visibilitychange', syncSound);
 $('#orbit').onclick = () => { stopJourney(); transition = null; interactive = true; setOrbit(!isOrbiting); };
 for (const [id, factor] of [['zoom-in', .8], ['zoom-out', 1.25]]) $(`#${id}`).onclick = () => {
   if (!controls) return;
@@ -322,7 +360,7 @@ async function openArchive() {
   }
   stopJourney(); showPhoto(photoIndex); $('#archive-dialog').showModal();
 }
-function openVideo() { stopJourney(); $('#archive-dialog').close(); $('#video-dialog').showModal(); $('video').play().catch(() => {}); }
+function openVideo() { stopJourney(); $('#archive-dialog').close(); $('#video-dialog').showModal(); syncSound(); $('video').play().catch(() => {}); }
 $('#archive').onclick = openArchive;
 if ($('#fallback-archive')) $('#fallback-archive').onclick = openArchive;
 $('#original-film').onclick = openVideo; $('#archive-film').onclick = openVideo;
@@ -332,5 +370,5 @@ $('#about').onclick = () => { stopJourney(); $('#about-dialog').showModal(); };
 document.querySelectorAll('.close-dialog').forEach(b => b.onclick = () => b.closest('dialog').close());
 document.querySelectorAll('dialog').forEach(d => {
   d.addEventListener('click', e => { if (e.target !== d) return; const r = d.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close(); });
-  d.addEventListener('close', () => { if (d.id === 'video-dialog') $('video').pause(); needsRender = true; });
+  d.addEventListener('close', () => { if (d.id === 'video-dialog') { $('video').pause(); syncSound(); } needsRender = true; });
 });

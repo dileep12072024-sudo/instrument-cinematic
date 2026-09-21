@@ -19,6 +19,8 @@ npm run deploy
 - `src/footprint.js`: shared five-block H plan used by both the 3D building and overhead map. The end wings are substantially deeper than the connecting corridors; the entrance block projects on both sides.
 - `src/architecture.js`: original Three.js geometry for the asymmetrical H footprint, two- and three-level wings, entrance canopy, windows, ventilation screens, grilles, doors, trees, paths and scooters. Static geometry is merged by material; foliage and ground debris are instanced.
 - `src/main.js`: damped orbit controls, four viewpoints, spline camera journey, continuous daylight controls, opening doors, photo export, footprint view, gallery and original video.
+- The rear ground floor is closed; upper windows retain scene reflections. The front canopy retains its original dimensions without freestanding pillars. The rear canopy has half its depth, and entrance doors open inward through 180 degrees.
+- `src/ambience.js`: optional synthesized wind and leaf rustle with volume control. Sound starts on user activation and pauses when the tab is hidden or the original video is open.
 - `src/style.css`: responsive full-screen layout, self-hosted fonts, dialogs and reduced-motion support.
 - `scripts/prepare-media.mjs`: reproducible local reference-image conversion. Originals remain untouched.
 - `scripts/check-site.mjs`: browser interaction, media, canvas-pixel and responsive checks.
