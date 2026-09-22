@@ -1,0 +1,9 @@
+Ambient Bird Sounds
+Author: isaiah658
+Source: https://opengameart.org/content/ambient-bird-sounds
+Original: https://opengameart.org/sites/default/files/birds-isaiah658_0.ogg
+License: CC0 1.0 Universal
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+Downloaded: 2026-09-22
+Changes: high-pass filtering, loudness adjustment, conversion to MP3.
+Playback crossfades the loop boundary. This is not a campus field recording.

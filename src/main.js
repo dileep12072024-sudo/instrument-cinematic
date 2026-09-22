@@ -17,8 +17,8 @@ const small = () => innerWidth < 700;
 const chapters = [
   { name: 'The arrival', title: 'Instrument<br><em>Technology.</em>', note: 'Andhra University, Visakhapatnam', eye: [42, 31, 76], target: [0, 5, 0] },
   { name: 'The entrance', title: 'A familiar<br><em>welcome.</em>', note: 'At the heart of the department', eye: [5, 6.3, 31], target: [0, 6, 6] },
-  { name: 'East courtyard', title: 'Light, shade.<br><em>And possibility.</em>', note: 'The eastern wing', eye: [9, 8, 30], target: [20, 6.2, 3] },
-  { name: 'West wing', title: 'A quieter<br><em>perspective.</em>', note: 'Beneath the trees of North Campus', eye: [-13, 10, 37], target: [-22, 4.6, 2] },
+  { name: 'East courtyard', title: 'Light, shade.<br><em>And possibility.</em>', note: 'The eastern wing', eye: [4, 7.5, 31], target: [22, 6.5, 8] },
+  { name: 'West wing', title: 'A quieter<br><em>perspective.</em>', note: 'Beneath the trees of North Campus', eye: [-5, 6, 4.8], target: [-22, 4.7, 9.125] },
 ];
 $('#app').innerHTML = `
   <main id="experience" aria-label="Instrument Technology interactive campus">
@@ -121,6 +121,8 @@ function fly(eye, target, duration = 2600) {
 }
 function cameraFor(index) {
   const c = chapters[index];
+  if (small() && index === 3) return [-1, 7, 26];
+  if (small() && index === 2) return [0, 8, 30];
   const target = new THREE.Vector3(...c.target), eye = new THREE.Vector3(...c.eye);
   if (small()) eye.sub(target).multiplyScalar(index === 0 ? 2.4 : 1.25).add(target);
   return eye.toArray();

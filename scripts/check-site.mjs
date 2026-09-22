@@ -9,6 +9,8 @@ const browser = await chromium.launch({ headless: true, executablePath: process.
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: .5, reducedMotion: 'reduce' });
 page.setDefaultTimeout(60000);
 const errors = [], failedAssets = [];
+let birdRequests = 0;
+page.on('request', request => { if (new URL(request.url()).pathname === '/media/birds.mp3') birdRequests++; });
 page.on('pageerror', error => { errors.push(error.message); console.error('BROWSER ERROR', error.stack); });
 page.on('response', response => { if (response.status() >= 400 && new URL(response.url()).origin === new URL(url).origin) failedAssets.push(`${response.status()} ${response.url()}`); });
 async function pixels() {
@@ -36,6 +38,14 @@ try {
   });
   assert.ok(facade.lowestWindow > 4, 'Rear windows must start above the solid ground floor');
   assert.ok(facade.reflective && facade.separateProbes, 'Both courtyards must have their own scene reflection');
+  const gate = await page.evaluate(() => {
+    const a = __portrait.architecture, mesh = a.group.children.find(m => m.material === a.materials.gate);
+    mesh.geometry.computeBoundingBox();
+    const { min, max } = mesh.geometry.boundingBox;
+    return { min: min.toArray(), max: max.toArray() };
+  });
+  assert.ok(gate.min[0] > 21.7 && gate.max[0] < 22.2 && gate.max[0] - gate.min[0] < .2, 'Gate must be on the east return plane, facing the courtyard');
+  assert.ok(gate.min[2] > 3.4 && gate.max[2] < 6.6 && gate.max[2] - gate.min[2] > 2.5, 'Gate must sit beside the right-wing windows, not on the long corridor wall');
   await page.evaluate(() => {
     const motion = document.querySelector('#motion'); motion.checked = false; motion.dispatchEvent(new Event('change'));
     __portrait.camera.position.set(0, 5.5, -42); __portrait.controls.target.set(0, 5, -3); __portrait.controls.update();
@@ -56,8 +66,10 @@ try {
   assert.equal(await page.evaluate(() => __portrait.doorsOpen), false);
   await page.waitForFunction(() => __portrait.architecture.doors.every(d => Math.abs(d.pivot.rotation.y) < .002));
   assert.equal(await page.evaluate(() => __portrait.sound.context === undefined), true, 'Audio must wait for user activation');
+  assert.equal(birdRequests, 0, 'Bird recording must not load before sound is enabled');
   await page.locator('#sound').click();
-  await page.waitForFunction(() => __portrait.sound.enabled && __portrait.sound.context.state === 'running');
+  await page.waitForFunction(() => __portrait.sound.enabled && __portrait.sound.context.state === 'running' && __portrait.sound.birdsReady);
+  assert.equal(birdRequests, 1, 'Bird recording should load once on user activation');
   assert.equal(await page.locator('#sound').getAttribute('aria-pressed'), 'true');
   console.log('PASS entrance and opening doors');
   const distance = await page.evaluate(() => __portrait.camera.position.distanceTo(__portrait.controls.target));
@@ -152,6 +164,7 @@ try {
   await page.screenshot({ path: 'artifacts/landscape.png' });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(errors, []); assert.deepEqual(failedAssets, []);
+  assert.equal(birdRequests, 1, 'Sound toggles should reuse the decoded recording');
   console.log('PASS export, footprint, mobile framing, pointer interaction and responsive layout');
   console.log('PASS: no page errors or failed assets');
 } finally { await browser.close(); }
