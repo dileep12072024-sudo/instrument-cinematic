@@ -53,10 +53,31 @@ $('#app').innerHTML = `
   <dialog id="archive-dialog" class="archive-dialog"><div class="dialog-top"><span class="eyebrow">FIELD NOTES / NORTH CAMPUS</span><button class="icon-btn close-dialog" aria-label="Close archive">${icon('x')}</button></div><div class="archive-heading"><h2>The original <em>perspectives.</em></h2><button id="archive-film" class="text-btn">${icon('play')} Watch the film</button></div><div class="photo-layout"><figure><img id="archive-image" alt=""/><figcaption><span id="photo-title"></span><span id="photo-index"></span></figcaption></figure><div class="photo-side"><div class="photo-thumbnails"></div><div class="photo-arrows"><button id="photo-prev" class="icon-btn" aria-label="Previous photo">${icon('arrow-left')}</button><span>FROM THE CAMPUS</span><button id="photo-next" class="icon-btn" aria-label="Next photo">${icon('arrow-right')}</button></div></div></div></dialog>
   <dialog id="video-dialog" class="video-dialog"><div class="dialog-top"><span class="eyebrow">THE CAMPUS / ORIGINAL FOOTAGE</span><button class="icon-btn close-dialog" aria-label="Close film">${icon('x')}</button></div><video controls playsinline preload="none" poster="/media/entrance.webp"><source src="/media/campus.mp4" type="video/mp4" /></video></dialog>
   <dialog id="about-dialog" class="about-dialog"><div class="dialog-top"><span class="eyebrow">ABOUT THE PORTRAIT</span><button class="icon-btn close-dialog" aria-label="Close about">${icon('x')}</button></div><h2>Built around<br><em>a real place.</em></h2><p>Department of Instrument Technology.<br>Andhra University, Visakhapatnam.</p><p>This independent architectural portrait is reconstructed from the supplied campus photographs, video, and footprint. The blue structural frame, open corridors, entrance, and different wing heights follow those references.</p><p>Geometry is constructed directly in Three.js. Dimensions, hidden elevations, planting, and materials are interpreted; this is not a measured survey or a photogrammetric scan.</p><a href="https://www.google.com/maps/search/?api=1&query=Andhra+University+Department+of+Instrument+Technology" target="_blank" rel="noopener" class="text-btn">Find the department ${icon('arrow-up-right')}</a><div class="credits">Original photographs & footage supplied by the project owner. Sky lighting: <a href="https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky" target="_blank" rel="noopener">Poly Haven / CC0</a>.</div></dialog>`;
-$('#about').insertAdjacentHTML('afterend', `<button id="sound" class="icon-btn" aria-label="Ambient sound" aria-pressed="false" data-tip="Ambient sound">${icon('volume-x')}</button>`);
+$('#about').insertAdjacentHTML('afterend', `<button id="sound" class="icon-btn" aria-label="Mute ambient sound" aria-pressed="true" data-tip="Mute ambient sound">${icon('volume-2')}</button>`);
 $('#light-panel').insertAdjacentHTML('beforeend', '<label class="range-label" for="ambient-volume">Ambient volume <output id="volume-output">40%</output></label><input id="ambient-volume" type="range" min="0" max="100" value="40" step="1"/>');
 refreshIcons();
 const sound = createAmbience();
+function updateSoundButton() {
+  const active = sound.enabled;
+  $('#sound').setAttribute('aria-pressed', active);
+  $('#sound').setAttribute('aria-label', active ? 'Mute ambient sound' : 'Unmute ambient sound');
+  $('#sound').dataset.tip = active ? 'Mute ambient sound' : 'Unmute ambient sound';
+  $('#sound').innerHTML = icon(active ? 'volume-2' : 'volume-x');
+  refreshIcons();
+}
+let soundActivationBound = true;
+function resumeDefaultSound() {
+  if (!soundActivationBound || !sound.enabled) return;
+  sound.setEnabled(true).then(() => {
+    if (sound.context?.state === 'running') {
+      soundActivationBound = false;
+      document.removeEventListener('pointerdown', resumeDefaultSound, true);
+      document.removeEventListener('keydown', resumeDefaultSound, true);
+    }
+  }).catch(() => {});
+}
+document.addEventListener('pointerdown', resumeDefaultSound, true);
+document.addEventListener('keydown', resumeDefaultSound, true);
 
 let renderer;
 try {
@@ -227,6 +248,9 @@ async function boot() {
     glass.forEach(material => { material.visible = true; });
     probe.dispose(); reflectionFilter.dispose();
   }
+  const defaultAudio = sound.setEnabled(true);
+  updateSoundButton();
+  defaultAudio.then(updateSoundButton).catch(updateSoundButton);
   ready = true; window.__portrait.ready = true;
   renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
   drawPlan(); resize(); requestAnimationFrame(animate);
@@ -296,8 +320,7 @@ $('#sound').onclick = async () => {
   $('#sound').disabled = true;
   try {
     await sound.setEnabled(!sound.enabled);
-    $('#sound').setAttribute('aria-pressed', sound.enabled);
-    $('#sound').innerHTML = icon(sound.enabled ? 'volume-2' : 'volume-x'); refreshIcons();
+    updateSoundButton();
   } catch { toast('Ambient sound could not start. Please try again.'); }
   finally { $('#sound').disabled = false; }
 };

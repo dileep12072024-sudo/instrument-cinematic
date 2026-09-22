@@ -20,7 +20,7 @@ npm run deploy
 - `src/architecture.js`: original Three.js geometry for the asymmetrical H footprint, two- and three-level wings, entrance canopy, windows, ventilation screens, grilles, doors, perimeter trees and paths. Static geometry is merged by material; foliage and ground debris are instanced. The courtyard is clear of vehicles and the two foreground trees; the east folding gate occupies the short return beside the wing windows.
 - `src/main.js`: damped orbit controls, four viewpoints, spline camera journey, continuous daylight controls, opening doors, photo export, footprint view, gallery and original video.
 - The rear ground floor is closed; upper windows retain scene reflections. The front canopy retains its original dimensions without freestanding pillars. The rear canopy has half its depth, and entrance doors open inward through 180 degrees.
-- `src/ambience.js`: recorded birdsong mixed with quiet synthesized wind and leaf rustle, with volume control and a crossfaded loop. Audio loads on user activation and pauses when the tab is hidden or the original video is open.
+- `src/ambience.js`: recorded birdsong mixed with quiet synthesized wind and leaf rustle, with volume control and a crossfaded loop. Ambient sound is on by default and the top-bar control mutes it; browsers that suspend autoplay resume it on the first interaction. Sound pauses when the tab is hidden or the original video is open.
 - `src/style.css`: responsive full-screen layout, self-hosted fonts, dialogs and reduced-motion support.
 - `scripts/prepare-media.mjs`: reproducible local reference-image conversion. Originals remain untouched.
 - `scripts/check-site.mjs`: browser interaction, media, canvas-pixel and responsive checks.

@@ -1,5 +1,5 @@
 export function createAmbience() {
-  let context, master, birds, enabled = false, muted = false, volume = .4;
+  let context, master, birds, birdPromise, enabled = false, muted = false, volume = .4;
 
   function prepare() {
     context = new AudioContext();
@@ -67,8 +67,14 @@ export function createAmbience() {
   return {
     async setEnabled(value) {
       enabled = value;
-      try { if (enabled && !context) prepare(); await sync(); if (enabled && !birds) await prepareBirds(); }
-      catch (error) { enabled = false; await context?.close(); context = null; birds = null; throw error; }
+      try {
+        if (enabled && !context) prepare();
+        await sync();
+        if (enabled && !birds) {
+          birdPromise ||= prepareBirds().finally(() => { birdPromise = null; });
+          await birdPromise;
+        }
+      } catch (error) { enabled = false; await context?.close(); context = null; birds = null; birdPromise = null; throw error; }
     },
     setVolume(value) {
       volume = Math.max(0, Math.min(1, value));
