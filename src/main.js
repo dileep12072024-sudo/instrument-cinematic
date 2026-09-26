@@ -115,7 +115,19 @@ sun.position.set(-34, 39, 30); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -55; sun.shadow.camera.right = 55; sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40; sun.shadow.camera.far = 180;
 sun.shadow.normalBias = .05; sun.shadow.bias = -.00015; sun.shadow.radius = 3; scene.add(sun);
 const ambient = new THREE.HemisphereLight('#e4eff7', '#77654c', 1.25); scene.add(ambient);
-const entranceLight = new THREE.PointLight('#ffdca0', 0, 18, 2); entranceLight.position.set(0, 3.2, 9); scene.add(entranceLight);
+const entranceLight = new THREE.PointLight('#fff0cc', 0, 14, 2);
+entranceLight.name = 'Entrance tube light';
+entranceLight.position.set(0, 3.30, 7.32);
+entranceLight.castShadow = true;
+entranceLight.shadow.mapSize.set(512, 512);
+entranceLight.shadow.camera.near = .025;
+entranceLight.shadow.camera.far = 14;
+entranceLight.shadow.bias = -.00003;
+entranceLight.shadow.normalBias = .008;
+// Static canopy occlusion needs a new cube map only when the doors move.
+entranceLight.shadow.autoUpdate = false;
+entranceLight.shadow.needsUpdate = true;
+scene.add(entranceLight);
 const litWindows = [];
 const warm = new THREE.MeshStandardMaterial({ color: '#f1d6a7', emissive: '#ffbd6a', emissiveIntensity: 0, transparent: true, opacity: 0, depthWrite: false });
 for (const x of [-2, 2]) {
@@ -123,10 +135,10 @@ for (const x of [-2, 2]) {
 }
 const defaultPixelRatio = () => Math.min(devicePixelRatio, small() ? 1.4 : 1.65);
 const frameSamples = [];
-// Instrument Technology location in AU's published rainwater harvesting survey.
-const LOCATION = { latitude: 17 + 43 / 60 + 44 / 3600, longitude: 83 + 19 / 60 + 25 / 3600, timezone: 'Asia/Kolkata', label: 'ANDHRA UNIVERSITY / VISAKHAPATNAM' };
+// Live weather point supplied for the Andhra University campus.
+const LOCATION = { latitude: 17.6801, longitude: 83.2016, timezone: 'Asia/Kolkata', label: 'ANDHRA UNIVERSITY / VISAKHAPATNAM' };
 const WEATHER_RAIN_CODES = new Set([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99]);
-const weatherState = { loaded: false, stale: false, rainFactor: 0, storm: false, windSpeed: 0, code: null, temperature: null, cloudCover: 0, summary: 'SYNCING WEATHER', updatedAt: 0, observedAt: 0, forecast: '' };
+const weatherState = { loaded: false, stale: false, rainFactor: 0, storm: false, windSpeed: 0, code: null, temperature: null, cloudCover: 0, summary: 'SYNCING WEATHER', updatedAt: 0, observedAt: 0, sunrise: null, sunset: null, moonrise: null, moonset: null, forecast: '' };
 const moonState = { phase: 0, illumination: 0, label: 'MOON', updatedAt: 0 };
 let sunlight = solarState(new Date(), LOCATION);
 let liveClock = true;
@@ -189,6 +201,7 @@ function updateWetMaterials() {
   const wet = weatherState.rainFactor;
   if (!landscape) return;
   landscape.groundMaterial.roughness = THREE.MathUtils.lerp(.95, .58, wet);
+  landscape.soilMaterial.roughness = THREE.MathUtils.lerp(.95, .58, wet);
   landscape.pavingMaterial.roughness = THREE.MathUtils.lerp(.95, .25, wet);
   if (architecture) {
     architecture.materials.paving.roughness = THREE.MathUtils.lerp(.9, .3, wet);
@@ -200,7 +213,13 @@ function updateWetMaterials() {
 let weatherRetry;
 async function loadWeather() {
   clearTimeout(weatherRetry);
-  const params = new URLSearchParams({ latitude: LOCATION.latitude, longitude: LOCATION.longitude, current: 'temperature_2m,precipitation,rain,showers,weather_code,cloud_cover,wind_speed_10m', hourly: 'precipitation_probability,weather_code', timeformat: 'unixtime', timezone: LOCATION.timezone, forecast_days: '2' });
+  const params = new URLSearchParams({
+    latitude: LOCATION.latitude, longitude: LOCATION.longitude,
+    current: 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,wind_speed_10m,wind_direction_10m,wind_gusts_10m,rain,precipitation,showers,snowfall,weather_code,cloud_cover,pressure_msl,surface_pressure',
+    daily: 'weather_code,temperature_2m_min,temperature_2m_max,sunrise,sunset,rain_sum,showers_sum,precipitation_sum,precipitation_hours,precipitation_probability_max,sunshine_duration,daylight_duration,moonrise,moon_phase,moonset,apparent_temperature_max,apparent_temperature_min,uv_index_max,wind_speed_10m_max,wind_gusts_10m_max,wind_direction_10m_dominant',
+    hourly: 'temperature_2m,showers,rain,precipitation,precipitation_probability,relative_humidity_2m,apparent_temperature,weather_code,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day,sunshine_duration',
+    timeformat: 'unixtime', timezone: 'auto', past_days: '2', forecast_days: '7'
+  });
   try {
     const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { mode: 'cors', cache: 'no-store', signal: AbortSignal.timeout(30000) });
     if (!response.ok) throw new Error(`weather ${response.status}`);
@@ -214,10 +233,19 @@ async function loadWeather() {
     weatherState.rainFactor = wet ? THREE.MathUtils.clamp(.35 + precip * .14 + rainNow * .22 + showers * .16, .35, 1) : 0;
     weatherState.summary = weatherState.storm ? 'THUNDERSTORM' : wet ? 'RAIN' : [45, 48].includes(code) ? 'FOG' : weatherState.cloudCover > 72 ? 'OVERCAST' : weatherState.cloudCover > 35 ? 'PARTLY CLOUDY' : 'CLEAR'; weatherState.updatedAt = Date.now();
     if (wet) weatherState.cloudCover = Math.max(weatherState.cloudCover, 75);
+    const daily = data.daily;
+    const dayIndex = daily?.time?.reduce((best, day, index, days) => Math.abs(day * 1000 - Date.now()) < Math.abs(days[best] * 1000 - Date.now()) ? index : best, 0) ?? -1;
+    if (daily && dayIndex >= 0) {
+      weatherState.sunrise = Number.isFinite(daily.sunrise?.[dayIndex]) ? daily.sunrise[dayIndex] * 1000 : null;
+      weatherState.sunset = Number.isFinite(daily.sunset?.[dayIndex]) ? daily.sunset[dayIndex] * 1000 : null;
+      weatherState.moonrise = Number.isFinite(daily.moonrise?.[dayIndex]) ? daily.moonrise[dayIndex] * 1000 : null;
+      weatherState.moonset = Number.isFinite(daily.moonset?.[dayIndex]) ? daily.moonset[dayIndex] * 1000 : null;
+    }
     const forecast = data.hourly;
     const next = forecast?.time?.map((t, i) => ({ t, chance: forecast.precipitation_probability?.[i], code: forecast.weather_code?.[i] })).filter(v => v.t * 1000 >= Date.now() && v.t * 1000 < Date.now() + 6 * 3600000) || [];
     const chances = next.map(v => v.chance).filter(Number.isFinite);
-    const risk = chances.length ? Math.max(...chances) : null;
+    const dailyRisk = Number.isFinite(data.daily?.precipitation_probability_max?.[dayIndex]) ? data.daily.precipitation_probability_max[dayIndex] : null;
+    const risk = chances.length ? Math.max(...chances, dailyRisk ?? 0) : dailyRisk;
     weatherState.forecast = risk == null ? 'Forecast unavailable' : `Next 6 hours: ${risk}% maximum hourly rain chance.${risk >= 50 ? ' An umbrella is advisable.' : ''}${next.some(v => [95, 96, 99].includes(v.code)) ? ' Thunderstorms possible.' : ''}`;
     updateWetMaterials(); updateLighting(hour); updateWeatherLabel();
   } catch {
@@ -429,7 +457,10 @@ function animate(now) {
     const a = doorsOpen ? d.openAngle : 0;
     if (Math.abs(d.pivot.rotation.y - a) > .001) {
       d.pivot.rotation.y = reduced ? a : THREE.MathUtils.damp(d.pivot.rotation.y, a, 5, dt); needsRender = true;
-      if (Math.abs(d.pivot.rotation.y - a) < .002) renderer.shadowMap.needsUpdate = true;
+      if (Math.abs(d.pivot.rotation.y - a) < .002) {
+        renderer.shadowMap.needsUpdate = true;
+        entranceLight.shadow.needsUpdate = true;
+      }
     }
   }
   // Orbit speed follows wall time, including slower devices; damping is for pointer input.

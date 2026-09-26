@@ -39,8 +39,21 @@ function noiseMap(base, repeat, paving = false) {
     x.fillRect(random() * 512, random() * 512, 1 + random() * 2, 1 + random() * 2);
   }
   if (paving) {
-    x.strokeStyle = '#696b6355'; x.lineWidth = 2;
-    for (let y = 0; y < 512; y += 64) for (let xx = (y % 128 ? -64 : 0); xx < 512; xx += 128) x.strokeRect(xx, y, 128, 64);
+    for (let i = 0; i < 110; i++) {
+      x.fillStyle = i % 3 ? '#454b3b08' : '#d8ceae10';
+      x.beginPath(); x.ellipse(random() * 512, random() * 512, 12 + random() * 55, 5 + random() * 30, random() * 6, 0, Math.PI * 2); x.fill();
+    }
+    x.strokeStyle = '#55564c65'; x.lineWidth = 1.4;
+    for (const start of [0, 256, 512]) {
+      x.beginPath(); x.moveTo(start, 0); x.lineTo(start, 512); x.stroke();
+      x.beginPath(); x.moveTo(0, start); x.lineTo(512, start); x.stroke();
+    }
+    for (let i = 0; i < 10; i++) {
+      let px = random() * 512, py = random() * 512;
+      x.lineWidth = .6 + random(); x.beginPath(); x.moveTo(px, py);
+      for (let j = 0; j < 7; j++) { px += (random() - .4) * 20; py += random() * 20; x.lineTo(px, py); }
+      x.stroke();
+    }
   }
   return texture(c, repeat);
 }
@@ -95,6 +108,7 @@ export function buildArchitecture(scene) {
   m.upperDoorPanel = m.entranceWood.clone(); m.upperDoorPanel.color.set('#dac98b');
   m.screen = mat('#d5d0bd', { name: 'Pierced concrete screens', map: plasterMap, bumpMap: plasterMap, bumpScale: .018 });
   m.gate = mat('#65777b', { name: 'East folding gate', metalness: .7, roughness: .46 });
+  m.westGate = m.gate.clone(); m.westGate.name = 'West folding gate';
   m.paving.bumpMap = m.paving.map;
   const batches = new Map(), matrix = new T.Matrix4(), quaternion = new T.Quaternion();
   const screenTemplates = new Map();
@@ -103,34 +117,37 @@ export function buildArchitecture(scene) {
     if (!screenTemplates.has(key)) {
       const shape = new T.Shape();
       shape.moveTo(-w / 2, -h / 2); shape.lineTo(w / 2, -h / 2); shape.lineTo(w / 2, h / 2); shape.lineTo(-w / 2, h / 2); shape.closePath();
-      const cols = 15, rows = 12, cw = w / cols, ch = h / rows;
+      const cols = 16, rows = 11, cw = w / cols, ch = h / rows;
       const hole = (left, bottom, width, height) => {
-        const p = new T.Path(); p.moveTo(left, bottom); p.lineTo(left, bottom + height); p.lineTo(left + width, bottom + height); p.lineTo(left + width, bottom); p.closePath(); shape.holes.push(p);
+        const p = new T.Path(), chip = Math.min(width, height) * .075;
+        p.moveTo(left, bottom); p.lineTo(left + chip, bottom + height * .52); p.lineTo(left, bottom + height);
+        p.lineTo(left + width * .58, bottom + height - chip); p.lineTo(left + width, bottom + height);
+        p.lineTo(left + width - chip, bottom + height * .35); p.lineTo(left + width, bottom); p.closePath(); shape.holes.push(p);
       };
       for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
         // Alternating narrow slots interrupt the horizontal openings, as in the concrete blocks.
-        if ((row === 5 || row === 6) && col >= 5 && col <= 9) continue;
-        const narrow = (col + (row < 6 ? 0 : 2)) % 5 === 3;
+        if (row === 4 && col >= 5 && col <= 9) continue;
+        const narrow = col === 3 || col === 4 || col === 11 || col === 12;
         const inset = narrow ? cw * .32 : cw * .14;
         const wear = Math.sin(row * 9.3 + col * 5.7) * .006;
         hole(-w / 2 + col * cw + inset, -h / 2 + row * ch + ch * .22 + wear, cw - 2 * inset, ch * .55);
       }
-      hole(-w / 2 + 5 * cw + .04, -ch + .04, 5 * cw - .08, 2 * ch - .08);
+      hole(-w / 2 + 5 * cw + .02, -h / 2 + 4 * ch + .015, 5 * cw - .04, ch - .025);
       const geo = new T.ExtrudeGeometry(shape, { depth: .2, bevelEnabled: false, steps: 1, curveSegments: 1 });
       geo.translate(0, 0, -.07); screenTemplates.set(key, geo);
     }
     const geo = screenTemplates.get(key).clone(); geo.translate(x, y, 0); geo.applyMatrix4(transform);
     if (!batches.has(m.screen)) batches.set(m.screen, []); batches.get(m.screen).push(geo);
     // Small sloping sill in the wider central ventilation slot.
-    const sill = new T.BoxGeometry(w / 3 - .08, .04, .24).toNonIndexed(); sill.rotateX(.25); sill.translate(x, y - h / 12 + .04, .025); sill.applyMatrix4(transform);
+    const slotY = -h / 11, sill = new T.BoxGeometry(w * 5 / 16 - .04, .035, .24).toNonIndexed(); sill.rotateX(.25); sill.translate(x - w / 32, y + slotY - h / 22, .025); sill.applyMatrix4(transform);
     batches.get(m.screen).push(sill);
     // Raised A U forms within the central ventilation slot.
-    const letter = (points, radius = .025) => {
-      const curve = new T.CatmullRomCurve3(points.map(([px, py]) => new T.Vector3(x + px, y + py, .06)), false, 'centripetal');
+    const letter = (points, radius = .028) => {
+      const curve = new T.CatmullRomCurve3(points.map(([px, py]) => new T.Vector3(x + px - w / 32, y + py + slotY, .06)), false, 'centripetal');
       const geo = new T.TubeGeometry(curve, 16, radius, 5, false); geo.applyMatrix4(transform);
       if (!batches.has(m.blue)) batches.set(m.blue, []); batches.get(m.blue).push(geo);
     };
-    const lh = h / 7, lx = w / 9;
+    const lh = h / 13, lx = w / 12;
     letter([[-lx * 1.6, -lh * .35], [-lx, lh * .5], [-lx * .4, -lh * .35]]);
     letter([[-lx * 1.35, 0], [-lx * .65, 0]]);
     letter([[lx * .3, lh * .5], [lx * .4, -lh * .2], [lx, -lh * .3], [lx * 1.5, -lh * .2], [lx * 1.6, lh * .5]]);
@@ -140,24 +157,38 @@ export function buildArchitecture(scene) {
     if (parent) geo.applyMatrix4(parent);
     if (!batches.has(material)) batches.set(material, []); batches.get(material).push(geo);
   }
+  function ramp(x, z, w, d, h, material, parent) {
+    // A triangular prism keeps the gate threshold flush with the surrounding ground.
+    const hw = w / 2, vertices = new Float32Array([
+      -hw, 0, 0, hw, 0, 0, -hw, 0, d, hw, 0, d,
+      -hw, h, 0, hw, h, 0,
+    ]);
+    const indices = [0, 2, 1, 1, 2, 3, 0, 1, 5, 0, 5, 4, 2, 4, 5, 2, 5, 3, 0, 4, 2, 1, 3, 5];
+    const uv = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0]);
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(vertices, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(indices); geo.translate(x, 0, z); geo.applyMatrix4(parent); geo.computeVertexNormals();
+    if (!batches.has(material)) batches.set(material, []); batches.get(material).push(geo);
+  }
   function face(cx, cz, rotation, width, height, bays, type, closedGround = false) {
     const transform = new T.Matrix4().compose(new T.Vector3(cx, 0, cz), quaternion.setFromAxisAngle(new T.Vector3(0, 1, 0), rotation), new T.Vector3(1, 1, 1));
     const b = (x, y, z, w, h, d, material) => box(x, y, z, w, h, d, material, transform);
     const floors = Math.round((height - 1.4) / 4), floorH = (height - 1.4) / floors, bay = width / bays;
-    const tower = type.startsWith('tower') || type === 'east-wing';
+    const westOuter = type === 'west-end' || type === 'west-outer';
+    const westWindow = type === 'west' || westOuter;
+    const tower = type.startsWith('tower') || type === 'east-wing' || westOuter;
     const corridor = type === 'corridor' || type === 'gate-return';
     for (let f = 0; f < floors; f++) {
       // The entrance is an actual opening, not doors placed over a solid ground-floor wall.
       if (type === 'tower-front' && f === 0) continue;
       const y = f * floorH, openingY = y + (f === 0 ? 1.9 : 2.55), openingH = f === 0 ? 2.15 : 1.9;
-      const hasGate = type === 'gate-return' && f === 0;
+      const hasGate = (type === 'gate-return' || type === 'west-end') && f === 0;
+      const gateMaterial = type === 'west-end' ? m.westGate : m.gate;
       if (!hasGate) b(0, y + (openingY - openingH / 2 - y) / 2, 0, width, openingY - openingH / 2 - y, .32, m.wall);
       const high = openingY + openingH / 2;
       b(0, (high + y + floorH) / 2, 0, width, y + floorH - high, .32, m.wall);
       for (let j = 0; j < bays; j++) {
         const x = -width / 2 + bay * (j + .5), ow = bay - .6;
         const worldZ = cz - Math.sin(rotation) * x;
-        const solid = f === 0 && (closedGround === true || closedGround === 'rear-half' && worldZ < -3.25);
+        const solid = closedGround === 'all' || f === 0 && (closedGround === true || closedGround === 'rear-half' && worldZ < -3.25);
         const glass = closedGround === true || worldZ < -3.25 ? m.rearGlass : m.glass;
         const lattice = type === 'low-corridor' || corridor && f < floors - 1 || type === 'west' && f === 0;
         b(x - bay / 2, y + floorH / 2, 0, .6, floorH, .32, m.wall);
@@ -165,19 +196,19 @@ export function buildArchitecture(scene) {
         if (hasGate && j === bays - 1) {
           const gateBottom = .16, gateTop = high, gateHeight = gateTop - gateBottom;
           b(x, (gateTop + gateBottom) / 2, -.4, ow, gateHeight, .06, m.dark);
-          for (const s of [-1, 1]) b(x + s * (ow / 2 - .04), (gateTop + gateBottom) / 2, .08, .08, gateHeight, .12, m.gate);
-          for (const yy of [gateBottom, gateTop]) b(x, yy, .08, ow, .08, .12, m.gate);
-          for (let k = 1; k < 15; k++) b(x - ow / 2 + k * ow / 15, (gateTop + gateBottom) / 2, .07, .018, gateHeight, .04, m.gate);
+          for (const s of [-1, 1]) b(x + s * (ow / 2 - .04), (gateTop + gateBottom) / 2, .08, .08, gateHeight, .12, gateMaterial);
+          for (const yy of [gateBottom, gateTop]) b(x, yy, .08, ow, .08, .12, gateMaterial);
+          const bars = Math.round(ow / .18);
+          for (let k = 1; k < bars; k++) b(x - ow / 2 + k * ow / bars, (gateTop + gateBottom) / 2, .07, .022, gateHeight, .04, gateMaterial);
           for (const slope of [-3, 3]) for (let offset = -gateHeight / 2 - ow * 1.5; offset <= gateHeight / 2 + ow * 1.5; offset += .85) {
             const a = (-gateHeight / 2 - offset) / slope, c = (gateHeight / 2 - offset) / slope;
             const lo = Math.max(-ow / 2, Math.min(a, c)), hi = Math.min(ow / 2, Math.max(a, c));
             if (hi <= lo) continue;
             const mid = (lo + hi) / 2, geo = new T.BoxGeometry((hi - lo) * Math.sqrt(10), .025, .045);
             geo.rotateZ(Math.atan(slope)); geo.translate(x + mid, (gateTop + gateBottom) / 2 + slope * mid + offset, .1); geo.applyMatrix4(transform);
-            if (!batches.has(m.gate)) batches.set(m.gate, []); batches.get(m.gate).push(geo);
+            if (!batches.has(gateMaterial)) batches.set(gateMaterial, []); batches.get(gateMaterial).push(geo);
           }
-          b(x, .1, .6, ow, .16, 1.15, m.brick);
-          b(x, .19, 1.17, ow, .035, .1, mat('#c2aa52'));
+          ramp(x, .08, ow, 1.2, .16, m.paving, transform);
           b(x, 3.12, .45, bay, .16, 1.15, m.trim);
         } else if (solid) {
           b(x, openingY, 0, ow, openingH, .32, m.wall);
@@ -203,8 +234,9 @@ export function buildArchitecture(scene) {
           b(x, openingY - openingH / 2 + .52, .04, ow, .045, .05, m.metal);
           for (let k = -1; k <= 1; k++) b(x + k * ow / 3, openingY - openingH / 2 + .34, .04, .04, .48, .05, m.metal);
         } else {
-          const ww = type === 'west' ? ow - .25 : Math.min(ow - .4, type === 'east-wing' ? 1.85 : tower ? 2.8 : 2.0), wh = openingH - .13;
-          const windowFrame = type === 'west' ? m.entranceWood : m.frame;
+          if (hasGate) b(x, (openingY - openingH / 2) / 2, 0, ow, openingY - openingH / 2, .32, m.wall);
+          const ww = westWindow ? ow - .25 : Math.min(ow - .4, type === 'east-wing' ? 1.85 : tower ? 2.8 : 2.0), wh = openingH - .13;
+          const windowFrame = westWindow && f > 0 ? m.entranceWood : m.frame;
           const side = (ow - ww) / 2;
           for (const s of [-1, 1]) b(x + s * (ww + side) / 2, openingY, 0, side, openingH, .32, m.wall);
           b(x, openingY, -.19, ww, wh, .05, glass);
@@ -213,7 +245,7 @@ export function buildArchitecture(scene) {
             b(x + s * ww / 2, openingY, .005, .085, wh, .12, windowFrame);
             b(x, openingY + s * wh / 2, .005, ww + .1, .08, .12, windowFrame);
           }
-          if (type === 'west') {
+          if (westWindow) {
             for (const s of [-1, 1]) {
               b(x + s * ww / 6, openingY, .015, .075, wh, .13, windowFrame);
               b(x, openingY + s * wh / 6, .015, ww, .065, .13, windowFrame);
@@ -222,7 +254,7 @@ export function buildArchitecture(scene) {
             b(x, openingY, .015, .065, wh, .13, windowFrame);
             for (const s of type === 'east-wing' ? [-1, 1] : [0]) b(x, openingY + s * wh / 6, .015, ww, .05, .13, windowFrame);
           }
-          const grilleZ = type === 'west' || type === 'east-wing' ? -.04 : .09;
+          const grilleZ = westWindow || type === 'east-wing' ? -.04 : .09;
           for (let k = -4; k <= 4; k++) b(x + k * ww / 10, openingY, grilleZ, .015, wh, .018, m.metal);
           for (let k = -3; k <= 3; k++) b(x, openingY + k * wh / 8, grilleZ, ww, .014, .018, m.metal);
           b(x, openingY - wh / 2 - .065, .13, ww + .25, .12, .55, m.trim);
@@ -241,8 +273,8 @@ export function buildArchitecture(scene) {
       b(width / 2, y + floorH / 2, 0, .6, floorH, .32, m.wall);
       b(width / 2, y + floorH / 2, .05, .3, floorH, .45, m.blue);
       if (f !== 0 || type !== 'west' && type !== 'east-wing') b(0, y + floorH - .1, .1, width + .24, .19, .63, m.trim);
-      if (f === 0) b(0, y + floorH + .45, .19, width, .35, .075, m.blue);
-      if (f === 0 && (type === 'west' || type === 'east-wing')) b(0, 3.15, .38, width + .25, .14, 1.05, m.trim);
+      if (f === 0 && !westOuter) b(0, y + floorH + .45, .19, width, .35, .075, m.blue);
+      if (f === 0 && (westWindow || type === 'east-wing')) b(0, 3.15, .38, width + .25, .14, 1.05, m.trim);
     }
     const roofY = height - 1.4;
     b(0, roofY + .7, 0, width, 1.4, .32, m.wall);
@@ -254,13 +286,15 @@ export function buildArchitecture(scene) {
       for (let k = -2; k <= 2; k++) b(x + k * .1, roofY + .58, .2, .035, .26, .02, m.dark);
     }
     if (type !== 'tower-front' && type !== 'gate-return') {
-      const geo = new T.PlaneGeometry(width - .35, .8); geo.translate(0, .4, .168); geo.applyMatrix4(transform);
+      const gateInset = type === 'west-end' ? bay : 0;
+      const geo = new T.PlaneGeometry(width - gateInset - .35, .8); geo.translate(-gateInset / 2, .4, .168); geo.applyMatrix4(transform);
       if (!batches.has(m.weather)) batches.set(m.weather, []); batches.get(m.weather).push(geo);
     }
   }
   function block(x, z, w, d, h, bays, type) {
-    face(x, z + d / 2, 0, w, h, bays, type === 'tower' ? 'tower-front' : type);
-    face(x, z - d / 2, Math.PI, w, h, bays, 'room', true);
+    face(x, z + d / 2, 0, w, h, bays, type === 'tower' ? 'tower-front' : type === 'west' ? 'west-end' : type);
+    const rearBays = type === 'tower' ? 3 : bays;
+    face(x, z - d / 2, Math.PI, w, h, rearBays, type === 'west' ? 'west-outer' : 'room', type === 'tower' || type.includes('corridor'));
     if (!type.includes('corridor')) {
       for (const side of [-1, 1]) {
         const innerWing = type === 'west' && side === 1 || type === 'room' && x > 20 && side === -1;
@@ -270,12 +304,12 @@ export function buildArchitecture(scene) {
             face(x + w / 2, z + (d / 2 + 3.25) / 2, Math.PI / 2, length, h, 3, 'west');
           } else {
             // The gate faces into the courtyard on the short return, beside the room windows.
-            const gateWidth = 3.3, roomStart = 3.25 + gateWidth;
+            const gateWidth = 4.6, roomStart = 3.25 + gateWidth;
             face(x - w / 2, z + 3.25 + gateWidth / 2, -Math.PI / 2, gateWidth, h, 1, 'gate-return');
             face(x - w / 2, z + (d / 2 + roomStart) / 2, -Math.PI / 2, length - gateWidth, h, 2, 'east-wing');
           }
           face(x + side * w / 2, z + (3.25 - d / 2) / 2, side * Math.PI / 2, d / 2 + 3.25, h, Math.max(2, Math.round((d / 2 + 3.25) / 3.5)), 'room', 'rear-half');
-        } else face(x + side * w / 2, z, side * Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'west' ? 'west' : 'room', 'rear-half');
+        } else face(x + side * w / 2, z, side * Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'west' ? 'west-outer' : 'room', type === 'tower' ? 'all' : false);
       }
     }
     box(x, .02, z, w, .18, d, m.roof);
@@ -283,6 +317,23 @@ export function buildArchitecture(scene) {
     box(x, h - 1.4, z, w + .35, .2, d + .35, m.roof);
   }
   for (const p of footprint) block(p.x, p.z, p.width, p.depth, p.height, p.bays, p.type);
+  // Outdoor condensers sit on the narrow ledge of the right-hand outer elevation.
+  const acCase = mat('#d4d1c2', { name: 'Right canopy AC casings', map: plasterMap, metalness: .2 });
+  box(31.42, 3.15, 0, 1.15, .15, 33.3, m.trim);
+  for (const [z, width, height] of [[-11, .95, .9], [-6.6, 1.05, 1.15], [-2.1, .9, 1.0], [2.5, 1.1, 1.2], [7.1, .9, .95], [11.7, 1.02, 1.12]]) {
+    const y = 3.29 + height / 2;
+    box(31.46, y, z, .48, height, width, acCase);
+    box(31.71, y, z, .015, height * .77, width * .77, m.dark);
+    const fan = new T.RingGeometry(height * .25, height * .27, 28);
+    fan.rotateY(Math.PI / 2); fan.translate(31.735, y, z);
+    if (!batches.has(m.metal)) batches.set(m.metal, []); batches.get(m.metal).push(fan);
+    for (let i = -4; i <= 4; i++) box(31.75, y + i * height * .078, z, .025, .018, width * .8, acCase);
+    for (const side of [-1, 1]) {
+      box(31.45, 3.26, z + side * width * .33, .64, .07, .06, m.metal);
+      box(31.13, 3.64, z + side * width * .33, .07, .72, .055, m.metal);
+    }
+    box(31.18, y + .5, z + width * .58, .07, 1.1, .055, m.trim);
+  }
   box(0, .04, 8.5, 10, .18, 5.2, m.paving);
   box(0, 3.55, 8.8, 10, .24, 4, m.wall);
   box(0, 3.7, 10.8, 10.1, .48, .18, mat('#1287b7'));
@@ -364,7 +415,7 @@ export function buildLandscape(scene) {
   const group = new T.Group(); group.name = 'Courtyard and planting'; scene.add(group);
   const mat = (color, opts = {}) => new T.MeshStandardMaterial({ color, roughness: .95, ...opts });
   const loader = new T.TextureLoader();
-  const earthMap = loader.load('/media/earth.jpg'); earthMap.colorSpace = T.SRGBColorSpace; earthMap.wrapS = earthMap.wrapT = T.RepeatWrapping; earthMap.repeat.set(330, 330); earthMap.anisotropy = 8;
+  const earthMap = loader.load('/media/earth.jpg'); earthMap.colorSpace = T.SRGBColorSpace; earthMap.wrapS = earthMap.wrapT = T.RepeatWrapping; earthMap.repeat.set(1000, 1000); earthMap.anisotropy = 8;
   const earthNormal = loader.load('/media/earth-normal.jpg'); earthNormal.wrapS = earthNormal.wrapT = T.RepeatWrapping; earthNormal.repeat.copy(earthMap.repeat); earthNormal.anisotropy = 4;
   const groundMat = mat('#c4ad8b', { map: earthMap, normalMap: earthNormal, normalScale: new T.Vector2(.6, .6) });
   const slope = z => T.MathUtils.clamp((z - 11) / 25, 0, 1) * .45;
@@ -374,10 +425,21 @@ export function buildLandscape(scene) {
   for (let i = 0; i < groundPos.count; i++) groundPos.setY(i, groundHeight(groundPos.getZ(i)));
   groundGeo.computeVertexNormals();
   const ground = new T.Mesh(groundGeo, groundMat); ground.receiveShadow = true; group.add(ground);
-  const grassMap = noiseMap('#76805a', 22), grassMat = mat('#9b9d73', { map: grassMap, bumpMap: grassMap, bumpScale: .08 });
-  const grass = new T.Mesh(new T.PlaneGeometry(400, 400), grassMat); grass.rotation.x = -Math.PI / 2; grass.position.set(0, -.12, -219); grass.receiveShadow = true; group.add(grass);
+  const soilMap = earthMap.clone(), soilNormal = earthNormal.clone(); soilMap.repeat.set(60, 60); soilNormal.repeat.set(60, 60);
+  const soilMat = groundMat.clone(); soilMat.map = soilMap; soilMat.normalMap = soilNormal; soilMat.vertexColors = true;
+  const soilGeo = new T.PlaneGeometry(120, 120, 160, 160); soilGeo.rotateX(-Math.PI / 2);
+  const soilPos = soilGeo.attributes.position, soilColors = [], color = new T.Color();
+  for (let i = 0; i < soilPos.count; i++) {
+    const x = soilPos.getX(i), z = soilPos.getZ(i);
+    const edge = T.MathUtils.smoothstep(60 - Math.max(Math.abs(x), Math.abs(z)), 0, 4);
+    const patch = Math.sin(x * .51 + Math.sin(z * .29)) * Math.cos(z * .43) * .5 + .5;
+    soilPos.setY(i, groundHeight(z) + edge * (.005 + patch * .044));
+    color.setRGB(.73 + patch * .27, .67 + patch * .3, .58 + patch * .34); soilColors.push(color.r, color.g, color.b);
+  }
+  soilGeo.setAttribute('color', new T.Float32BufferAttribute(soilColors, 3)); soilGeo.computeVertexNormals();
+  const soil = new T.Mesh(soilGeo, soilMat); soil.name = 'Uneven mottled courtyard earth'; soil.receiveShadow = true; group.add(soil);
   const roadMat = mat('#989a90', { map: noiseMap('#53585a', 20) }); roadMat.bumpMap = roadMat.map; roadMat.bumpScale = .016;
-  const pavingMat = mat('#c5c3b3', { map: noiseMap('#bebeb3', 10, true) });
+  const pavingMat = mat('#c5c3b3', { map: noiseMap('#b3b3a8', 10, true), bumpScale: .018 }); pavingMat.bumpMap = pavingMat.map;
   const curbMat = mat('#c7c4b6'), white = mat('#e3dfcb');
   function box(w, h, d, x, y, z, material) { const m = new T.Mesh(new T.BoxGeometry(w, h, d), material); m.position.set(x, y, z); m.receiveShadow = true; group.add(m); return m; }
   box(64, .12, 6, 0, -.045, 6.3, pavingMat);
@@ -400,7 +462,7 @@ export function buildLandscape(scene) {
   const tileMap = texture(tiles); tileMap.repeat.set(16, 6);
   const tileMat = mat('#ded0c5', { map: tileMap, bumpMap: tileMap, bumpScale: .009 });
   box(9.9, .03, 3.55, 0, .145, 8.95, tileMat).name = 'Pink patterned entrance apron';
-  const treePositions = [[-39, 16, 14], [41, 11, 13], [-43, -10, 14], [44, -15, 12], [-13, -25, 13], [9, -25, 15], [30, -29, 13], [-30, -29, 15]];
+  const treePositions = [[-43, 16, 14], [41, 11, 13], [-45, -10, 14], [44, -15, 12], [-13, -25, 13], [9, -25, 15], [30, -29, 13], [-30, -29, 15]];
   for (let i = 0; i < 26; i++) {
     const a = random() * Math.PI * 2, r = 60 + random() * 50;
     const z = Math.sin(a) * r;
@@ -461,9 +523,21 @@ export function buildLandscape(scene) {
   for (let i = 0; i < 1900; i++) {
     let x = (random() - .5) * 95, z = 10 + random() * 40;
     if (Math.abs(x) < 3 || Math.abs(z - 39) < 3.3) x += x < 0 ? -5 : 5;
-    dummy.position.set(x, -.052 + random() * .01, z); dummy.rotation.set(-Math.PI / 2, 0, random() * 6); dummy.scale.setScalar(.7 + random() * 1.7); dummy.updateMatrix(); debris.setMatrixAt(i, dummy.matrix);
+    const paved = (x < -21 && x > -35 && z < 16) || (x > 21 && x < 32 && z < 17.5);
+    dummy.position.set(x, (paved ? .022 : groundHeight(z) + .06) + random() * .01, z); dummy.rotation.set(-Math.PI / 2, 0, random() * 6); dummy.scale.setScalar(.7 + random() * 1.7); dummy.updateMatrix(); debris.setMatrixAt(i, dummy.matrix);
+    debris.setColorAt(i, new T.Color().setHSL(.07 + random() * .12, .2 + random() * .25, .3 + random() * .25));
   }
   group.add(debris);
+  const stones = new T.InstancedMesh(new T.IcosahedronGeometry(1, 0), mat('#a69f8c'), 280);
+  stones.name = 'Broken verge aggregate';
+  for (let i = 0; i < stones.count; i++) {
+    const side = random() < .5 ? -1 : 1, x = side * (3.2 + random() ** 2 * 19), z = 12 + random() * 23;
+    const size = .035 + random() ** 3 * .18;
+    dummy.position.set(x, groundHeight(z) + .04, z); dummy.rotation.set(random() * 3, random() * 6, random() * 3);
+    dummy.scale.set(size * 1.6, size * .5, size); dummy.updateMatrix(); stones.setMatrixAt(i, dummy.matrix);
+    stones.setColorAt(i, new T.Color().setHSL(.08, .1 + random() * .2, .35 + random() * .3));
+  }
+  stones.receiveShadow = true; group.add(stones);
   const garden = buildReferenceGarden(group, groundHeight, wind);
-  return { group, foliage, wind, garden, groundMaterial: groundMat, pavingMaterial: pavingMat };
+  return { group, foliage, wind, garden, groundMaterial: groundMat, soilMaterial: soilMat, pavingMaterial: pavingMat };
 }

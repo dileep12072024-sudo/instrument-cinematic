@@ -33,10 +33,12 @@ try {
     const rear = group.children.find(mesh => mesh.material === materials.rearGlass);
     const vertices = rear.geometry.attributes.position;
     let lowestWindow = Infinity;
-    for (let i = 0; i < vertices.count; i++) lowestWindow = Math.min(lowestWindow, vertices.getY(i));
+    for (let i = 0; i < vertices.count; i++) {
+      if (Math.abs(vertices.getX(i)) < 21.7) lowestWindow = Math.min(lowestWindow, vertices.getY(i));
+    }
     return { lowestWindow, reflective: !!materials.glass.envMap?.image?.width && !!materials.rearGlass.envMap?.image?.width, separateProbes: materials.glass.envMap !== materials.rearGlass.envMap };
   });
-  assert.ok(facade.lowestWindow > 4, 'Rear windows must start above the solid ground floor');
+  assert.ok(facade.lowestWindow > 4, 'Central rear ground floor remains solid; outer wing rooms have windows');
   assert.ok(facade.reflective && facade.separateProbes, 'Both courtyards must have their own scene reflection');
   const gate = await page.evaluate(() => {
     const a = __portrait.architecture, mesh = a.group.children.find(m => m.material === a.materials.gate);
@@ -45,7 +47,7 @@ try {
     return { min: min.toArray(), max: max.toArray() };
   });
   assert.ok(gate.min[0] > 21.7 && gate.max[0] < 22.2 && gate.max[0] - gate.min[0] < .2, 'Gate must be on the east return plane, facing the courtyard');
-  assert.ok(gate.min[2] > 3.4 && gate.max[2] < 6.6 && gate.max[2] - gate.min[2] > 2.5, 'Gate must sit beside the right-wing windows, not on the long corridor wall');
+  assert.ok(gate.min[2] > 3.4 && gate.max[2] < 7.9 && gate.max[2] - gate.min[2] > 3.9, 'Wider gate must sit beside the right-wing windows, not on the long corridor wall');
   await page.evaluate(() => {
     const motion = document.querySelector('#motion'); motion.checked = false; motion.dispatchEvent(new Event('change'));
     __portrait.camera.position.set(0, 5.5, -42); __portrait.controls.target.set(0, 5, -3); __portrait.controls.update();

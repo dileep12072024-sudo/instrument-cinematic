@@ -11,8 +11,9 @@ export const referenceTrees = [
   { x: -10, z: 30, h: 13, lean: [2.1, .2], spread: 5.8 },
   { x: 10, z: 25, h: 15, lean: [-1.3, .7], spread: 7.2 },
   { x: 18, z: 30, h: 15.5, lean: [-1.7, -.3], spread: 6.5 },
-  { x: -35, z: 4, h: 16, lean: [1.5, .5], spread: 7 },
-  { x: 35, z: 4, h: 16, lean: [-1.5, .2], spread: 6.8 },
+  // Side trees stay clear of the wing corners; their crowns can still shade the walls.
+  { x: -38.5, z: 4, h: 16, lean: [1.1, .5], spread: 5.8 },
+  { x: 38.5, z: 4, h: 16, lean: [-1.1, .2], spread: 5.8 },
 ];
 
 function barkTexture() {
@@ -31,14 +32,14 @@ function barkTexture() {
 
 function leafGeometry() {
   const positions = [], uvs = [], indices = [];
-  for (let i = 0; i <= 2; i++) {
-    const t = i / 2, w = Math.sin(t * Math.PI) * .27;
+  for (let i = 0; i <= 4; i++) {
+    const t = i / 4, w = Math.pow(Math.sin(t * Math.PI), .85) * .23;
     for (const side of [-1, 0, 1]) {
       positions.push(side * w, t, Math.sin(t * Math.PI) * .09 - Math.abs(side) * .035);
       uvs.push((side + 1) / 2, t);
     }
   }
-  for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) {
     const a = i * 3 + j; indices.push(a, a + 3, a + 1, a + 1, a + 3, a + 4);
   }
   const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
@@ -54,16 +55,17 @@ export function buildReferenceGarden(group, groundHeight, wind) {
   function branch(a, b, radius, bend = .15) {
     const mid = a.clone().lerp(b, .5).add(new T.Vector3(bend, 0, -bend * .35));
     const curve = new T.CatmullRomCurve3([a, mid, b]);
-    const geo = new T.TubeGeometry(curve, 5, radius, 7, false);
+    const segments = radius < .02 ? 2 : 6, radial = radius < .02 ? 3 : 7;
+    const geo = new T.TubeGeometry(curve, segments, radius, radial, false);
     const pos = geo.attributes.position;
-    for (let ring = 0; ring <= 5; ring++) {
-      const center = curve.getPointAt(ring / 5), taper = 1 - ring / 5 * .58;
-      for (let j = 0; j <= 7; j++) {
-        const k = ring * 8 + j;
+    for (let ring = 0; ring <= segments; ring++) {
+      const center = curve.getPointAt(ring / segments), taper = 1 - ring / segments * .72;
+      for (let j = 0; j <= radial; j++) {
+        const k = ring * (radial + 1) + j;
         pos.setXYZ(k, center.x + (pos.getX(k) - center.x) * taper, center.y + (pos.getY(k) - center.y) * taper, center.z + (pos.getZ(k) - center.z) * taper);
       }
     }
-    geo.computeVertexNormals(); branches.push(geo);
+    geo.computeVertexNormals(); branches.push(geo); return curve;
   }
   function leaf(position, size, tint = 0) {
     leaves.push({ position, size, rotation: [random() * 2.4 - 1.2, random() * Math.PI * 2, random() * Math.PI * 2], tint });
@@ -76,19 +78,29 @@ export function buildReferenceGarden(group, groundHeight, wind) {
       const angle = root * Math.PI * .4;
       branch(base.clone().add(new T.Vector3(0, .22, 0)), base.clone().add(new T.Vector3(Math.cos(angle) * .9, .025, Math.sin(angle) * .9)), .12, .08);
     }
-    for (let limb = 0; limb < 4; limb++) {
-      const angle = limb * Math.PI * 2 / 4 + random() * 1.2;
+    const limbs = 4 + Math.round(random());
+    for (let limb = 0; limb < limbs; limb++) {
+      const angle = limb * Math.PI * 2 / limbs + random() * 1.2;
       const tip = new T.Vector3(x + lean[0] + Math.cos(angle) * spread * .52, floor + h * (.68 + random() * .13), z + lean[1] + Math.sin(angle) * spread * .52);
       const origin = base.clone().lerp(fork, .72 + random() * .28);
-      branch(origin, tip, h * (.012 + random() * .006), (random() - .5) * 1.6);
-      for (let twig = 0; twig < 12; twig++) {
+      const limbCurve = branch(origin, tip, h * (.012 + random() * .006), (random() - .5) * 1.6);
+      for (let twig = 0; twig < 10; twig++) {
         const a = angle + (random() - .5) * 2.6;
-        const attachment = fork.clone().lerp(tip, .4 + random() * .6);
+        const attachment = limbCurve.getPoint(.35 + random() * .65);
         const end = attachment.clone().add(new T.Vector3(Math.cos(a) * spread * (.2 + random() * .4), (.04 + random() * .15) * h, Math.sin(a) * spread * (.2 + random() * .4)));
-        branch(attachment, end, .03 + random() * .03, .25);
-        for (let spray = 0; spray < 8; spray++) {
-          const center = end.clone().add(new T.Vector3((random() - .5) * 1.9, (random() - .5) * 1.15, (random() - .5) * 1.9));
-          for (let l = 0; l < 12; l++) leaf(center.clone().add(new T.Vector3((random() - .5) * .85, (random() - .5) * .65, (random() - .5) * .85)), .18 + random() * .18);
+        const twigCurve = branch(attachment, end, .03 + random() * .03, .25);
+        for (let spray = 0; spray < 7; spray++) {
+          const start = twigCurve.getPoint(.25 + spray / 10);
+          const direction = new T.Vector3(Math.cos(a + spray * 2.4), (random() - .4) * .65, Math.sin(a + spray * 2.4));
+          const finish = start.clone().addScaledVector(direction, .65 + random() * .65);
+          const frond = branch(start, finish, .009, .07);
+          // Paired leaves grow along connected twigs, rather than floating in cubical clusters.
+          for (let pair = 1; pair <= 5; pair++) for (const side of [-1, 1]) {
+            const position = frond.getPoint(pair / 6);
+            const size = (.25 + random() * .13) * (1 - pair * .05);
+            leaves.push({ position, size, rotation: [Math.PI * .36 + random() * .3, -a - spray * 2.4, side * (.7 + random() * .3)], tint: 0 });
+          }
+          leaf(finish, .24);
         }
       }
     }
@@ -126,7 +138,7 @@ export function buildReferenceGarden(group, groundHeight, wind) {
     }
   }
   const trunks = new T.Mesh(mergeGeometries(branches), barkMat); trunks.name = 'Reference forked trunks and shrub stems'; trunks.castShadow = trunks.receiveShadow = true; group.add(trunks); branches.forEach(g => g.dispose());
-  const leafMat = new T.MeshStandardMaterial({ color: '#789653', side: T.DoubleSide, roughness: .72 });
+  const leafMat = new T.MeshStandardMaterial({ color: '#aebf87', side: T.DoubleSide, roughness: .58 });
   leafMat.onBeforeCompile = shader => {
     shader.uniforms.uWind = wind;
     shader.vertexShader = 'uniform float uWind;\n' + shader.vertexShader;
@@ -136,7 +148,7 @@ export function buildReferenceGarden(group, groundHeight, wind) {
   const foliage = new T.InstancedMesh(leafGeometry(), leafMat, leaves.length); foliage.name = 'Individual curved foliage';
   leaves.forEach(({ position, size, rotation, tint }, i) => {
     dummy.position.copy(position); dummy.rotation.set(...rotation); dummy.scale.set(size * (tint ? 1.4 : 1), size, size); dummy.updateMatrix(); foliage.setMatrixAt(i, dummy.matrix);
-    foliage.setColorAt(i, new T.Color().setHSL(.22 + random() * .09, .25 + random() * .25, .36 + random() * .26));
+    foliage.setColorAt(i, new T.Color().setHSL(.22 + random() * .065, .32 + random() * .22, .27 + random() * .21));
   });
   foliage.receiveShadow = true; group.add(foliage);
   const flowerMat = new T.MeshStandardMaterial({ color: '#e9609a', side: T.DoubleSide, roughness: .7 });
