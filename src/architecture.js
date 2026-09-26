@@ -422,5 +422,5 @@ export function buildLandscape(scene) {
     dummy.position.set(x, -.052 + random() * .01, z); dummy.rotation.set(-Math.PI / 2, 0, random() * 6); dummy.scale.setScalar(.7 + random() * 1.7); dummy.updateMatrix(); debris.setMatrixAt(i, dummy.matrix);
   }
   group.add(debris);
-  return { group, foliage, wind };
+  return { group, foliage, wind, groundMaterial: groundMat, pavingMaterial: pavingMat };
 }

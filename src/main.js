@@ -4,13 +4,13 @@ import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { createIcons, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, Images, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check } from 'lucide';
 import { buildArchitecture, buildLandscape } from './architecture.js';
 import { footprint } from './footprint.js';
-import { Map as MapIcon, Volume2, VolumeX } from 'lucide';
+import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
 import './style.css';
 
 const $ = s => document.querySelector(s);
 const icon = name => `<i data-lucide="${name}"></i>`;
-const icons = { Volume2, VolumeX, Map: MapIcon, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, Images, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check };
+const icons = { Move, Volume2, VolumeX, Map: MapIcon, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, Images, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check };
 const refreshIcons = () => createIcons({ icons, attrs: { 'stroke-width': 1.5 } });
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const small = () => innerWidth < 700;
@@ -27,12 +27,13 @@ $('#app').innerHTML = `
       <a href="#" class="brand" aria-label="Instrument Technology home"><span class="brand-mark" aria-hidden="true">IT<span></span></span><span>ANDHRA UNIVERSITY<small>A CAMPUS PORTRAIT</small></span></a>
       <nav aria-label="Main navigation"><button id="archive" class="nav-link">${icon('images')}<span>The archive</span><span class="count">15</span></button><button id="about" class="icon-btn" aria-label="About this portrait" data-tip="About this portrait">${icon('info')}</button><span class="nav-divider"></span><button id="film" class="film-btn">${icon('play')}<span>Play the journey</span></button></nav>
     </header>
-    <div class="scene-meta"><span class="live-dot"></span><span id="scene-mode">LIVE EXPLORATION</span><span class="meta-line"></span><span id="time-label">16:30 / AFTERNOON</span></div>
+    <div class="scene-meta"><span class="live-dot"></span><span id="scene-mode">LIVE EXPLORATION</span><span class="meta-line"></span><span id="time-label">16:30 / AFTERNOON</span><span class="meta-line weather-divider"></span><span id="weather-label" class="weather-live">SYNCING SKY</span></div>
     <div class="scene-number" aria-hidden="true"><span id="scene-number">01</span><small>/ 04</small></div>
     <section class="scene-heading"><p class="eyebrow" id="eyebrow">THE DEPARTMENT / NORTH CAMPUS</p><h1>${chapters[0].title}</h1><p class="scene-note">${icon('map-pin')}<span id="scene-note">${chapters[0].note}</span></p><div class="heading-actions"><button id="explore" class="primary-btn">Enter the courtyard ${icon('arrow-up-right')}</button><button id="original-film" class="text-btn">${icon('play')} Original film</button></div></section>
     <div class="scene-tools" aria-label="Scene tools">
       <button class="icon-btn" id="light" aria-label="Light and quality" aria-expanded="false" data-tip="Light & quality">${icon('sun')}</button>
       <button class="icon-btn" id="orbit" aria-label="Orbit building" aria-pressed="false" data-tip="Orbit building">${icon('compass')}</button>
+      <button class="icon-btn" id="panorama" aria-label="Panorama exploration" aria-pressed="false" data-tip="Panorama exploration">${icon('move')}</button>
       <button class="icon-btn mobile-plan" id="mobile-plan" aria-label="View building from above" data-tip="Overhead view">${icon('map')}</button>
       <span class="tools-divider"></span>
       <button class="icon-btn" id="zoom-in" aria-label="Zoom in" data-tip="Zoom in">${icon('plus')}</button>
@@ -93,6 +94,18 @@ let controls, architecture, landscape;
 let selected = 0, transition = null, journey = false, journeyStart = 0, isOrbiting = false, doorsOpen = false, hour = 16.5, targetHour = 16.5;
 let ready = false, drift = !reduced, quality = 'auto', needsRender = true, lastRendered = 0, lastShadowUpdate = 0;
 let interactive = false;
+let panorama = false;
+function setPanorama(enabled) {
+  panorama = enabled;
+  $('#panorama').setAttribute('aria-pressed', enabled);
+  $('#experience').classList.toggle('panorama-view', enabled);
+  if (!controls) return;
+  controls.enablePan = enabled;
+  controls.screenSpacePanning = true;
+  controls.minDistance = enabled ? 2 : 13;
+  controls.maxPolarAngle = Math.PI * (enabled ? .499 : .485);
+  controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+}
 const sun = new THREE.DirectionalLight('#ffe8c5', 3.5);
 sun.position.set(-34, 39, 30); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -55; sun.shadow.camera.right = 55; sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40; sun.shadow.camera.far = 180;
@@ -106,17 +119,149 @@ for (const x of [-2, 2]) {
 }
 const defaultPixelRatio = () => Math.min(devicePixelRatio, small() ? 1.4 : 1.65);
 const frameSamples = [];
+const LOCATION = { latitude: 17.6868, longitude: 83.2185, timezone: 'Asia/Kolkata', label: 'ANDHRA UNIVERSITY / VISAKHAPATNAM' };
+const SYNODIC_MONTH = 29.530588853;
+const WEATHER_RAIN_CODES = new Set([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99]);
+const weatherState = { loaded: false, rainFactor: 0, code: null, temperature: null, cloudCover: 0, summary: 'SYNCING SKY', updatedAt: 0 };
+const moonState = { phase: 0, illumination: 0, label: 'MOON', updatedAt: 0 };
+let liveClock = true;
+let lastClockSync = 0;
+
+function localHour(now = Date.now()) {
+  const parts = new Intl.DateTimeFormat('en-IN', { timeZone: LOCATION.timezone, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now);
+  const h = Number(parts.find(part => part.type === 'hour')?.value || 0);
+  const m = Number(parts.find(part => part.type === 'minute')?.value || 0);
+  return Math.min(23.99, h + m / 60);
+}
+
+function moonPhase(now = Date.now()) {
+  const reference = Date.UTC(2000, 0, 6, 18, 14);
+  const age = ((now - reference) / 86400000) % SYNODIC_MONTH;
+  const phase = (age + SYNODIC_MONTH) % SYNODIC_MONTH / SYNODIC_MONTH;
+  const illumination = (1 - Math.cos(phase * Math.PI * 2)) / 2;
+  return { phase, illumination, age: phase * SYNODIC_MONTH };
+}
+
+function moonLabel(phase, illumination) {
+  if (illumination < .035) return 'NEW MOON';
+  if (illumination > .965) return 'FULL MOON';
+  if (phase < .5) return phase < .25 ? 'WAXING CRESCENT' : 'WAXING GIBBOUS';
+  return phase < .75 ? 'WANING GIBBOUS' : 'WANING CRESCENT';
+}
+
+function makeMoonTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#d4d0c7'; ctx.fillRect(0, 0, c.width, c.height);
+  const craterSeed = 9281;
+  let seed = craterSeed;
+  const rand = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < 160; i++) {
+    const x = rand() * c.width, y = rand() * c.height, r = 3 + rand() * 24;
+    const gradient = ctx.createRadialGradient(x - r * .22, y - r * .2, r * .12, x, y, r);
+    gradient.addColorStop(0, 'rgba(255,255,255,.12)'); gradient.addColorStop(.55, 'rgba(110,108,104,.13)'); gradient.addColorStop(1, 'rgba(70,68,65,.04)');
+    ctx.fillStyle = gradient; ctx.beginPath(); ctx.ellipse(x, y, r * (1.15 + rand() * .32), r * (.72 + rand() * .34), rand() * Math.PI, 0, Math.PI * 2); ctx.fill();
+  }
+  for (let i = 0; i < 9000; i++) {
+    const b = 125 + rand() * 95; ctx.fillStyle = `rgba(${b},${b},${b},${.025 + rand() * .055})`; ctx.fillRect(rand() * c.width, rand() * c.height, 1, 1);
+  }
+  const texture = new THREE.CanvasTexture(c); texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = 8; return texture;
+}
+
+const moonUniforms = { uTexture: { value: makeMoonTexture() }, uLightDirection: { value: new THREE.Vector3(0, 0, -1) }, uOpacity: { value: .86 } };
+const moon = new THREE.Mesh(new THREE.SphereGeometry(4.2, 64, 32), new THREE.ShaderMaterial({
+  uniforms: moonUniforms, transparent: true, depthWrite: false, side: THREE.FrontSide,
+  vertexShader: `varying vec3 vNormal; varying vec2 vUv; void main(){ vNormal = normalize(normal); vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform sampler2D uTexture; uniform vec3 uLightDirection; uniform float uOpacity; varying vec3 vNormal; varying vec2 vUv; void main(){ float light = smoothstep(-.08, .1, dot(normalize(vNormal), normalize(uLightDirection))); vec3 albedo = texture2D(uTexture, vUv).rgb; float rim = pow(max(0.0, 1.0 - abs(vNormal.z)), .7); vec3 color = albedo * (.08 + light * .92) + vec3(.045, .043, .039) * rim; gl_FragColor = vec4(color, uOpacity * (.08 + light * .92)); }`
+}));
+moon.name = 'Live lunar phase';
+const moonHaloTexture = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); const g = x.createRadialGradient(64, 64, 5, 64, 64, 64); g.addColorStop(0, 'rgba(255,244,205,.22)'); g.addColorStop(1, 'rgba(255,244,205,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+const moonHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: moonHaloTexture, transparent: true, depthWrite: false, opacity: .25, blending: THREE.AdditiveBlending }));
+moonHalo.scale.set(16, 16, 1); moon.add(moonHalo);
+const moonAnchor = new THREE.Group(); moonAnchor.name = 'Moon sky anchor'; moonAnchor.add(moon); scene.add(moonAnchor);
+
+function updateMoon(now = Date.now()) {
+  const { phase, illumination } = moonPhase(now);
+  moonState.phase = phase; moonState.illumination = illumination; moonState.label = moonLabel(phase, illumination); moonState.updatedAt = now;
+  const h = liveClock ? localHour(now) : hour;
+  const skyAngle = (h / 24) * Math.PI * 2 + phase * .42 - 1.15;
+  moonAnchor.position.set(Math.sin(skyAngle) * 94, 48 + Math.cos(skyAngle * .74) * 26, -Math.cos(skyAngle) * 105);
+  moonAnchor.lookAt(camera.position.x, camera.position.y + 3, camera.position.z);
+  moonUniforms.uLightDirection.value.set(Math.sin(phase * Math.PI * 2), 0, -Math.cos(phase * Math.PI * 2)).normalize();
+  moonUniforms.uOpacity.value = h > 18 || h < 6.5 ? .96 : .12;
+  moonHalo.material.opacity = (h > 18 || h < 6.5) ? .26 : .035;
+  moonAnchor.visible = h > 16.5 || h < 8.2;
+  updateWeatherLabel();
+  needsRender = true;
+}
+
+function createRain() {
+  const count = 820, geometry = new THREE.PlaneGeometry(.035, 1.7);
+  const material = new THREE.MeshBasicMaterial({ color: '#c9dce6', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+  const mesh = new THREE.InstancedMesh(geometry, material, count); mesh.name = 'Live rain'; mesh.frustumCulled = false; mesh.visible = false; scene.add(mesh);
+  const drops = Array.from({ length: count }, (_, i) => ({ x: ((i * 37.17) % 120) - 60, y: (i * 19.73) % 48 + 2, z: ((i * 53.11) % 96) - 40, speed: 23 + (i % 11) * 1.9, lean: -.08 - (i % 5) * .012 }));
+  const dummy = new THREE.Object3D();
+  return {
+    current: 0,
+    update(dt, target) {
+      this.current = THREE.MathUtils.damp(this.current, target, 2.8, dt); mesh.visible = this.current > .004;
+      material.opacity = THREE.MathUtils.lerp(0, .28, this.current);
+      if (!mesh.visible) return;
+      for (let i = 0; i < drops.length; i++) {
+        const drop = drops[i]; drop.y -= drop.speed * dt * (.72 + this.current * .45); if (drop.y < -.4) drop.y = 48 + (i % 17) * .3;
+        dummy.position.set(drop.x + drop.lean * (48 - drop.y), drop.y, drop.z); dummy.rotation.set(0, 0, Math.atan2(drop.lean, 1)); dummy.scale.setScalar(.72 + this.current * .5); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+  };
+}
+const rain = createRain();
+
+function updateWeatherLabel() {
+  const temp = weatherState.temperature == null ? '' : ` / ${Math.round(weatherState.temperature)}°C`;
+  const weather = weatherState.loaded ? `${weatherState.summary}${temp}` : 'LIVE SKY';
+  $('#weather-label').textContent = `${weather} / ${moonState.label}`;
+}
+
+function updateWetMaterials() {
+  const wet = weatherState.rainFactor;
+  if (!landscape) return;
+  landscape.groundMaterial.roughness = THREE.MathUtils.lerp(.95, .58, wet);
+  landscape.pavingMaterial.roughness = THREE.MathUtils.lerp(.95, .25, wet);
+  if (architecture) {
+    architecture.materials.paving.roughness = THREE.MathUtils.lerp(.9, .3, wet);
+    architecture.materials.glass.roughness = THREE.MathUtils.lerp(.055, .025, wet);
+    architecture.materials.rearGlass.roughness = architecture.materials.glass.roughness;
+  }
+}
+
+async function loadWeather() {
+  const params = new URLSearchParams({ latitude: LOCATION.latitude, longitude: LOCATION.longitude, current: 'temperature_2m,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m', timezone: LOCATION.timezone, forecast_days: '1' });
+  try {
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`, { mode: 'cors', cache: 'no-store' });
+    if (!response.ok) throw new Error(`weather ${response.status}`);
+    const current = (await response.json()).current || {};
+    const code = Number(current.weather_code); const precip = Number(current.precipitation) || 0; const rainNow = Number(current.rain) || 0; const showers = Number(current.showers) || 0;
+    const wet = WEATHER_RAIN_CODES.has(code) || precip > 0 || rainNow > 0 || showers > 0;
+    weatherState.loaded = true; weatherState.code = code; weatherState.temperature = Number(current.temperature_2m); weatherState.cloudCover = Number(current.cloud_cover) || 0;
+    weatherState.rainFactor = wet ? THREE.MathUtils.clamp(.35 + precip * .14 + rainNow * .22 + showers * .16, .35, 1) : 0;
+    weatherState.summary = wet ? 'LIVE RAIN' : weatherState.cloudCover > 72 ? 'LIVE OVERCAST' : weatherState.cloudCover > 35 ? 'LIVE CLOUD' : 'LIVE CLEAR'; weatherState.updatedAt = Date.now();
+    updateWetMaterials(); updateLighting(hour); updateWeatherLabel();
+  } catch {
+    weatherState.loaded = false; weatherState.summary = 'LIVE SKY'; updateWeatherLabel();
+  }
+}
 
 function updateLighting(h) {
   const evening = THREE.MathUtils.smoothstep(h, 17, 19);
   const afternoon = THREE.MathUtils.smoothstep(h, 12, 17);
+  const wet = weatherState.rainFactor;
   sun.position.set(THREE.MathUtils.lerp(30, -45, (h - 8) / 11), THREE.MathUtils.lerp(58, 8, (h - 8) / 11), 35);
   sun.color.set('#fff4dc').lerp(new THREE.Color('#ffd0a2'), afternoon).lerp(new THREE.Color('#8099c9'), evening);
-  sun.intensity = THREE.MathUtils.lerp(3.6, .34, evening);
-  ambient.intensity = THREE.MathUtils.lerp(.7, .5, evening);
+  sun.intensity = THREE.MathUtils.lerp(3.6, .34, evening) * THREE.MathUtils.lerp(1, .76, wet);
+  ambient.intensity = THREE.MathUtils.lerp(.7, .5, evening) * THREE.MathUtils.lerp(1, .9, wet);
   scene.environmentIntensity = THREE.MathUtils.lerp(.42, .2, evening);
   scene.backgroundIntensity = THREE.MathUtils.lerp(.95, .13, evening);
-  scene.fog.color.set('#b6c5c9').lerp(new THREE.Color('#4c6380'), evening);
+  scene.fog.color.set('#b6c5c9').lerp(new THREE.Color('#4c6380'), evening).lerp(new THREE.Color('#64757b'), wet * .42);
   if (scene.background?.isColor) scene.background.copy(scene.fog.color);
   entranceLight.intensity = evening * 40;
   warm.opacity = evening * .6; warm.emissiveIntensity = evening * 1.4;
@@ -128,7 +273,8 @@ function updateLighting(h) {
   needsRender = true;
 }
 function formatTime(h) { return `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round(h % 1 * 60)).padStart(2, '0')}`; }
-function setHour(h) {
+function setHour(h, { manual = true } = {}) {
+  if (manual) liveClock = false;
   targetHour = h;
   if (reduced) { hour = h; updateLighting(h); }
   $('#hour').value = h; $('#hour-output').textContent = formatTime(h);
@@ -160,6 +306,7 @@ function updateChapter(index) {
   $('#experience').classList.toggle('detail-view', index !== 0);
 }
 function selectChapter(index) {
+  setPanorama(false);
   $('#experience').classList.remove('footprint-view');
   stopJourney(); setOrbit(false); interactive = false; updateChapter(index);
   if (controls) controls.maxPolarAngle = Math.PI * .485;
@@ -225,6 +372,9 @@ async function boot() {
   $('#loading-status').textContent = 'Finding the light';
   await new Promise(resolve => requestAnimationFrame(resolve));
   landscape = buildLandscape(scene);
+  setHour(localHour(), { manual: false });
+  updateMoon();
+  updateWetMaterials();
   try {
     const hdr = await new HDRLoader().loadAsync('/media/sky.hdr'); hdr.mapping = THREE.EquirectangularReflectionMapping;
     const pmrem = new THREE.PMREMGenerator(renderer); const env = pmrem.fromEquirectangular(hdr);
@@ -251,6 +401,7 @@ async function boot() {
   const defaultAudio = sound.setEnabled(true);
   updateSoundButton();
   defaultAudio.then(updateSoundButton).catch(updateSoundButton);
+  loadWeather();
   ready = true; window.__portrait.ready = true;
   renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
   drawPlan(); resize(); requestAnimationFrame(animate);
@@ -284,6 +435,8 @@ function animate(now) {
     base.sub(look).applyAxisAngle(new THREE.Vector3(0, 1, 0), theta).add(look);
     camera.position.lerp(base, 1 - Math.exp(-dt * 1.5)); needsRender = true;
   }
+  if (liveClock && now - lastClockSync > 15000) { lastClockSync = now; setHour(localHour(), { manual: false }); updateMoon(); }
+  if (Date.now() - moonState.updatedAt > 30000) updateMoon();
   if (Math.abs(hour - targetHour) > .005) { hour = THREE.MathUtils.damp(hour, targetHour, 4, dt); updateLighting(hour); }
   for (const d of architecture.doors) {
     const a = doorsOpen ? d.openAngle : 0;
@@ -295,6 +448,7 @@ function animate(now) {
   // Orbit speed follows wall time, including slower devices; damping is for pointer input.
   controls.update(Math.min(frameDuration / 1000, 1));
   if (!reduced) landscape.wind.value = now / 1000;
+  rain.update(dt, weatherState.rainFactor);
   if (needsRender || !reduced) {
     renderer.render(scene, camera);
     if (++frames % 60 === 0) drawPlan();
@@ -305,7 +459,7 @@ function animate(now) {
     needsRender = false; lastRendered = now;
   }
 }
-window.__portrait = { ready: false, scene, camera, footprint, sound, get architecture() { return architecture; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get lastRendered() { return lastRendered; } };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, get architecture() { return architecture; }, get landscape() { return landscape; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; } };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;
@@ -332,6 +486,15 @@ function syncSound() {
 }
 document.addEventListener('visibilitychange', syncSound);
 $('#orbit').onclick = () => { stopJourney(); transition = null; interactive = true; setOrbit(!isOrbiting); };
+$('#panorama').onclick = () => {
+  stopJourney(); transition = null; interactive = true; setOrbit(false);
+  setPanorama(!panorama);
+  if (panorama) {
+    $('#experience').classList.remove('footprint-view');
+    controls.target.set(0, 6, 0);
+    needsRender = true;
+  }
+};
 for (const [id, factor] of [['zoom-in', .8], ['zoom-out', 1.25]]) $(`#${id}`).onclick = () => {
   if (!controls) return;
   stopJourney(); interactive = true; setOrbit(false);

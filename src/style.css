@@ -20,3 +20,6 @@ dialog{background:#18221f;color:#edf2e4;border:1px solid #e9f0df29;border-radius
 .light-panel{max-height:calc(100dvh - 220px);overflow-y:auto}#ambient-volume{margin-bottom:4px}
 @media(max-height:680px){.light-panel{top:82px;max-height:calc(100dvh - 100px)}}
 @media(max-width:699px){.mobile-plan{display:grid}}
+.weather-live{color:#dce7d1bd;white-space:nowrap}.weather-divider{width:13px}
+.panorama-view .scene-heading,.panorama-view .door-action,.panorama-view .plan{display:none}
+@media(max-width:699px){.weather-divider,.weather-live{display:none}}

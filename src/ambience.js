@@ -59,9 +59,11 @@ export function createAmbience() {
       await context.suspend();
       return;
     }
-    await context.resume();
+    // Autoplay policy can leave the context suspended until the first gesture.
+    // Do not hold asset decoding hostage to that browser decision.
+    try { await Promise.race([context.resume(), new Promise(resolve => setTimeout(resolve, 80))]); } catch {}
     if (!enabled || muted) return context.suspend();
-    master.gain.setTargetAtTime(volume * .65, context.currentTime, .3);
+    if (context.state === 'running') master.gain.setTargetAtTime(volume * .65, context.currentTime, .3);
   }
 
   return {
