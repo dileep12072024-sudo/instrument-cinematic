@@ -17,13 +17,19 @@ npm run deploy
 ## Implementation
 
 - `src/footprint.js`: shared five-block H plan used by both the 3D building and overhead map. The end wings are substantially deeper than the connecting corridors; the entrance block projects on both sides.
-- `src/architecture.js`: original Three.js geometry for the asymmetrical H footprint, two- and three-level wings, entrance canopy, windows, ventilation screens, grilles, doors, perimeter trees and paths. Static geometry is merged by material; foliage and ground debris are instanced. The courtyard is clear of vehicles and the two foreground trees; the east folding gate occupies the short return beside the wing windows.
+- `src/architecture.js`: original Three.js geometry for the asymmetrical H footprint, two- and three-level wings, entrance canopy, windows, ventilation screens, grilles, doors, perimeter trees and paths. Static geometry is merged by material; foliage and ground debris are instanced. The courtyard is clear of vehicles; the east folding gate occupies the short return beside the wing windows.
+- `src/garden.js`: planting interpreted from the folder-organized site photographs, including one tree immediately right of the entrance, damaged square brick surrounds, flowering shrubs and groundcover. The entrance apron, threshold and sloping drive follow the visible level changes.
+- `src/sky.js`: photographic lunar backdrop with SunCalc phase and local orientation, animated clouds and reduced-motion-aware lightning. The moon is artistically enlarged and composed above the building, with a centred mobile framing and no nearby-object parallax. Its decorative placement is independent of actual moonrise and bearing. Daylight and twilight use the calculated solar altitude for the campus and selected time; the scene's north alignment is approximately interpreted from the supplied north-up plan.
 - `src/main.js`: damped orbit controls, four viewpoints, spline camera journey, continuous daylight controls, opening doors, photo export, footprint view, gallery and original video.
 - The rear ground floor is closed; upper windows retain scene reflections. The front canopy retains its original dimensions without freestanding pillars. The rear canopy has half its depth, and entrance doors open inward through 180 degrees.
 - `src/ambience.js`: recorded birdsong mixed with quiet synthesized wind and leaf rustle, with volume control and a crossfaded loop. Ambient sound is on by default and the top-bar control mutes it; browsers that suspend autoplay resume it on the first interaction. Sound pauses when the tab is hidden or the original video is open.
 - `src/style.css`: responsive full-screen layout, self-hosted fonts, dialogs and reduced-motion support.
 - `scripts/prepare-media.mjs`: reproducible local reference-image conversion. Originals remain untouched.
 - `scripts/check-site.mjs`: browser interaction, media, canvas-pixel and responsive checks.
+- `scripts/check-live-scene.mjs`: lunar phase, door and planting checks, mocked clear/cloud/rain/storm reports, stale-report recovery, moving rain/clouds and mobile screenshots. Run with `node scripts/check-live-scene.mjs`.
+- `scripts/check-celestial.mjs`: fixed-date solar/lunar calculations, local preview date, decorative moon framing, camera-independent placement and desktop/mobile screenshots.
+
+Live time uses Asia/Kolkata. Weather is requested from Open-Meteo every five minutes while visible, at the department coordinates (17.728889, 83.323611). This is model-based weather, not an on-site sensor. The settings show the report timestamp and next-six-hour rain outlook. Failed refreshes retain and label the last available report. Manual time previews can be returned to live time with the Live campus time checkbox.
 
 The building is a visual reconstruction, not a measured survey. Dimensions, hidden elevations, material textures and planting positions are approximated. Some supplied reference images are AI generated; the on-site photographs and video guide the building's visible architecture. Interior rooms are not reconstructed. Door controls reveal the entrance recess only.
 

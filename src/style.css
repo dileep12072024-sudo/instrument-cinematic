@@ -23,3 +23,6 @@ dialog{background:#18221f;color:#edf2e4;border:1px solid #e9f0df29;border-radius
 .weather-live{color:#dce7d1bd;white-space:nowrap}.weather-divider{width:13px}
 .panorama-view .scene-heading,.panorama-view .door-action,.panorama-view .plan{display:none}
 @media(max-width:699px){.weather-divider,.weather-live{display:none}}
+.weather-detail{font-size:10px;line-height:1.5;color:#cdd8c9;margin:14px 0 8px}.weather-source{font-size:9px;text-decoration:underline;color:#acbba3}
+.scene-meta{max-width:calc(100% - 180px);flex-wrap:wrap}.weather-live{white-space:normal}
+@media(max-width:699px){.scene-meta{max-width:calc(100% - 90px)}.scene-meta #scene-mode,.scene-meta .meta-line{display:none}.weather-live{display:block;flex-basis:100%;font-size:7px;line-height:1.4}}

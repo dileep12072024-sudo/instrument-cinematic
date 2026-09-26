@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint } from './footprint.js';
+import { buildReferenceGarden } from './garden.js';
 
 let seed = 1937;
 const random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
@@ -89,8 +90,9 @@ export function buildArchitecture(scene) {
   };
   m.rearGlass = m.glass.clone(); m.rearGlass.name = 'Rear glass';
   const grain = woodGrain();
-  m.entranceWood = mat('#d9b890', { name: 'Entrance timber', map: grain, bumpMap: grain, bumpScale: .006, roughness: .48 });
+  m.entranceWood = mat('#927c64', { name: 'Entrance timber', map: grain, bumpMap: grain, bumpScale: .003, roughness: .65 });
   m.doorPanel = m.entranceWood.clone(); m.doorPanel.color.set('#b69372');
+  m.upperDoorPanel = m.entranceWood.clone(); m.upperDoorPanel.color.set('#dac98b');
   m.screen = mat('#d5d0bd', { name: 'Pierced concrete screens', map: plasterMap, bumpMap: plasterMap, bumpScale: .018 });
   m.gate = mat('#65777b', { name: 'East folding gate', metalness: .7, roughness: .46 });
   m.paving.bumpMap = m.paving.map;
@@ -122,6 +124,16 @@ export function buildArchitecture(scene) {
     // Small sloping sill in the wider central ventilation slot.
     const sill = new T.BoxGeometry(w / 3 - .08, .04, .24).toNonIndexed(); sill.rotateX(.25); sill.translate(x, y - h / 12 + .04, .025); sill.applyMatrix4(transform);
     batches.get(m.screen).push(sill);
+    // Raised A U forms within the central ventilation slot.
+    const letter = (points, radius = .025) => {
+      const curve = new T.CatmullRomCurve3(points.map(([px, py]) => new T.Vector3(x + px, y + py, .06)), false, 'centripetal');
+      const geo = new T.TubeGeometry(curve, 16, radius, 5, false); geo.applyMatrix4(transform);
+      if (!batches.has(m.blue)) batches.set(m.blue, []); batches.get(m.blue).push(geo);
+    };
+    const lh = h / 7, lx = w / 9;
+    letter([[-lx * 1.6, -lh * .35], [-lx, lh * .5], [-lx * .4, -lh * .35]]);
+    letter([[-lx * 1.35, 0], [-lx * .65, 0]]);
+    letter([[lx * .3, lh * .5], [lx * .4, -lh * .2], [lx, -lh * .3], [lx * 1.5, -lh * .2], [lx * 1.6, lh * .5]]);
   }
   function box(x, y, z, w, h, d, material, parent = null) {
     const geo = new T.BoxGeometry(w, h, d); matrix.makeTranslation(x, y, z); geo.applyMatrix4(matrix);
@@ -285,6 +297,8 @@ export function buildArchitecture(scene) {
   for (const x of [-2.75, 2.75]) {
     box(x, 1.7, 7, 2.05, 3.2, .08, m.entranceWood);
     box(x, 2.2, 7.06, 1.88, 1.98, .045, m.glass);
+    box(x, 2.2, 7.10, .065, 2.02, .08, m.entranceWood);
+    for (const s of [-1, 1]) box(x + s * .94, 2.2, 7.10, .065, 2.02, .08, m.entranceWood);
     for (const offset of [-.49, .49]) box(x + offset, .63, 7.05, .83, .83, .025, m.doorPanel);
     box(x, 1.17, 7.09, 2.05, .12, .1, m.entranceWood);
   }
@@ -294,8 +308,16 @@ export function buildArchitecture(scene) {
     const leaf = new T.Mesh(new T.BoxGeometry(1.68, 3.2, .14), m.entranceWood); leaf.name = 'Solid timber leaf'; leaf.position.set(-side * .85, 1.6, 0); pivot.add(leaf);
     // Inset-style panel fields on both sides keep the folded-open doors finished too.
     const panels = [];
-    for (const offset of [-.37, .37]) for (const [y, h] of [[.54, .78], [2.05, 1.94]]) for (const z of [-.074, .074]) {
-      const panel = new T.BoxGeometry(.62, h, .018); panel.translate(-side * .85 + offset, y, z); panels.push(panel);
+    for (const z of [-.074, .074]) {
+      const panel = new T.BoxGeometry(1.32, .82, .018); panel.translate(-side * .85, .56, z); panels.push(panel);
+      const upper = new T.Mesh(new T.BoxGeometry(1.32, 1.88, .018), m.upperDoorPanel);
+      upper.name = 'Single tall inset panel'; upper.position.set(-side * .85, 2.06, z); pivot.add(upper);
+      for (const edge of [-1, 1]) {
+        const molding = new T.Mesh(new T.BoxGeometry(.034, 1.95, .036), m.doorPanel);
+        molding.position.set(-side * .85 + edge * .68, 2.06, z); pivot.add(molding);
+        const rail = new T.Mesh(new T.BoxGeometry(1.39, .034, .036), m.doorPanel);
+        rail.position.set(-side * .85, 2.06 + edge * .965, z); pivot.add(rail);
+      }
     }
     const panelMesh = new T.Mesh(mergeGeometries(panels), m.doorPanel); panelMesh.name = 'Timber panels'; pivot.add(panelMesh); panels.forEach(g => g.dispose());
     for (const z of [-.15, .15]) {
@@ -304,6 +326,8 @@ export function buildArchitecture(scene) {
     leaf.castShadow = leaf.receiveShadow = panelMesh.castShadow = panelMesh.receiveShadow = true;
     doors.push({ pivot, side, openAngle: -side * Math.PI });
   }
+  box(0, .18, 6.85, 7.5, .09, .45, mat('#343d3c', { roughness: .25 }));
+  box(0, 3.36, 7.32, 1.8, .065, .065, new T.MeshStandardMaterial({ color: '#fffde7', emissive: '#fffde7', emissiveIntensity: 2 }));
   const sign = new T.Mesh(new T.PlaneGeometry(9.8, .35), mat('white', { map: textMap('DEPARTMENT OF INSTRUMENT TECHNOLOGY', '#eee9da', '#96372e'), roughness: .9 }));
   sign.position.set(0, 3.7, 10.901); group.add(sign);
   const upperSign = new T.Mesh(new T.PlaneGeometry(6.8, .36), new T.MeshStandardMaterial({ map: textMap('INSTRUMENT TECHNOLOGY', '#dfddd3', '#858880'), roughness: .9 }));
@@ -343,7 +367,13 @@ export function buildLandscape(scene) {
   const earthMap = loader.load('/media/earth.jpg'); earthMap.colorSpace = T.SRGBColorSpace; earthMap.wrapS = earthMap.wrapT = T.RepeatWrapping; earthMap.repeat.set(330, 330); earthMap.anisotropy = 8;
   const earthNormal = loader.load('/media/earth-normal.jpg'); earthNormal.wrapS = earthNormal.wrapT = T.RepeatWrapping; earthNormal.repeat.copy(earthMap.repeat); earthNormal.anisotropy = 4;
   const groundMat = mat('#c4ad8b', { map: earthMap, normalMap: earthNormal, normalScale: new T.Vector2(.6, .6) });
-  const ground = new T.Mesh(new T.PlaneGeometry(2000, 2000), groundMat); ground.rotation.x = -Math.PI / 2; ground.position.y = -.14; ground.receiveShadow = true; group.add(ground);
+  const slope = z => T.MathUtils.clamp((z - 11) / 25, 0, 1) * .45;
+  const groundHeight = z => -.14 - slope(z);
+  const groundGeo = new T.PlaneGeometry(2000, 2000, 1, 400); groundGeo.rotateX(-Math.PI / 2);
+  const groundPos = groundGeo.attributes.position;
+  for (let i = 0; i < groundPos.count; i++) groundPos.setY(i, groundHeight(groundPos.getZ(i)));
+  groundGeo.computeVertexNormals();
+  const ground = new T.Mesh(groundGeo, groundMat); ground.receiveShadow = true; group.add(ground);
   const grassMap = noiseMap('#76805a', 22), grassMat = mat('#9b9d73', { map: grassMap, bumpMap: grassMap, bumpScale: .08 });
   const grass = new T.Mesh(new T.PlaneGeometry(400, 400), grassMat); grass.rotation.x = -Math.PI / 2; grass.position.set(0, -.12, -219); grass.receiveShadow = true; group.add(grass);
   const roadMat = mat('#989a90', { map: noiseMap('#53585a', 20) }); roadMat.bumpMap = roadMat.map; roadMat.bumpScale = .016;
@@ -352,12 +382,24 @@ export function buildLandscape(scene) {
   function box(w, h, d, x, y, z, material) { const m = new T.Mesh(new T.BoxGeometry(w, h, d), material); m.position.set(x, y, z); m.receiveShadow = true; group.add(m); return m; }
   box(64, .12, 6, 0, -.045, 6.3, pavingMat);
   for (const p of footprint.filter(p => p.depth > 20)) box(p.width + 2, .12, p.depth + 2, p.x, -.045, p.z, pavingMat);
-  box(5.2, .1, 30, 0, -.045, 26, roadMat);
-  box(180, .1, 6.5, 0, -.045, 39, roadMat);
-  for (const x of [-2.5, 2.5]) box(.065, .012, 29.5, x, .017, 22.3, white);
-  for (const z of [35.95, 42.04]) box(180, .014, .08, 0, .018, z, white);
-  for (const x of [-3, 3]) box(.18, .16, 27, x, .025, 22, curbMat);
-  for (const z of [35.7, 42.3]) box(180, .18, .22, 0, .025, z, curbMat);
+  function gradedBox(w, h, d, x, y, z, material) {
+    const mesh = box(w, h, d, x, y, z, material), p = mesh.geometry.attributes.position;
+    for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) - slope(z + p.getZ(i)));
+    mesh.geometry.computeVertexNormals(); return mesh;
+  }
+  gradedBox(5.2, .1, 25, 0, -.045, 23.5, roadMat).name = 'Sloping entrance drive';
+  gradedBox(180, .1, 6.5, 0, -.045, 39, roadMat);
+  for (const x of [-2.5, 2.5]) gradedBox(.065, .012, 25, x, .017, 23.5, white);
+  for (const z of [35.95, 42.04]) gradedBox(180, .014, .08, 0, .018, z, white);
+  for (const x of [-3, 3]) gradedBox(.18, .22, 24, x, .035, 23.5, curbMat);
+  for (const z of [35.7, 42.3]) gradedBox(180, .18, .22, 0, .025, z, curbMat);
+  const tiles = canvas(256), tileCtx = tiles.getContext('2d');
+  tileCtx.fillStyle = '#c1a39a'; tileCtx.fillRect(0, 0, 256, 256);
+  tileCtx.strokeStyle = '#816d65'; tileCtx.lineWidth = 2; tileCtx.strokeRect(2, 2, 252, 252);
+  for (let r = 24; r < 170; r += 22) { tileCtx.beginPath(); tileCtx.arc(128, 128, r, 0, Math.PI * 2); tileCtx.stroke(); }
+  const tileMap = texture(tiles); tileMap.repeat.set(16, 6);
+  const tileMat = mat('#ded0c5', { map: tileMap, bumpMap: tileMap, bumpScale: .009 });
+  box(9.9, .03, 3.55, 0, .145, 8.95, tileMat).name = 'Pink patterned entrance apron';
   const treePositions = [[-39, 16, 14], [41, 11, 13], [-43, -10, 14], [44, -15, 12], [-13, -25, 13], [9, -25, 15], [30, -29, 13], [-30, -29, 15]];
   for (let i = 0; i < 26; i++) {
     const a = random() * Math.PI * 2, r = 60 + random() * 50;
@@ -422,5 +464,6 @@ export function buildLandscape(scene) {
     dummy.position.set(x, -.052 + random() * .01, z); dummy.rotation.set(-Math.PI / 2, 0, random() * 6); dummy.scale.setScalar(.7 + random() * 1.7); dummy.updateMatrix(); debris.setMatrixAt(i, dummy.matrix);
   }
   group.add(debris);
-  return { group, foliage, wind, groundMaterial: groundMat, pavingMaterial: pavingMat };
+  const garden = buildReferenceGarden(group, groundHeight, wind);
+  return { group, foliage, wind, garden, groundMaterial: groundMat, pavingMaterial: pavingMat };
 }
