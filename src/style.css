@@ -24,6 +24,19 @@ dialog{background:#18221f;color:#edf2e4;border:1px solid #e9f0df29;border-radius
 @media(max-width:699px){.mobile-plan{display:grid}}
 .weather-live{color:#dce7d1bd;white-space:nowrap}.weather-divider{width:13px}
 .panorama-view .scene-heading,.panorama-view .door-action,.panorama-view .plan{display:none}
+.entrance-actions{position:absolute;bottom:175px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;z-index:4}
+.entrance-actions .door-action{position:static;transform:none;white-space:nowrap}
+.entrance-actions .primary-btn{white-space:nowrap}
+.walk-panel{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);width:520px;max-width:calc(100% - 32px);padding:14px 18px;background:#14211eed;backdrop-filter:blur(12px);border:1px solid #ffffff35;border-radius:4px;z-index:8}
+#walk-location{display:block;font-size:12px;margin-bottom:8px;color:#edf1e5}
+.walk-controls{display:flex;align-items:center;gap:9px;height:40px}
+.walk-controls input{min-width:30px;flex:1;accent-color:var(--accent);margin:0}
+.walk-controls .icon-btn span{display:contents}
+.walk-controls .icon-btn:disabled{opacity:.35;cursor:default}
+.interior-view .scene-heading,.interior-view .chapter-bar,.interior-view .plan,.interior-view .scene-number,.interior-view .entrance-actions,.interior-view .scene-tools,.interior-view #film{display:none}
+.interior-view .shade{background:linear-gradient(180deg,#101a1977 0%,transparent 24%,transparent 80%,#101a1944 100%)}
+@media(max-width:699px){.entrance-actions{bottom:133px;left:22px;right:22px;transform:none;gap:8px}.entrance-actions .door-action{font-size:10px;padding:10px 12px}.entrance-actions .primary-btn{font-size:10px;padding:10px 12px;gap:8px}.walk-panel{bottom:max(16px,env(safe-area-inset-bottom));padding:12px}.walk-controls{gap:4px}.walk-controls .icon-btn{width:36px;height:40px}.interior-view .scene-meta{top:94px}}
+@media(max-height:680px) and (min-width:700px){.entrance-actions{bottom:115px}.walk-panel{bottom:16px}}
 @media(max-width:699px){.weather-divider,.weather-live{display:none}}
 .weather-detail{font-size:10px;line-height:1.5;color:#cdd8c9;margin:14px 0 8px}.weather-source{font-size:9px;text-decoration:underline;color:#acbba3}
 .scene-meta{max-width:calc(100% - 180px);flex-wrap:wrap}.weather-live{white-space:normal}

@@ -1,0 +1,84 @@
+import * as T from 'three';
+
+const stops = [
+  { at: 0, z: 12.3, yaw: 0, name: 'The threshold' },
+  { at: .24, z: 5.8, yaw: 0, name: 'Entrance hall' },
+  { at: .47, z: 2.6, yaw: 0, name: 'The twin stairways' },
+  { at: .7, z: -.8, yaw: 0, name: 'The central recess' },
+  { at: .83, z: -2.3, yaw: 0, name: 'The central recess' },
+  { at: 1, z: .9, yaw: Math.PI, name: 'Looking toward the entrance' },
+];
+
+export function createEntranceWalk(camera, canvas, onExit, onChange) {
+  let active = false, playing = false, progress = 0, yaw = 0, pitch = 0, pointer = null;
+  const panel = document.querySelector('#walk-panel'), slider = document.querySelector('#walk-progress');
+  const play = document.querySelector('#walk-play');
+  function sync() {
+    panel.hidden = !active;
+    slider.value = Math.round(progress * 1000);
+    const current = stops.findLast(stop => progress >= stop.at) || stops[0];
+    document.querySelector('#walk-location').textContent = current.name;
+    slider.setAttribute('aria-valuetext', current.name);
+    play.setAttribute('aria-pressed', playing);
+    play.setAttribute('aria-label', playing ? 'Pause entrance walkthrough' : 'Play entrance walkthrough');
+    play.dataset.tip = playing ? 'Pause walkthrough' : 'Play walkthrough';
+    play.querySelector('.walk-play-icon').hidden = playing;
+    play.querySelector('.walk-pause-icon').hidden = !playing;
+    document.querySelector('#walk-back').disabled = progress === 0;
+    document.querySelector('#walk-forward').disabled = progress === 1;
+    onChange();
+  }
+  function seek(value) {
+    progress = T.MathUtils.clamp(value, 0, 1); playing = false; yaw = pitch = 0; sync();
+  }
+  function step(direction) {
+    const stop = direction > 0 ? stops.find(s => s.at > progress + .002) : stops.findLast(s => s.at < progress - .002);
+    seek(stop?.at ?? (direction > 0 ? 1 : 0));
+  }
+  slider.addEventListener('input', () => seek(Number(slider.value) / 1000));
+  play.onclick = () => { if (progress === 1) progress = 0; playing = !playing; sync(); };
+  document.querySelector('#walk-back').onclick = () => step(-1);
+  document.querySelector('#walk-forward').onclick = () => step(1);
+  document.querySelector('#walk-exit').onclick = onExit;
+  canvas.addEventListener('pointerdown', e => {
+    if (!active || pointer) return;
+    pointer = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId);
+    playing = false; sync();
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!active || pointer?.id !== e.pointerId) return;
+    yaw -= (e.clientX - pointer.x) * .004;
+    pitch = T.MathUtils.clamp(pitch - (e.clientY - pointer.y) * .004, -1.05, 1.05);
+    pointer.x = e.clientX; pointer.y = e.clientY; onChange();
+  });
+  const release = e => { if (pointer?.id === e.pointerId) pointer = null; };
+  canvas.addEventListener('pointerup', release); canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('lostpointercapture', release);
+  canvas.addEventListener('wheel', e => {
+    if (!active) return;
+    e.preventDefault(); seek(progress + Math.sign(e.deltaY) * .012);
+  }, { passive: false });
+  canvas.addEventListener('keydown', e => {
+    if (!active) return;
+    if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') { e.preventDefault(); seek(progress + .015); }
+    if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') { e.preventDefault(); seek(progress - .015); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); yaw += .1; onChange(); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); yaw -= .1; onChange(); }
+  });
+  document.addEventListener('keydown', e => { if (active && e.key === 'Escape' && !document.querySelector('dialog[open]')) onExit(); });
+  return {
+    get active() { return active; }, get progress() { return progress; }, get playing() { return playing; },
+    enter() { active = true; playing = false; progress = 0; yaw = pitch = 0; sync(); canvas.focus({ preventScroll: true }); },
+    exit() { active = playing = false; pointer = null; sync(); },
+    update(dt) {
+      if (!active) return;
+      if (playing) { progress = Math.min(1, progress + dt / 36); if (progress === 1) playing = false; sync(); }
+      const next = stops.findIndex(stop => stop.at > progress), b = stops[next < 0 ? stops.length - 1 : next];
+      const a = stops[Math.max(0, (next < 0 ? stops.length - 1 : next) - 1)];
+      const raw = T.MathUtils.clamp((progress - a.at) / (b.at - a.at), 0, 1), t = raw * raw * (3 - 2 * raw);
+      const angle = T.MathUtils.lerp(a.yaw, b.yaw, t) + yaw;
+      camera.position.set(0, 1.83, T.MathUtils.lerp(a.z, b.z, t));
+      camera.lookAt(Math.sin(angle) * Math.cos(pitch), 1.83 + Math.sin(pitch), camera.position.z - Math.cos(angle) * Math.cos(pitch));
+    },
+  };
+}

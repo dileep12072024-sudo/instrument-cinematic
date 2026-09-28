@@ -6,6 +6,7 @@ import { buildArchitecture, buildLandscape } from './architecture.js';
 import { footprint } from './footprint.js';
 import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
+import { createEntranceWalk } from './entrance-walk.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
 import './style.css';
 
@@ -45,7 +46,8 @@ $('#app').innerHTML = `
       <button class="icon-btn" id="fullscreen" aria-label="Full screen" data-tip="Full screen">${icon('maximize')}</button>
     </div>
     <section id="light-panel" class="light-panel" hidden aria-label="Scene settings"><div class="panel-title">The light of a place<button class="icon-btn" id="light-close" aria-label="Close settings">${icon('x')}</button></div><div class="light-presets"><button data-hour="10" aria-label="Morning light">${icon('sun')}<span>Daylight</span></button><button data-hour="16.5" class="selected" aria-label="Afternoon light">${icon('sunset')}<span>Afternoon</span></button><button data-hour="18.8" aria-label="Blue hour">${icon('moon')}<span>Blue hour</span></button></div><label class="range-label" for="hour">Time of day <output id="hour-output">16:30</output></label><input id="hour" type="range" min="8" max="19" value="16.5" step="0.1"/><div class="quality-row"><label for="quality">Render quality</label><select id="quality"><option value="auto">Adaptive</option><option value="high">High</option><option value="low">Performance</option></select></div><label class="motion-row" for="motion">Camera drift<input type="checkbox" id="motion" ${reduced ? '' : 'checked'} /></label></section>
-    <button id="door" class="door-action" hidden aria-pressed="false">${icon('door-open')}<span>Open the doors</span></button>
+    <div class="entrance-actions"><button id="door" class="door-action" hidden aria-pressed="false">${icon('door-open')}<span>Open the doors</span></button><button id="enter-hall" class="primary-btn" hidden>${icon('arrow-up-right')}<span>Step inside</span></button></div>
+    <section id="walk-panel" class="walk-panel" hidden aria-label="Entrance walkthrough"><span id="walk-location">The threshold</span><div class="walk-controls"><button id="walk-back" class="icon-btn" aria-label="Previous entrance viewpoint" data-tip="Previous viewpoint">${icon('arrow-left')}</button><button id="walk-play" class="icon-btn" aria-label="Play entrance walkthrough" aria-pressed="false" data-tip="Play walkthrough"><span class="walk-play-icon">${icon('play')}</span><span class="walk-pause-icon" hidden>${icon('pause')}</span></button><input id="walk-progress" type="range" min="0" max="1000" value="0" aria-label="Position along the entrance walkthrough"/><button id="walk-forward" class="icon-btn" aria-label="Next entrance viewpoint" data-tip="Next viewpoint">${icon('arrow-right')}</button><button id="walk-exit" class="icon-btn" aria-label="Return to courtyard" data-tip="Return to courtyard">${icon('x')}</button></div></section>
     <button id="plan" class="plan" aria-label="View building from above" data-tip="Overhead view"><canvas width="220" height="120" aria-hidden="true"></canvas><span>NORTH CAMPUS ${icon('arrow-up-right')}</span></button>
     <footer class="chapter-bar"><div class="chapter-caption"><span>THE CAMPUS</span><small>Four perspectives. One place.</small></div><nav class="chapters" aria-label="Camera viewpoints">${chapters.map((c, i) => `<button data-chapter="${i}" class="chapter ${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}"><span>0${i + 1}</span><strong>${c.name}</strong><span class="chapter-line"></span></button>`).join('')}</nav><button id="next" class="next-btn" aria-label="Next viewpoint">${icon('arrow-right')}</button></footer>
     <div id="journey-track" class="journey-track" hidden><span></span></div>
@@ -94,7 +96,7 @@ try {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#b6c5c9'); scene.fog = new THREE.Fog('#b6c5c9', 80, 300);
 const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 500);
-let controls, architecture, landscape;
+let controls, architecture, landscape, entranceWalk;
 let selected = 0, transition = null, journey = false, journeyStart = 0, isOrbiting = false, doorsOpen = false, hour = 16.5, targetHour = 16.5;
 let ready = false, drift = !reduced, quality = 'auto', needsRender = true, lastRendered = 0, lastShadowUpdate = 0;
 let interactive = false;
@@ -312,10 +314,12 @@ function updateChapter(index) {
   $('#scene-number').textContent = `0${index + 1}`;
   $('#eyebrow').textContent = index === 0 ? 'THE DEPARTMENT / NORTH CAMPUS' : `PERSPECTIVE 0${index + 1} / NORTH CAMPUS`;
   $('#door').hidden = index !== 1;
+  $('#enter-hall').hidden = index !== 1;
   $('.heading-actions').hidden = index !== 0;
   $('#experience').classList.toggle('detail-view', index !== 0);
 }
 function selectChapter(index) {
+  if (entranceWalk?.active) leaveHall(false);
   setPanorama(false);
   $('#experience').classList.remove('footprint-view');
   stopJourney(); setOrbit(false); interactive = false; updateChapter(index);
@@ -336,6 +340,7 @@ function stopJourney() {
 }
 function startJourney() {
   if (!ready) return;
+  if (entranceWalk?.active) leaveHall(false);
   if (journey) return stopJourney();
   setPanorama(false);
   transition = null; interactive = false; setOrbit(false); journey = true; journeyStart = performance.now();
@@ -351,7 +356,7 @@ function resize() {
   if (!renderer) return;
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
   scene.fog.near = small() ? 160 : 80; scene.fog.far = small() ? 450 : 300;
-  if (!interactive && !journey) { camera.position.fromArray(cameraFor(selected)); controls.target.fromArray(chapters[selected].target); transition = null; }
+  if (!interactive && !journey && !entranceWalk?.active) { camera.position.fromArray(cameraFor(selected)); controls.target.fromArray(chapters[selected].target); transition = null; }
   needsRender = true;
 }
 function drawPlan() {
@@ -377,6 +382,7 @@ async function boot() {
   camera.position.fromArray(cameraFor(0)); controls.target.fromArray(chapters[0].target); controls.update();
   controls.addEventListener('start', () => { transition = null; interactive = true; stopJourney(); setOrbit(false); });
   controls.addEventListener('change', () => { needsRender = true; });
+  entranceWalk = createEntranceWalk(camera, renderer.domElement, () => leaveHall(), () => { needsRender = true; });
   $('#loading-status').textContent = 'Reconstructing the architecture';
   await new Promise(resolve => requestAnimationFrame(resolve));
   architecture = buildArchitecture(scene);
@@ -429,7 +435,9 @@ function animate(now) {
   if (document.hidden || !ready) return;
   const modalOpen = !!document.querySelector('dialog[open]');
   if (modalOpen) return;
-  if (transition) {
+  if (entranceWalk?.active) {
+    entranceWalk.update(Math.min(frameDuration / 1000, .1));
+  } else if (transition) {
     const raw = THREE.MathUtils.clamp((now - transition.start) / transition.duration, 0, 1), t = raw * raw * raw * (raw * (raw * 6 - 15) + 10);
     camera.position.lerpVectors(transition.from, transition.to, t); controls.target.lerpVectors(transition.fromTarget, transition.toTarget, t);
     if (raw >= 1) transition = null;
@@ -460,12 +468,14 @@ function animate(now) {
       if (Math.abs(d.pivot.rotation.y - a) < .002) {
         renderer.shadowMap.needsUpdate = true;
         entranceLight.shadow.needsUpdate = true;
+        architecture.interior.lights.forEach(light => { light.shadow.needsUpdate = true; });
       }
     }
   }
   // Orbit speed follows wall time, including slower devices; damping is for pointer input.
-  controls.update(Math.min(frameDuration / 1000, 1));
+  if (!entranceWalk?.active) controls.update(Math.min(frameDuration / 1000, 1));
   if (!reduced) landscape.wind.value += dt * (1 + weatherState.windSpeed / 25);
+  if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
   rain.update(reduced ? 0 : dt, weatherState.rainFactor);
   sky.update(now / 1000, sunlight.night, weatherState, reduced);
   if (needsRender || !reduced) {
@@ -478,7 +488,7 @@ function animate(now) {
     needsRender = false; lastRendered = now;
   }
 }
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get architecture() { return architecture; }, get landscape() { return landscape; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; } };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; } };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;
@@ -486,6 +496,25 @@ function toast(message) { $('#toast').textContent = message; $('#toast').hidden 
 document.querySelectorAll('[data-chapter]').forEach(b => b.addEventListener('click', () => selectChapter(+b.dataset.chapter)));
 $('#next').onclick = () => selectChapter((selected + 1) % chapters.length);
 $('#explore').onclick = () => selectChapter(1);
+function leaveHall(returnToEntrance = true) {
+  entranceWalk.exit(); controls.enabled = true;
+  camera.fov = 43; camera.updateProjectionMatrix();
+  $('#experience').classList.remove('interior-view');
+  $('#scene-mode').textContent = 'LIVE EXPLORATION';
+  if (returnToEntrance) { selectChapter(1); $('#enter-hall').focus(); }
+}
+$('#enter-hall').onclick = () => {
+  if (!ready) return;
+  stopJourney(); setOrbit(false); setPanorama(false); transition = null; interactive = true;
+  $('#experience').classList.remove('footprint-view');
+  doorsOpen = true; $('#door span').textContent = 'Close the doors'; $('#door').setAttribute('aria-pressed', 'true');
+  architecture.doors.forEach(d => { d.pivot.rotation.y = d.openAngle; });
+  renderer.shadowMap.needsUpdate = entranceLight.shadow.needsUpdate = true;
+  architecture.interior.lights.forEach(light => { light.shadow.needsUpdate = true; });
+  controls.enabled = false; camera.fov = 68; camera.updateProjectionMatrix();
+  $('#experience').classList.add('interior-view'); $('#scene-mode').textContent = 'ENTRANCE HALL';
+  entranceWalk.enter(); entranceWalk.update(0); needsRender = true;
+};
 $('.brand').onclick = e => { e.preventDefault(); selectChapter(0); };
 $('#reset').onclick = () => selectChapter(0);
 $('#film').onclick = startJourney;
@@ -534,6 +563,7 @@ $('#fullscreen').onclick = async () => { try { if (document.fullscreenElement) a
 document.addEventListener('fullscreenchange', () => { $('#fullscreen').innerHTML = icon(document.fullscreenElement ? 'minimize' : 'maximize'); $('#fullscreen').setAttribute('aria-label', document.fullscreenElement ? 'Exit full screen' : 'Full screen'); refreshIcons(); });
 window.addEventListener('resize', resize);
 renderer?.domElement.addEventListener('keydown', e => {
+  if (entranceWalk?.active) return;
   if (['+', '=', '-', 'Home', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
   if (e.key === '+' || e.key === '=') $('#zoom-in').click();
   if (e.key === '-') $('#zoom-out').click();

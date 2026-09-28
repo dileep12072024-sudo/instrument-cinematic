@@ -2,6 +2,7 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint } from './footprint.js';
 import { buildReferenceGarden } from './garden.js';
+import { buildEntranceHall } from './entrance-hall.js';
 
 let seed = 1937;
 const random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
@@ -102,6 +103,8 @@ export function buildArchitecture(scene) {
     weather: mat('#ffffff', { map: weatherMap(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }),
   };
   m.rearGlass = m.glass.clone(); m.rearGlass.name = 'Rear glass';
+  m.entranceGlazing = m.glass.clone(); m.entranceGlazing.name = 'Transparent entrance sidelights';
+  m.entranceGlazing.color.set('#d9e5d9'); m.entranceGlazing.transparent = true; m.entranceGlazing.opacity = .22; m.entranceGlazing.depthWrite = false;
   const grain = woodGrain();
   m.entranceWood = mat('#927c64', { name: 'Entrance timber', map: grain, bumpMap: grain, bumpScale: .003, roughness: .65 });
   m.doorPanel = m.entranceWood.clone(); m.doorPanel.color.set('#b69372');
@@ -109,6 +112,8 @@ export function buildArchitecture(scene) {
   m.screen = mat('#d5d0bd', { name: 'Pierced concrete screens', map: plasterMap, bumpMap: plasterMap, bumpScale: .018 });
   m.gate = mat('#65777b', { name: 'East folding gate', metalness: .7, roughness: .46 });
   m.westGate = m.gate.clone(); m.westGate.name = 'West folding gate';
+  m.eastRamp = mat('#a54637', { name: 'Red east gate ramp', map: plasterMap, bumpMap: plasterMap, bumpScale: .008 });
+  m.rampEdge = mat('#c4a83f', { name: 'Yellow east ramp edge', map: plasterMap });
   m.paving.bumpMap = m.paving.map;
   const batches = new Map(), matrix = new T.Matrix4(), quaternion = new T.Quaternion();
   const screenTemplates = new Map();
@@ -160,10 +165,10 @@ export function buildArchitecture(scene) {
   function ramp(x, z, w, d, h, material, parent) {
     // A triangular prism keeps the gate threshold flush with the surrounding ground.
     const hw = w / 2, vertices = new Float32Array([
-      -hw, 0, 0, hw, 0, 0, -hw, 0, d, hw, 0, d,
+      -hw, .016, 0, hw, .016, 0, -hw, .016, d, hw, .016, d,
       -hw, h, 0, hw, h, 0,
     ]);
-    const indices = [0, 2, 1, 1, 2, 3, 0, 1, 5, 0, 5, 4, 2, 4, 5, 2, 5, 3, 0, 4, 2, 1, 3, 5];
+    const indices = [0, 1, 2, 1, 3, 2, 0, 5, 1, 0, 4, 5, 2, 5, 4, 2, 3, 5, 0, 2, 4, 1, 5, 3];
     const uv = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0]);
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(vertices, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(indices); geo.translate(x, 0, z); geo.applyMatrix4(parent); geo.computeVertexNormals();
     if (!batches.has(material)) batches.set(material, []); batches.get(material).push(geo);
@@ -178,7 +183,7 @@ export function buildArchitecture(scene) {
     const corridor = type === 'corridor' || type === 'gate-return';
     for (let f = 0; f < floors; f++) {
       // The entrance is an actual opening, not doors placed over a solid ground-floor wall.
-      if (type === 'tower-front' && f === 0) continue;
+      if ((type === 'tower-front' || type === 'tower-side') && f === 0) continue;
       const y = f * floorH, openingY = y + (f === 0 ? 1.9 : 2.55), openingH = f === 0 ? 2.15 : 1.9;
       const hasGate = (type === 'gate-return' || type === 'west-end') && f === 0;
       const gateMaterial = type === 'west-end' ? m.westGate : m.gate;
@@ -208,7 +213,13 @@ export function buildArchitecture(scene) {
             geo.rotateZ(Math.atan(slope)); geo.translate(x + mid, (gateTop + gateBottom) / 2 + slope * mid + offset, .1); geo.applyMatrix4(transform);
             if (!batches.has(gateMaterial)) batches.set(gateMaterial, []); batches.get(gateMaterial).push(geo);
           }
-          ramp(x, .08, ow, 1.2, .16, m.paving, transform);
+          if (type === 'gate-return') {
+            const edge = .16;
+            ramp(x - edge / 2, .08, ow - edge, 1.2, .16, m.eastRamp, transform);
+            ramp(x + (ow - edge) / 2, .08, edge, 1.2, .16, m.rampEdge, transform);
+          } else {
+            ramp(x, .08, ow, 1.2, .16, m.paving, transform);
+          }
           b(x, 3.12, .45, bay, .16, 1.15, m.trim);
         } else if (solid) {
           b(x, openingY, 0, ow, openingH, .32, m.wall);
@@ -309,11 +320,26 @@ export function buildArchitecture(scene) {
             face(x - w / 2, z + (d / 2 + roomStart) / 2, -Math.PI / 2, length - gateWidth, h, 2, 'east-wing');
           }
           face(x + side * w / 2, z + (3.25 - d / 2) / 2, side * Math.PI / 2, d / 2 + 3.25, h, Math.max(2, Math.round((d / 2 + 3.25) / 3.5)), 'room', 'rear-half');
-        } else face(x + side * w / 2, z, side * Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'west' ? 'west-outer' : 'room', type === 'tower' ? 'all' : false);
+        } else {
+          face(x + side * w / 2, z, side * Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'tower' ? 'tower-side' : type === 'west' ? 'west-outer' : 'room', type === 'tower' ? 'all' : false);
+          if (type === 'tower') {
+            // Ground-floor openings connect the filmed entrance hall to each side passage.
+            box(x + side * w / 2, 2, -3.85, .32, 4, 6.3, m.wall);
+            box(x + side * w / 2, 2, 2.715, .32, 4, .63, m.wall);
+            box(x + side * w / 2, 2, 6.205, .32, 4, 1.59, m.wall);
+            box(x + side * w / 2, .8725, 4.22, .32, 1.745, 2.38, m.wall);
+            box(x + side * w / 2, 3.4475, 4.22, .32, 1.105, 2.38, m.wall);
+            box(x + side * w / 2, 3.8, .85, .32, .4, 3.1, m.wall);
+          }
+        }
       }
     }
     box(x, .02, z, w, .18, d, m.roof);
-    for (let y = 4; y < h - 1.3; y += 4) box(x, y - .07, z, w, .2, d, m.roof);
+    for (let y = 4; y < h - 1.3; y += 4) {
+      // Leave the first-floor stairwell open above the two visible flights.
+      if (type === 'tower' && y === 4) box(x, y - .07, 4.15, w, .2, 5.7, m.roof);
+      else box(x, y - .07, z, w, .2, d, m.roof);
+    }
     box(x, h - 1.4, z, w + .35, .2, d + .35, m.roof);
   }
   for (const p of footprint) block(p.x, p.z, p.width, p.depth, p.height, p.bays, p.type);
@@ -342,12 +368,12 @@ export function buildArchitecture(scene) {
   box(0, 3.63, -8.9, 10.1, .3, .18, m.blue);
   box(0, 3.78, 7, 8, .44, .35, m.wall);
   for (const x of [-3.85, 3.85]) box(x, 1.75, 7, .3, 3.5, .45, m.blue);
-  box(0, 1.7, 3, 7.5, 3.4, .25, m.dark);
   box(0, 3.43, 7, 7.5, .3, .28, m.entranceWood);
   for (const x of [-1.715, 1.715]) box(x, 1.7, 7, .075, 3.25, .28, m.entranceWood);
   for (const x of [-2.75, 2.75]) {
-    box(x, 1.7, 7, 2.05, 3.2, .08, m.entranceWood);
-    box(x, 2.2, 7.06, 1.88, 1.98, .045, m.glass);
+    box(x, .64, 7, 2.05, 1.08, .08, m.entranceWood);
+    box(x, 3.23, 7, 2.05, .15, .08, m.entranceWood);
+    box(x, 2.2, 7.06, 1.88, 1.98, .018, m.entranceGlazing);
     box(x, 2.2, 7.10, .065, 2.02, .08, m.entranceWood);
     for (const s of [-1, 1]) box(x + s * .94, 2.2, 7.10, .065, 2.02, .08, m.entranceWood);
     for (const offset of [-.49, .49]) box(x + offset, .63, 7.05, .83, .83, .025, m.doorPanel);
@@ -374,6 +400,33 @@ export function buildArchitecture(scene) {
     for (const z of [-.15, .15]) {
       const handle = new T.Mesh(new T.CylinderGeometry(.022, .022, .4, 8), m.metal); handle.position.set(-side * 1.49, 1.5, z); pivot.add(handle);
     }
+    if (side === 1) {
+      // The photographed bolt is on the inner face, withdrawn so the leaf can swing freely.
+      const hardware = [], add = (geometry, x, y, z) => {
+        geometry.translate(x, y, z); hardware.push(geometry);
+      };
+      const bolt = new T.CylinderGeometry(.022, .022, .68, 10);
+      bolt.rotateZ(Math.PI / 2); add(bolt, -1.22, 1.08, -.17);
+      for (const x of [-1.52, -1.18]) {
+        add(new T.BoxGeometry(.08, .15, .025), x, 1.08, -.086);
+        const guide = new T.TorusGeometry(.034, .012, 6, 12);
+        guide.rotateY(Math.PI / 2); add(guide, x, 1.08, -.17);
+        for (const y of [1.025, 1.135]) {
+          const screw = new T.CylinderGeometry(.009, .009, .012, 6);
+          screw.rotateX(Math.PI / 2); add(screw, x, y, -.105);
+        }
+      }
+      add(new T.BoxGeometry(.034, .13, .045), -1.29, 1.02, -.2);
+      add(new T.BoxGeometry(.07, .1, .04), -1.5, .965, -.12);
+      add(new T.TorusGeometry(.042, .009, 6, 14, Math.PI), -1.5, .894, -.18);
+      for (const x of [-1.542, -1.458]) add(new T.CylinderGeometry(.009, .009, .044, 6), x, .872, -.18);
+      const lockBody = new T.CylinderGeometry(.064, .058, .045, 16);
+      lockBody.rotateX(Math.PI / 2); add(lockBody, -1.5, .817, -.18);
+      const fittings = new T.Mesh(mergeGeometries(hardware), m.metal);
+      fittings.name = 'Interior sliding bolt and hanging padlock';
+      fittings.castShadow = fittings.receiveShadow = true; pivot.add(fittings);
+      hardware.forEach(geometry => geometry.dispose());
+    }
     leaf.castShadow = leaf.receiveShadow = panelMesh.castShadow = panelMesh.receiveShadow = true;
     doors.push({ pivot, side, openAngle: -side * Math.PI });
   }
@@ -389,11 +442,13 @@ export function buildArchitecture(scene) {
     box(x + .12, .25, 3.53, .24, .065, .08, m.trim);
   }
   for (const [material, geometries] of batches) {
-    const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = material !== m.weather; mesh.receiveShadow = true; group.add(mesh);
+    const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = material !== m.weather && material !== m.entranceGlazing; mesh.receiveShadow = true; mesh.layers.enable(1); group.add(mesh);
     geometries.forEach(g => g.dispose());
   }
   screenTemplates.forEach(geo => geo.dispose());
-  return { group, doors, materials: m };
+  const interior = buildEntranceHall(group, m);
+  for (const { pivot } of doors) pivot.traverse(object => { if (object.isMesh) object.layers.enable(1); });
+  return { group, doors, materials: m, interior };
 }
 
 function foliageTexture() {
