@@ -24,10 +24,10 @@ for (const pointerType of ['mouse', 'touch']) {
   send('pointerdown', { pointerType, pointerId: 1, clientX: 100, clientY: 100 });
   send('pointermove', { pointerType, pointerId: 1, clientX: 150, clientY: 130 });
   let d = direction();
-  assert.ok(d.x > 0 && d.y < 0, `${pointerType}: right/down turns right/down`);
+  assert.ok(d.x < 0 && d.y > 0, `${pointerType}: dragging right/down pulls the panorama right/down`);
   send('pointermove', { pointerType, pointerId: 1, clientX: 50, clientY: 70 });
   d = direction();
-  assert.ok(d.x < 0 && d.y > 0, `${pointerType}: left/up turns left/up`);
+  assert.ok(d.x > 0 && d.y < 0, `${pointerType}: dragging left/up pulls the panorama left/up`);
   send('pointerup', { pointerId: 1 });
   send('pointermove', { pointerType, pointerId: 1, clientX: 300, clientY: 300 });
   assert.deepEqual(direction(), d, 'Releasing the pointer stops turning');

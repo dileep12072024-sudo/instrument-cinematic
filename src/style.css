@@ -29,6 +29,7 @@ dialog{background:#18221f;color:#edf2e4;border:1px solid #e9f0df29;border-radius
 .entrance-actions .primary-btn{white-space:nowrap}
 .walk-panel{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);width:520px;max-width:calc(100% - 32px);padding:14px 18px;background:#14211eed;backdrop-filter:blur(12px);border:1px solid #ffffff35;border-radius:4px;z-index:8}
 #walk-location{display:block;font-size:12px;margin-bottom:8px;color:#edf1e5}
+#walk-route{width:100%;min-height:32px;margin-bottom:10px;padding:4px 8px;background:#24352e;color:#edf1e5;border:1px solid #ffffff35;border-radius:3px;font-size:12px}
 .walk-controls{display:flex;align-items:center;gap:9px;height:40px}
 .walk-controls input{min-width:30px;flex:1;accent-color:var(--accent);margin:0}
 .walk-controls .icon-btn span{display:contents}

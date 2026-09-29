@@ -1,5 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { groundSpine } from './footprint.js';
+import { buildSpineInterior } from './spine-interior.js';
 
 // Evidence and approximate dimensions: docs/entrance-video.md.
 export function buildEntranceHall(parent, exterior) {
@@ -55,32 +57,34 @@ export function buildEntranceHall(parent, exterior) {
   // Side doors open onto the cross-corridor; upper grilles remain fixed.
   for (const side of [-1, 1]) {
     const x = side * 3.79;
-    box(x, 2.03, -3.74, .12, 3.72, 6.12, wall);
+    const { roomFront, front, corridorCenter, corridorDepth } = groundSpine;
+    box(x, 2.03, (roomFront - 6.8) / 2, .12, 3.72, roomFront + 6.8, wall);
     box(x, 5.85, -3.74, .12, 4.2, 6.12, wall);
-    box(x, 2.03, 2.715, .12, 3.72, .63, wall);
+    // The window bay begins at 3.03; the passage now reaches the spine's front edge.
     box(x, 2.03, 6.055, .12, 3.72, 1.29, wall);
-    box(x, .955, 4.22, .12, 1.58, 2.38, wall);
-    box(x, 3.3925, 4.22, .12, .995, 2.38, wall);
-    box(x, 3.79, .85, .12, .26, 3.1, wall);
+    box(x, .955, 4.37, .12, 1.58, 2.08, wall);
+    box(x, 3.3925, 4.37, .12, .995, 2.08, wall);
+    box(x, 3.79, corridorCenter, .12, .26, corridorDepth, wall);
     box(x - side * .07, .26, 4.55, .07, .2, 4.3, tread);
     box(x - side * .07, .26, -3.74, .07, .2, 6.12, tread);
     // The camera shows the passage mouth, not the rooms beyond it.
-    box(side * 4.7, .125, .85, 1.75, .07, 3.1, tread);
-    for (const z of [-.67, 2.37]) box(x, 1.55, z, .16, 2.78, .07, trim);
-    box(x, 2.94, .85, .16, .08, 3.1, trim);
+    box(side * 4.7, .125, corridorCenter, 1.75, .07, corridorDepth, tread);
+    for (const z of [roomFront + .04, front - .04]) box(x, 1.55, z, .16, 2.78, .07, trim);
+    box(x, 2.94, corridorCenter, .16, .08, corridorDepth, trim);
     for (let row = 0; row < 3; row++) for (let col = 0; col < 8; col++) {
-      const cy = 3.08 + row * .24, cz = -.48 + col * .38;
-      const pts = [[-.15, 0], [-.08, .09], [.08, .09], [.15, 0], [.08, -.09], [-.08, -.09], [-.15, 0]];
+      const cy = 3.08 + row * .24, cell = (corridorDepth - .12) / 8, cz = roomFront + .06 + (col + .5) * cell;
+      const pts = [[-.4 * cell, 0], [-.2 * cell, .09], [.2 * cell, .09], [.4 * cell, 0], [.2 * cell, -.09], [-.2 * cell, -.09], [-.4 * cell, 0]];
       for (let i = 1; i < pts.length; i++) rod([x, cy + pts[i - 1][1], cz + pts[i - 1][0]], [x, cy + pts[i][1], cz + pts[i][0]], .014, trim);
-      rod([x, cy, cz + .15], [x, cy, cz + .23], .012, trim);
+      if (col < 7) rod([x, cy, cz + .4 * cell], [x, cy, cz + .6 * cell], .012, trim);
     }
-    for (const z of [-.5, 2.18]) for (let j = 0; j < 6; j++) {
+    for (const z of [roomFront + .08, front - .23]) for (let j = 0; j < 6; j++) {
       box(x + side * (.02 + j * .018), 1.54, z + j * .025, .024, 2.7, .018, trim);
     }
   }
   box(0, 3.80, 4.25, 7.62, .08, 5.15, wall);
   // Twin stair flights and their solid sloping parapets, visible at 24-32s.
-  const steps = 18, rise = .205, run = .33, startZ = .8;
+  const steps = 18, rise = .205, run = .33, startZ = groundSpine.roomFront;
+  group.userData.stairStartZ = startZ;
   for (const side of [-1, 1]) {
     for (let i = 0; i < steps; i++) {
       const top = .164 + (i + 1) * rise, z = startZ - (i + .5) * run;
@@ -92,7 +96,7 @@ export function buildEntranceHall(parent, exterior) {
     const g = new T.ExtrudeGeometry(shape, { depth: .18, bevelEnabled: false, steps: 1 });
     g.rotateY(-Math.PI / 2); g.translate(side * 1.55 + .09, 0, 0); add(g, wall);
     rod([side * 1.55, 1.12, startZ], [side * 1.55, .96 + steps * rise, startZ - steps * run], .037, wall);
-    box(side * 2.67, 3.78, -5.7, 2.02, .15, 1.1, tread);
+    box(side * 2.67, 3.78, startZ - steps * run - .55, 2.02, .15, 1.1, tread);
   }
   // Only the underside of the central returning stair is evidenced by this clip.
   const soffit = new T.BoxGeometry(2.9, .17, 5.9); soffit.rotateX(-.46); soffit.translate(0, 4.1, -1.82); add(soffit, wall);
@@ -151,7 +155,7 @@ export function buildEntranceHall(parent, exterior) {
   ].map(p => new T.Vector3(...p)));
   const rings = 48, columns = 12;
   for (let bench = 0; bench < 2; bench++) {
-    const first = 2.95 + bench * 1.72, last = first + 1.08;
+    const first = 3.58 + bench * 1.72, last = first + 1.08;
     const beam = new T.BoxGeometry(.085, .10, 1.65); beam.translate(3.19, .51, (first + last) / 2); seatPart(beam, frameMetal);
     for (let i = 0; i < 3; i++) {
       const z = first + i * .54, positions = [], uvs = [], indices = [];
@@ -200,12 +204,12 @@ export function buildEntranceHall(parent, exterior) {
   for (const side of [-1, 1]) {
     // Timber-framed interior notice/window bays; unreadable notices are left unlettered.
     for (let i = 0; i < 3; i++) {
-      const z = 3.4 + i * .82;
+      const z = 3.68 + i * .69;
       for (const edge of [-1, 1]) {
-        box(side * 3.78, 2.32, z + edge * .35, .24, 1.15, .065, exterior.entranceWood);
-        box(side * 3.78, 2.32 + edge * .55, z, .24, .05, .74, exterior.entranceWood);
+        box(side * 3.78, 2.32, z + edge * .31, .24, 1.15, .065, exterior.entranceWood);
+        box(side * 3.78, 2.32 + edge * .55, z, .24, .05, .66, exterior.entranceWood);
       }
-      box(side * 3.78, 2.32, z, .018, 1.04, .63, exterior.entranceGlazing);
+      box(side * 3.78, 2.32, z, .018, 1.04, .55, exterior.entranceGlazing);
       for (const offset of [-.15, .15]) box(side * 3.63, 2.32, z + offset, .035, 1.04, .015, trim);
     }
     box(side * 3.68, 3.26, 4.36, .06, .62, 1.5, exterior.entranceWood);
@@ -267,5 +271,6 @@ export function buildEntranceHall(parent, exterior) {
     geometries.forEach(g => g.dispose());
   }
   group.traverse(object => { if (object.isMesh) object.layers.enable(1); });
+  buildSpineInterior(group, { ...exterior, wall, tread, floor: floorMaterial });
   return { group, fan, floor, lights, stepsPerFlight: steps };
 }

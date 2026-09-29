@@ -52,7 +52,7 @@ try {
   await position(830, 'hall-recess');
   await position(1000, 'hall-looking-out');
   await position(350, 'hall-seating-approach');
-  await page.mouse.move(507, 420); await page.mouse.down(); await page.mouse.move(900, 490, { steps: 8 }); await page.mouse.up();
+  await page.mouse.move(1050, 510); await page.mouse.down(); await page.mouse.move(550, 420, { steps: 3 }); await page.mouse.up();
   await page.waitForTimeout(400);
   await page.screenshot({ path: 'artifacts/hall-right-seating.png' });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -75,8 +75,8 @@ try {
   await page.waitForTimeout(400);
   assert.notDeepEqual(await page.evaluate(() => __portrait.camera.quaternion.toArray()), quaternion, 'Drag looks around the hall');
   const directionAfter = await page.evaluate(() => __portrait.camera.getWorldDirection(__portrait.camera.position.clone()).toArray());
-  assert.ok(directionAfter.reduce((sum, v, i) => sum + (v - directionBefore.forward[i]) * directionBefore.right[i], 0) > .1, 'Dragging right turns the view right');
-  assert.ok(directionAfter[1] < directionBefore.forward[1], 'Dragging down looks down');
+  assert.ok(directionAfter.reduce((sum, v, i) => sum + (v - directionBefore.forward[i]) * directionBefore.right[i], 0) < -.1, 'Dragging right pulls the panorama right');
+  assert.ok(directionAfter[1] > directionBefore.forward[1], 'Dragging down pulls the panorama down');
   await page.setViewportSize({ width: 390, height: 844 });
   await position(240, 'hall-mobile-entry');
   await position(470, 'hall-mobile-stairs');

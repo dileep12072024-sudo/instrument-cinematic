@@ -1,6 +1,6 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { footprint } from './footprint.js';
+import { footprint, groundSpine } from './footprint.js';
 import { buildReferenceGarden } from './garden.js';
 import { buildEntranceHall } from './entrance-hall.js';
 
@@ -224,7 +224,7 @@ export function buildArchitecture(scene) {
         } else if (solid) {
           b(x, openingY, 0, ow, openingH, .32, m.wall);
         } else if (lattice) {
-          b(x, openingY, -.27, ow, openingH, .05, m.dark);
+          if (f !== 0 || !type.includes('corridor')) b(x, openingY, -.27, ow, openingH, .05, m.dark);
           if (f === 0) {
             concreteScreen(x, openingY, ow, openingH, transform);
           } else {
@@ -324,12 +324,13 @@ export function buildArchitecture(scene) {
           face(x + side * w / 2, z, side * Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'tower' ? 'tower-side' : type === 'west' ? 'west-outer' : 'room', type === 'tower' ? 'all' : false);
           if (type === 'tower') {
             // Ground-floor openings connect the filmed entrance hall to each side passage.
-            box(x + side * w / 2, 2, -3.85, .32, 4, 6.3, m.wall);
-            box(x + side * w / 2, 2, 2.715, .32, 4, .63, m.wall);
+            const { roomFront, front } = groundSpine;
+            box(x + side * w / 2, 2, (roomFront - 7) / 2, .32, 4, roomFront + 7, m.wall);
+            if (front < 3.03) box(x + side * w / 2, 2, (front + 3.03) / 2, .32, 4, 3.03 - front, m.wall);
             box(x + side * w / 2, 2, 6.205, .32, 4, 1.59, m.wall);
-            box(x + side * w / 2, .8725, 4.22, .32, 1.745, 2.38, m.wall);
-            box(x + side * w / 2, 3.4475, 4.22, .32, 1.105, 2.38, m.wall);
-            box(x + side * w / 2, 3.8, .85, .32, .4, 3.1, m.wall);
+            box(x + side * w / 2, .8725, 4.37, .32, 1.745, 2.08, m.wall);
+            box(x + side * w / 2, 3.4475, 4.37, .32, 1.105, 2.08, m.wall);
+            box(x + side * w / 2, 3.8, groundSpine.corridorCenter, .32, .4, groundSpine.corridorDepth, m.wall);
           }
         }
       }

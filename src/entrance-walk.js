@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { groundSpine } from './footprint.js';
 
 const stops = [
   { at: 0, z: 12.3, yaw: 0, name: 'The threshold' },
@@ -8,15 +9,34 @@ const stops = [
   { at: .83, z: -2.3, yaw: 0, name: 'The central recess' },
   { at: 1, z: .9, yaw: Math.PI, name: 'Looking toward the entrance' },
 ];
+const rightWing = [
+  stops[0],
+  { at: .18, x: 0, z: 4.0, yaw: 0, name: 'Entrance hall' },
+  { at: .32, x: 3.65, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Right-wing gate' },
+  { at: .36, x: 3.8, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Right-wing steps' },
+  { at: .43, x: 4.7, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Right-wing corridor' },
+  { at: .68, x: 12, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Right-wing corridor' },
+  { at: .86, x: 19.9, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Seminar Hall' },
+  { at: 1, x: 19.9, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: -Math.PI / 2, name: 'Looking toward the central hall' },
+];
+const seminarSurrounds = [
+  { at: 0, x: 19.8, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Seminar Hall approach' },
+  { at: .22, x: 21.08, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: 0, name: 'Side-passage grille' },
+  { at: .42, x: 21.08, y: groundSpine.rightFloor + 1.666, z: .55, yaw: 0, name: 'Side passage' },
+  { at: .70, x: 21.08, y: groundSpine.rightFloor + 1.666, z: -2.1, yaw: 0, name: 'Strong Room approach' },
+  { at: .82, x: 21.08, y: groundSpine.rightFloor + 1.666, z: -2.1, yaw: Math.PI, name: 'Looking back toward the grille' },
+  { at: 1, x: 21.08, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI * 1.5, name: 'Front corridor' },
+];
 
 export function createEntranceWalk(camera, canvas, onExit, onChange) {
   let active = false, playing = false, progress = 0, yaw = 0, pitch = 0, pointer = null;
+  let route = stops;
   const panel = document.querySelector('#walk-panel'), slider = document.querySelector('#walk-progress');
   const play = document.querySelector('#walk-play');
   function sync() {
     panel.hidden = !active;
     slider.value = Math.round(progress * 1000);
-    const current = stops.findLast(stop => progress >= stop.at) || stops[0];
+    const current = route.findLast(stop => progress >= stop.at) || route[0];
     document.querySelector('#walk-location').textContent = current.name;
     slider.setAttribute('aria-valuetext', current.name);
     play.setAttribute('aria-pressed', playing);
@@ -32,10 +52,11 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
     progress = T.MathUtils.clamp(value, 0, 1); playing = false; yaw = pitch = 0; sync();
   }
   function step(direction) {
-    const stop = direction > 0 ? stops.find(s => s.at > progress + .002) : stops.findLast(s => s.at < progress - .002);
+    const stop = direction > 0 ? route.find(s => s.at > progress + .002) : route.findLast(s => s.at < progress - .002);
     seek(stop?.at ?? (direction > 0 ? 1 : 0));
   }
   slider.addEventListener('input', () => seek(Number(slider.value) / 1000));
+  document.querySelector('#walk-route').addEventListener('change', e => { route = { hall: stops, right: rightWing, seminar: seminarSurrounds }[e.target.value] || stops; seek(0); });
   play.onclick = () => { if (progress === 1) progress = 0; playing = !playing; sync(); };
   document.querySelector('#walk-back').onclick = () => step(-1);
   document.querySelector('#walk-forward').onclick = () => step(1);
@@ -47,8 +68,10 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
   });
   canvas.addEventListener('pointermove', e => {
     if (!active || pointer?.id !== e.pointerId) return;
-    yaw += (e.clientX - pointer.x) * .004;
-    pitch = T.MathUtils.clamp(pitch - (e.clientY - pointer.y) * .004, -1.05, 1.05);
+    // Grab the panorama rather than steer the gaze; preserve screen-relative sensitivity.
+    const sensitivity = Math.PI / Math.max(1, canvas.clientHeight || 800);
+    yaw -= (e.clientX - pointer.x) * sensitivity;
+    pitch = T.MathUtils.clamp(pitch + (e.clientY - pointer.y) * sensitivity, -1.05, 1.05);
     pointer.x = e.clientX; pointer.y = e.clientY; onChange();
   });
   const release = e => { if (pointer?.id === e.pointerId) pointer = null; };
@@ -68,17 +91,17 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
   document.addEventListener('keydown', e => { if (active && e.key === 'Escape' && !document.querySelector('dialog[open]')) onExit(); });
   return {
     get active() { return active; }, get progress() { return progress; }, get playing() { return playing; },
-    enter() { active = true; playing = false; progress = 0; yaw = pitch = 0; sync(); canvas.focus({ preventScroll: true }); },
+    enter() { active = true; playing = false; progress = 0; yaw = pitch = 0; route = stops; document.querySelector('#walk-route').value = 'hall'; sync(); canvas.focus({ preventScroll: true }); },
     exit() { active = playing = false; pointer = null; sync(); },
     update(dt) {
       if (!active) return;
       if (playing) { progress = Math.min(1, progress + dt / 36); if (progress === 1) playing = false; sync(); }
-      const next = stops.findIndex(stop => stop.at > progress), b = stops[next < 0 ? stops.length - 1 : next];
-      const a = stops[Math.max(0, (next < 0 ? stops.length - 1 : next) - 1)];
+      const next = route.findIndex(stop => stop.at > progress), b = route[next < 0 ? route.length - 1 : next];
+      const a = route[Math.max(0, (next < 0 ? route.length - 1 : next) - 1)];
       const raw = T.MathUtils.clamp((progress - a.at) / (b.at - a.at), 0, 1), t = raw * raw * (3 - 2 * raw);
       const angle = T.MathUtils.lerp(a.yaw, b.yaw, t) + yaw;
-      camera.position.set(0, 1.83, T.MathUtils.lerp(a.z, b.z, t));
-      camera.lookAt(Math.sin(angle) * Math.cos(pitch), 1.83 + Math.sin(pitch), camera.position.z - Math.cos(angle) * Math.cos(pitch));
+      camera.position.set(T.MathUtils.lerp(a.x || 0, b.x || 0, t), T.MathUtils.lerp(a.y || 1.83, b.y || 1.83, t), T.MathUtils.lerp(a.z, b.z, t));
+      camera.lookAt(camera.position.x + Math.sin(angle) * Math.cos(pitch), camera.position.y + Math.sin(pitch), camera.position.z - Math.cos(angle) * Math.cos(pitch));
     },
   };
 }
