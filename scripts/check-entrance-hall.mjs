@@ -18,6 +18,20 @@ try {
   await page.waitForFunction(() => __portrait.camera.position.z < 32);
   await page.locator('#enter-hall').click();
   assert.ok(await page.evaluate(() => __portrait.entranceWalk.active && __portrait.doorsOpen && !__portrait.controls.enabled));
+  const seating = await page.evaluate(() => {
+    const bank = __portrait.scene.getObjectByName('Right-side waiting benches');
+    const shell = bank?.getObjectByName('Perforated brushed steel seating');
+    return {
+      seats: bank?.userData.seats, benches: bank?.userData.benches, meshes: bank?.children.length,
+      rightOnly: bank?.children.every(mesh => {
+        const p = mesh.geometry.attributes.position;
+        return Array.from({ length: p.count }, (_, i) => p.getX(i)).every(x => x > 2.7 && x < 3.65);
+      }),
+      curved: new Set(Array.from(shell?.geometry.attributes.position.array || []).filter((_, i) => i % 3 === 1).map(y => y.toFixed(3))).size > 40,
+      perforated: shell?.material.alphaTest === .5,
+    };
+  });
+  assert.deepEqual(seating, { seats: 6, benches: 2, meshes: 3, rightOnly: true, curved: true, perforated: true });
   async function position(value, name) {
     await page.locator('#walk-progress').evaluate((e, value) => { e.value = value; e.dispatchEvent(new Event('input')); }, value);
     await page.waitForFunction(value => Math.abs(__portrait.entranceWalk.progress - value / 1000) < .002, value);
@@ -37,6 +51,15 @@ try {
   await position(470, 'hall-stairs');
   await position(830, 'hall-recess');
   await position(1000, 'hall-looking-out');
+  await position(350, 'hall-seating-approach');
+  await page.mouse.move(507, 420); await page.mouse.down(); await page.mouse.move(900, 490, { steps: 8 }); await page.mouse.up();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'artifacts/hall-right-seating.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'artifacts/hall-mobile-seating.png' });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await position(1000, 'hall-looking-out');
   await page.locator('#walk-back').click();
   assert.ok(await page.evaluate(() => __portrait.entranceWalk.progress < 1));
   await page.locator('#walk-play').click();
@@ -44,8 +67,16 @@ try {
   await page.waitForFunction(before => __portrait.entranceWalk.progress > before + .005, before);
   await page.locator('#walk-play').click();
   const quaternion = await page.evaluate(() => __portrait.camera.quaternion.toArray());
+  const directionBefore = await page.evaluate(() => {
+    const c = __portrait.camera;
+    return { forward: c.getWorldDirection(c.position.clone()).toArray(), right: c.matrixWorld.elements.slice(0, 3) };
+  });
   await page.mouse.move(650, 420); await page.mouse.down(); await page.mouse.move(780, 450, { steps: 8 }); await page.mouse.up();
+  await page.waitForTimeout(400);
   assert.notDeepEqual(await page.evaluate(() => __portrait.camera.quaternion.toArray()), quaternion, 'Drag looks around the hall');
+  const directionAfter = await page.evaluate(() => __portrait.camera.getWorldDirection(__portrait.camera.position.clone()).toArray());
+  assert.ok(directionAfter.reduce((sum, v, i) => sum + (v - directionBefore.forward[i]) * directionBefore.right[i], 0) > .1, 'Dragging right turns the view right');
+  assert.ok(directionAfter[1] < directionBefore.forward[1], 'Dragging down looks down');
   await page.setViewportSize({ width: 390, height: 844 });
   await position(240, 'hall-mobile-entry');
   await position(470, 'hall-mobile-stairs');

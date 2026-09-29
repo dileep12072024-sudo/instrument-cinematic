@@ -48,7 +48,6 @@ export function buildEntranceHall(parent, exterior) {
   plaster.wrapS = plaster.wrapT = T.RepeatWrapping; plaster.anisotropy = 4;
   const wall = exterior.wall.clone(); wall.name = 'Aged entrance hall plaster'; wall.color.set('#ffffff'); wall.map = plaster; wall.bumpMap = plaster; wall.bumpScale = .008; wall.roughness = .98;
   const trim = new T.MeshStandardMaterial({ color: '#273a33', roughness: .58, metalness: .15 });
-  const metal = new T.MeshStandardMaterial({ color: '#a5aaa0', metalness: .65, roughness: .38 });
   const recess = new T.MeshStandardMaterial({ color: '#607e9b', roughness: .96, map: exterior.wall.map });
   const floor = new T.Mesh(new T.PlaneGeometry(7.64, 13.6), floorMaterial);
   floor.name = 'Continuous tiled entrance floor'; floor.rotation.x = -Math.PI / 2; floor.position.set(0, .164, 0);
@@ -119,21 +118,86 @@ export function buildEntranceHall(parent, exterior) {
   for (const x of [-.51, .75]) box(x, .78, -3.72, .08, .43, .05, exterior.doorPanel);
   const board = new T.BoxGeometry(.75, 1.6, .035); board.rotateZ(-.09); board.rotateX(-.12); board.translate(-1.26, .96, -2.8); add(board, exterior.doorPanel);
 
-  // Five waiting seats are visible on one wall, with another bank on the opposite side.
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < 5; i++) {
-      const z = 2.95 + i * .62, x = side * 3.23;
-      const seat = new T.BoxGeometry(.52, .045, .55); seat.translate(x - side * .15, .62, z); add(seat, metal);
-      const back = new T.BoxGeometry(.045, .62, .55); back.rotateZ(side * -.12); back.translate(x + side * .16, .95, z); add(back, metal);
-      if (i % 2 === 0) {
-        rod([x, .52, z], [x, .23, z], .033, trim);
-        rod([x - .3, .21, z], [x + .3, .21, z], .027, trim);
+  // At 48s the camera looks outward: both three-seat benches are on the entrance's right.
+  const seating = new T.Group(); seating.name = 'Right-side waiting benches'; group.add(seating);
+  seating.userData = { side: 'right on entering', benches: 2, seats: 6 };
+  const perforations = map((c, w, h) => {
+    c.fillStyle = '#c5c8c5'; c.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y++) {
+      c.fillStyle = y % 3 ? '#ffffff08' : '#262e3212'; c.fillRect(0, y, w, 1);
+    }
+    c.globalCompositeOperation = 'destination-out';
+    c.fillStyle = '#000000';
+    for (let row = 0; row < 112; row++) for (let col = 0; col < 44; col++) {
+      const x = 22 + col * 10.7 + (row % 2) * 5.35, y = 44 + row * 8.35;
+      c.beginPath(); c.arc(x, y, 1.85, 0, Math.PI * 2); c.fill();
+    }
+  }, 512, 1024);
+  const shellMetal = new T.MeshStandardMaterial({ name: 'Perforated brushed steel seating', map: perforations, color: '#c3c7c6', metalness: .72, roughness: .32, alphaTest: .5, side: T.DoubleSide });
+  const edgeMetal = new T.MeshStandardMaterial({ name: 'Polished seat edging', color: '#b7bfc0', metalness: .9, roughness: .19 });
+  const frameMetal = new T.MeshStandardMaterial({ name: 'Dark bench frame and armrests', color: '#222b2a', metalness: .65, roughness: .31 });
+  const seatBatches = new Map();
+  function seatPart(g, material) {
+    if (!seatBatches.has(material)) seatBatches.set(material, []);
+    seatBatches.get(material).push(g.index ? g.toNonIndexed() : g);
+  }
+  function seatTube(points, radius, material) {
+    const curve = new T.CatmullRomCurve3(points.map(p => new T.Vector3(...p)));
+    seatPart(new T.TubeGeometry(curve, 32, radius, 8, false), material);
+  }
+  const profile = new T.CatmullRomCurve3([
+    [2.84, .61, 0], [2.88, .65, 0], [3.12, .62, 0], [3.29, .65, 0],
+    [3.36, .76, 0], [3.40, .94, 0], [3.46, 1.20, 0], [3.50, 1.31, 0],
+  ].map(p => new T.Vector3(...p)));
+  const rings = 48, columns = 12;
+  for (let bench = 0; bench < 2; bench++) {
+    const first = 2.95 + bench * 1.72, last = first + 1.08;
+    const beam = new T.BoxGeometry(.085, .10, 1.65); beam.translate(3.19, .51, (first + last) / 2); seatPart(beam, frameMetal);
+    for (let i = 0; i < 3; i++) {
+      const z = first + i * .54, positions = [], uvs = [], indices = [];
+      for (let row = 0; row <= rings; row++) {
+        const t = row / rings, p = profile.getPoint(t), tangent = profile.getTangent(t);
+        for (let col = 0; col <= columns; col++) {
+          const u = col / columns, cup = .018 * (2 * u - 1) ** 2;
+          positions.push(p.x - tangent.y * cup, p.y + tangent.x * cup, z + (u - .5) * .50);
+          uvs.push(u, t);
+          if (row < rings && col < columns) {
+            const a = row * (columns + 1) + col, b = a + columns + 1;
+            indices.push(a, b, a + 1, b, b + 1, a + 1);
+          }
+        }
       }
-      if (i === 0 || i === 2 || i === 4) {
-        rod([x - side * .4, .7, z - .28], [x - side * .4, .9, z - .28], .025, trim);
-        rod([x - side * .4, .9, z - .28], [x + side * .12, .9, z - .28], .028, trim);
+      const shell = new T.BufferGeometry(); shell.setAttribute('position', new T.Float32BufferAttribute(positions, 3));
+      shell.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2)); shell.setIndex(indices); shell.computeVertexNormals(); seatPart(shell, shellMetal);
+      for (const edge of [-1, 1]) {
+        const points = Array.from({ length: 25 }, (_, j) => {
+          const p = profile.getPoint(j / 24), t = profile.getTangent(j / 24);
+          return [p.x - t.y * .018, p.y + t.x * .018, z + edge * .251];
+        });
+        seatTube(points, .012, edgeMetal);
+      }
+      for (const t of [0, 1]) {
+        const p = profile.getPoint(t);
+        seatTube([[p.x, p.y, z - .25], [p.x, p.y, z], [p.x, p.y, z + .25]], .012, edgeMetal);
       }
     }
+    for (const z of [first - .28, last + .28]) {
+      seatTube([[3.27, .51, z], [3.16, .59, z], [2.88, .66, z], [2.87, .84, z], [3.05, .90, z], [3.36, .90, z]], .028, frameMetal);
+    }
+    for (const z of [first - .12, last + .12]) {
+      seatTube([[3.19, .53, z], [3.20, .41, z], [3.18, .31, z]], .047, frameMetal);
+      seatTube([[2.80, .20, z], [2.95, .28, z], [3.18, .33, z], [3.40, .28, z], [3.55, .20, z]], .034, frameMetal);
+      for (const x of [2.80, 3.55]) {
+        const foot = new T.SphereGeometry(.042, 12, 6); foot.scale(1.3, .30, 1); foot.translate(x, .184, z); seatPart(foot, frameMetal);
+      }
+    }
+  }
+  for (const [material, geometries] of seatBatches) {
+    const mesh = new T.Mesh(mergeGeometries(geometries), material);
+    mesh.name = material.name; mesh.castShadow = mesh.receiveShadow = true; seating.add(mesh);
+    geometries.forEach(g => g.dispose());
+  }
+  for (const side of [-1, 1]) {
     // Timber-framed interior notice/window bays; unreadable notices are left unlettered.
     for (let i = 0; i < 3; i++) {
       const z = 3.4 + i * .82;

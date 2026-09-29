@@ -47,7 +47,7 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
   });
   canvas.addEventListener('pointermove', e => {
     if (!active || pointer?.id !== e.pointerId) return;
-    yaw -= (e.clientX - pointer.x) * .004;
+    yaw += (e.clientX - pointer.x) * .004;
     pitch = T.MathUtils.clamp(pitch - (e.clientY - pointer.y) * .004, -1.05, 1.05);
     pointer.x = e.clientX; pointer.y = e.clientY; onChange();
   });
@@ -62,8 +62,8 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
     if (!active) return;
     if (e.key === 'ArrowUp' || e.key.toLowerCase() === 'w') { e.preventDefault(); seek(progress + .015); }
     if (e.key === 'ArrowDown' || e.key.toLowerCase() === 's') { e.preventDefault(); seek(progress - .015); }
-    if (e.key === 'ArrowLeft') { e.preventDefault(); yaw += .1; onChange(); }
-    if (e.key === 'ArrowRight') { e.preventDefault(); yaw -= .1; onChange(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); yaw -= .1; onChange(); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); yaw += .1; onChange(); }
   });
   document.addEventListener('keydown', e => { if (active && e.key === 'Escape' && !document.querySelector('dialog[open]')) onExit(); });
   return {
