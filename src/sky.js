@@ -63,19 +63,19 @@ export function createLiveSky(scene, camera) {
       }`
   })); clouds.name = 'Live moving cloud cover'; clouds.renderOrder = 3; scene.add(clouds);
   const texture = new T.TextureLoader().load('/media/moon-reference.jpg'); texture.colorSpace = T.SRGBColorSpace;
-  const moonUniforms = { photo: { value: texture }, light: { value: new T.Vector3(0, 0, 1) }, opacity: { value: 1 } };
-  const moon = new T.Mesh(new T.PlaneGeometry(31.5, 31.5), new T.ShaderMaterial({
+  const moonUniforms = { photo: { value: texture }, light: { value: new T.Vector3(0, 0, 1) }, opacity: { value: 0 } };
+  const moon = new T.Mesh(new T.PlaneGeometry(11.5, 11.5), new T.ShaderMaterial({
     uniforms: moonUniforms, transparent: true, depthWrite: false,
     vertexShader: 'varying vec2 vUv;varying vec3 vSkyDirection;void main(){vUv=uv;vSkyDirection=(modelMatrix*vec4(position,1.)).xyz-cameraPosition;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position.z=gl_Position.w*.9999;}',
     fragmentShader: `uniform sampler2D photo;uniform vec3 light;uniform float opacity;varying vec2 vUv;varying vec3 vSkyDirection;
       void main(){vec2 p=(vUv-.5)*2.;float r=length(p);if(r>1.||vSkyDirection.y<=0.)discard;
-        vec3 n=vec3(p,sqrt(max(0.,1.-r*r)));float lit=smoothstep(-.025,.045,dot(n,light));
+        vec3 n=vec3(p,sqrt(max(0.,1.-r*r)));float lit=smoothstep(0.,.045,dot(n,light));if(lit<.001)discard;
         vec2 uv=vec2((154.+vUv.x*430.)/736.,1.-(255.+(1.-vUv.y)*430.)/1104.);
-        vec3 albedo=texture2D(photo,uv).rgb;gl_FragColor=vec4(albedo*.72*(.07+.93*lit),opacity*(1.-smoothstep(.989,1.,r)));
+        vec3 albedo=texture2D(photo,uv).rgb;gl_FragColor=vec4(albedo*.72,opacity*lit*(1.-smoothstep(.989,1.,r)));
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`
-  })); moon.name = 'Photographic phased moon'; moon.renderOrder = 1; scene.add(moon);
+  })); moon.name = 'Photographic phased moon'; moon.visible = false; moon.renderOrder = 1; scene.add(moon);
   const moonDirection = new T.Vector3();
   const moonlight = new T.DirectionalLight('#c7d8ff', 0); scene.add(moonlight);
   let illumination = 0;
@@ -95,10 +95,11 @@ export function createLiveSky(scene, camera) {
       // Compose the lunar backdrop above the roofline, with a centred mobile framing.
       moonDirection.set(camera.aspect < .85 ? -.465 : -.25, .104, camera.aspect < .85 ? -.885 : -.968).normalize();
       moon.position.copy(camera.position).addScaledVector(moonDirection, 240); moon.lookAt(camera.position);
-      moon.visible = true;
-      moonUniforms.opacity.value = .08 + night * .92;
+      const moonOpacity = T.MathUtils.smoothstep(night, .65, .95);
+      moon.visible = moonOpacity > 0 && illumination > .005;
+      moonUniforms.opacity.value = moonOpacity;
       moonlight.position.copy(moonDirection).multiplyScalar(80);
-      moonlight.intensity = .34 * Math.pow(illumination, 1.4) * night * (1 - weather.cloudCover / 100);
+      moonlight.intensity = .14 * Math.pow(illumination, 1.4) * moonOpacity * (1 - weather.cloudCover / 100);
       if (!weather.storm || reduced) { flash.intensity = 0; nextFlash = time + 12; }
       else {
         if (time > nextFlash) { flashEnd = time + .25; nextFlash = time + 14 + Math.random() * 18; }

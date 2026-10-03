@@ -1,12 +1,14 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { footprint, groundSpine as layout } from './footprint.js';
+import { footprint, groundSpine as layout, seminarPassage as passage } from './footprint.js';
 
-// Facades only: photographs do not establish the rooms' internal partitions or contents.
+// Visible circulation and closed room fronts only. Dimensions remain interpreted.
 export function buildSpineInterior(parent, m) {
-  const group = new T.Group(); group.name = 'Ground-floor spine'; group.userData = { ...layout }; parent.add(group);
+  const group = new T.Group(); group.name = 'Ground-floor spine'; group.userData = { ...layout, sidePassage: { ...passage } }; parent.add(group);
   const batches = new Map();
+  let transform = new T.Matrix4();
   function add(g, material) {
+    g.applyMatrix4(transform);
     if (!batches.has(material)) batches.set(material, []);
     batches.get(material).push(g.index ? g.toNonIndexed() : g);
   }
@@ -16,162 +18,255 @@ export function buildSpineInterior(parent, m) {
   function tube(points, radius, material) {
     const vertices = points.map(p => new T.Vector3(...p));
     const curve = points.length === 2 ? new T.LineCurve3(...vertices) : new T.CatmullRomCurve3(vertices);
-    add(new T.TubeGeometry(curve, points.length === 2 ? 1 : 20, radius, 6, false), material);
+    add(new T.TubeGeometry(curve, points.length === 2 ? 1 : 24, radius, 8, false), material);
   }
-  const blue = m.frame.clone(); blue.color.set('#708b95'); blue.roughness = .72;
-  const inset = blue.clone(); inset.color.set('#526d76');
-  const wire = new T.MeshStandardMaterial({ color: '#716e61', roughness: .95 });
-  const glass = new T.MeshStandardMaterial({ color: '#bbc5b9', roughness: .29, metalness: .18 });
-  const floorMap = m.floor.map.clone(); floorMap.repeat.set(23, 3); floorMap.needsUpdate = true;
-  const floorMat = m.floor.clone(); floorMat.map = floorMap; floorMat.color.set('#bbc4b9'); floorMat.roughness = .28; floorMat.envMapIntensity = .4;
-  const grout = new T.MeshStandardMaterial({ color: '#7a887e', roughness: .72 });
+  function rectangle(w, h, x = 0, y = 0) {
+    const s = new T.Shape(); s.moveTo(x - w / 2, y - h / 2); s.lineTo(x + w / 2, y - h / 2);
+    s.lineTo(x + w / 2, y + h / 2); s.lineTo(x - w / 2, y + h / 2); s.closePath(); return s;
+  }
+  function extrude(shape, x, y, z, depth, material, bevel = .003) {
+    const g = new T.ExtrudeGeometry(shape, { depth, steps: 1, bevelEnabled: bevel > 0, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 2, curveSegments: 1 });
+    g.translate(x, y, z - depth); add(g, material);
+  }
+  function frame(x, y, z, w, h, border, depth, material) {
+    const s = rectangle(w, h); s.holes.push(rectangle(w - border * 2, h - border * 2));
+    extrude(s, x, y, z, depth, material);
+  }
+  function onWall(x, z, angle, build) {
+    const previous = transform;
+    transform = new T.Matrix4().makeRotationY(angle); transform.setPosition(x, 0, z); build(); transform = previous;
+  }
+  // Shared fine-scale paint wear, rather than stretching plaster across the joinery.
+  let seed = 101625;
+  const random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 512;
+  const ctx = canvas.getContext('2d'); ctx.fillStyle = '#e1e1e1'; ctx.fillRect(0, 0, 256, 512);
+  for (let i = 0; i < 2200; i++) {
+    ctx.fillStyle = `rgba(50,50,50,${random() * .10})`; ctx.fillRect(random() * 256, random() * 512, .5 + random(), 1 + random() * 35);
+  }
+  for (let i = 0; i < 130; i++) {
+    ctx.fillStyle = '#adadad55'; ctx.fillRect(random() * 256, random() * 512, 1 + random() * 3, 1 + random() * 5);
+  }
+  const paint = new T.CanvasTexture(canvas); paint.colorSpace = T.SRGBColorSpace; paint.wrapS = paint.wrapT = T.RepeatWrapping; paint.anisotropy = 4;
+  const blue = new T.MeshStandardMaterial({ name: 'Worn blue-grey painted timber', color: '#93a7ac', map: paint, bumpMap: paint, bumpScale: .0015, roughness: .48 });
+  const inset = blue.clone(); inset.color.set('#81969b');
+  const darkWood = m.entranceWood.clone(); darkWood.color.set('#4c4435');
+  const wire = new T.MeshStandardMaterial({ color: '#99958a', roughness: .85 });
+  const glass = new T.MeshPhysicalMaterial({ color: '#a2b5ad', roughness: .16, metalness: .05, clearcoat: .8, envMapIntensity: 1.2 });
+  const daylightGlass = glass.clone(); daylightGlass.transparent = true; daylightGlass.opacity = .23; daylightGlass.depthWrite = false;
+  const tile = document.createElement('canvas'); tile.width = tile.height = 512;
+  const tileContext = tile.getContext('2d'); tileContext.drawImage(m.floor.map.image, 0, 0, 512, 512);
+  tileContext.strokeStyle = '#7b8278'; tileContext.lineWidth = 3.5; tileContext.strokeRect(0, 0, 512, 512);
+  const floorMap = m.floor.map.clone(); floorMap.image = tile; floorMap.repeat.set(1, 1); floorMap.needsUpdate = true;
+  const floorMat = m.floor.clone(); floorMat.map = floorMap; floorMat.color.set('#bdc5b9'); floorMat.roughness = .29; floorMat.envMapIntensity = .18;
+  const skirting = floorMat.clone(); skirting.color.set('#767c73'); skirting.roughness = .34;
+  const base = layout.rightFloor, front = layout.roomFront;
+  const doorCenters = [5.45, 8.7, 11.05, 15.15, 17.6, 20.1];
+  const windows = [[7.02, 1.28, 3], [13.1, 1.22, 2]];
+  const vents = [...doorCenters, ...windows.map(w => w[0])];
+
+  function floor(x, z, width, depth, y) {
+    const g = new T.PlaneGeometry(width, depth); g.rotateX(-Math.PI / 2); g.translate(x, y, z);
+    const p = g.attributes.position, uv = g.attributes.uv;
+    for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / .72, p.getZ(i) / .72);
+    add(g, floorMat);
+  }
+  function wall(x, z, angle, width, bottom, top, openings = []) {
+    onWall(x, z, angle, () => {
+      const shape = rectangle(width, top - bottom, 0, (bottom + top) / 2);
+      for (const o of openings) shape.holes.push(rectangle(o.w, o.h, o.x, o.y));
+      extrude(shape, 0, 0, 0, .18, m.wall, 0);
+    });
+  }
+  function latch(x, y, z, width = .40) {
+    tube([[x - width / 2, y, z], [x + width / 2, y, z]], .012, m.metal);
+    for (const dx of [-width * .38, .05, width * .38]) {
+      box(x + dx, y, z - .014, .028, .085, .014, m.metal);
+      tube([[x + dx, y - .02, z], [x + dx, y + .02, z]], .017, m.metal);
+    }
+    tube([[x + .05, y - .055, z], [x + .04, y - .024, z], [x + .075, y - .024, z], [x + .09, y - .055, z]], .006, m.metal);
+    const lock = new T.CylinderGeometry(.029, .029, .023, 16); lock.rotateX(Math.PI / 2); lock.translate(x + .065, y - .078, z); add(lock, m.metal);
+  }
+  function panelDoor(x, bottom, z, width, height, rows = 7) {
+    frame(x, bottom + height / 2, z + .012, width + .12, height + .08, .062, .10, blue);
+    for (const side of [-1, 1]) {
+      const w = width / 2 - .006, cx = x + side * width / 4;
+      const leaf = rectangle(w, height - .022);
+      const weights = rows === 5 ? [.40, .15, .15, .15, .15] : Array(rows).fill(1 / rows);
+      let offset = .06;
+      const panels = weights.map(weight => { const spacing = (height - .12) * weight, panel = { y: offset + spacing / 2, h: spacing - .065 }; offset += spacing; return panel; });
+      const panelW = w - .11;
+      for (const panel of panels) leaf.holes.push(rectangle(panelW, panel.h, 0, -height / 2 + panel.y));
+      extrude(leaf, cx, bottom + height / 2, z, .038, blue);
+      for (const panel of panels) {
+        extrude(rectangle(panelW - .008, panel.h - .008), cx, bottom + panel.y, z - .012, .018, inset, .005);
+      }
+      for (const y of [bottom + .30, bottom + height - .30]) {
+        box(cx + side * (w / 2 - .01), y, z + .012, .025, .095, .014, m.metal);
+        tube([[cx + side * w / 2, y - .05, z + .021], [cx + side * w / 2, y + .05, z + .021]], .009, m.metal);
+      }
+    }
+    latch(x, bottom + .97, z + .043);
+  }
+  function windowFrame(x, y, z, width, height, columns, transparent = false) {
+    frame(x, y, z + .02, width + .09, height + .09, .045, .085, blue);
+    for (let col = 0; col < columns; col++) for (let row = 0; row < 3; row++) {
+      const cx = x - width / 2 + (col + .5) * width / columns, cy = y - height / 2 + (row + .5) * height / 3;
+      frame(cx, cy, z, width / columns - .008, height / 3 - .008, .028, .038, blue);
+      box(cx, cy, z - .024, width / columns - .065, height / 3 - .063, .004, transparent ? daylightGlass : glass);
+    }
+    for (let row = 0; row < 12; row++) tube([[x - width / 2, y - height / 2 + .055 + row * (height - .11) / 11, z + .037], [x + width / 2, y - height / 2 + .055 + row * (height - .11) / 11, z + .037]], .007, m.metal);
+    box(x, y - height / 2 - .065, z + .015, width + .16, .055, .20, m.wall);
+  }
+  function ventilator(x, y, z) {
+    // Shallow timber frame, four glazed lights and a tilted dark wooden lower flap.
+    frame(x, y, z, .96, .39, .032, .045, darkWood);
+    for (let col = 0; col < 4; col++) {
+      const cx = x - .345 + col * .23;
+      frame(cx, y + .065, z + .002, .223, .20, .021, .031, blue);
+      box(cx, y + .065, z - .018, .18, .15, .005, glass);
+    }
+    const flap = new T.BoxGeometry(.90, .12, .018); flap.rotateX(-.48); flap.translate(x, y - .11, z + .022); add(flap, darkWood);
+  }
+  function sign(text, x, y, z, rotation, width, color = '#18201e') {
+    const c = document.createElement('canvas'); c.width = 768; c.height = 128;
+    const p = c.getContext('2d'); p.fillStyle = '#e5e1d6'; p.fillRect(0, 0, c.width, c.height);
+    p.fillStyle = color; p.font = 'bold 60px Arial'; p.textAlign = 'center'; p.textBaseline = 'middle'; p.fillText(text, 384, 64, 730);
+    const map = new T.CanvasTexture(c); map.colorSpace = T.SRGBColorSpace;
+    const mesh = new T.Mesh(new T.PlaneGeometry(width, width / 6), new T.MeshStandardMaterial({ map, roughness: .85 })); mesh.position.set(x, y, z); mesh.rotation.y = rotation; group.add(mesh);
+  }
+
   for (const part of footprint.filter(p => p.type.includes('corridor'))) {
-    const y = part.x > 0 ? layout.rightFloor : layout.hallFloor;
-    const stepInset = part.x > 0 ? .7 : 0;
-    const floor = new T.Mesh(new T.PlaneGeometry(part.width - stepInset, layout.corridorDepth), floorMat);
-    floor.rotation.x = -Math.PI / 2; floor.position.set(part.x + stepInset / 2, y, layout.corridorCenter); floor.receiveShadow = true; group.add(floor);
-    for (let x = part.x - part.width / 2 + stepInset; x < part.x + part.width / 2; x += .72) box(x, y + .002, layout.corridorCenter, .007, .002, layout.corridorDepth, grout);
-    for (let z = layout.roomFront + .72; z < layout.front; z += .72) box(part.x + stepInset / 2, y + .002, z, part.width - stepInset, .002, .007, grout);
-    const wallEnd = part.x > 0 ? 20.35 : part.x + part.width / 2;
-    const wallStart = part.x - part.width / 2;
-    box((wallStart + wallEnd) / 2, (y + 3.8) / 2, layout.roomFront, wallEnd - wallStart, 3.8 - y, .16, m.wall);
-    box((wallStart + wallEnd) / 2, y + .12, layout.roomFront + .1, wallEnd - wallStart, .24, .045, m.tread);
-    box(part.x, 3.86, layout.corridorCenter, part.width, .16, layout.corridorDepth, m.wall);
-    box(part.x, .10, (layout.rear + layout.roomFront) / 2, part.width, .12, layout.roomDepth, m.tread);
+    const right = part.x > 0, y = right ? base : layout.hallFloor;
+    const start = part.x - part.width / 2 + (right ? .7 : 0), end = right ? passage.terminalX : part.x + part.width / 2;
+    floor((start + end) / 2, layout.corridorCenter, end - start, layout.corridorDepth, y);
+    const wallStart = part.x - part.width / 2, wallEnd = right ? passage.x - passage.width / 2 : end, cx = (wallStart + wallEnd) / 2;
+    const openings = right ? [
+      ...doorCenters.map((x, i) => ({ x: x - cx, y: base + 1.08, w: i ? 1.18 : 1.08, h: 2.16 })),
+      ...windows.map(([x, w]) => ({ x: x - cx, y: base + 1.28, w, h: 1.36 })),
+      ...vents.map(x => ({ x: x - cx, y: 3.47, w: .96, h: .39 })),
+    ] : [];
+    wall(cx, front, 0, wallEnd - wallStart, y, 3.8, openings);
+    let from = wallStart;
+    for (const x of right ? doorCenters : []) { box((from + x - .67) / 2, y + .09, front + .019, x - .67 - from, .18, .036, skirting); from = x + .67; }
+    box((from + wallEnd) / 2, y + .09, front + .019, wallEnd - from, .18, .036, skirting);
+    box((start + end) / 2, 3.86, layout.corridorCenter, end - start, .16, layout.corridorDepth, m.wall);
   }
-  // Three short rises into the right wing are visible at 10s in 095714.mp4.
+  box(13, base + .10, layout.front - .17, 18, .20, .035, skirting);
+  box(13, layout.screenBottom - .025, layout.front - .06, 18, .05, .35, skirting);
+  group.userData.screenSillAboveFloor = layout.screenBottom - base;
   for (let i = 0; i < 3; i++) {
-    const top = layout.hallFloor + (i + 1) * (layout.rightFloor - layout.hallFloor) / 3;
+    const top = layout.hallFloor + (i + 1) * (base - layout.hallFloor) / 3;
     box(3.95 + i * .30, (top + layout.hallFloor) / 2, layout.corridorCenter, .30, top - layout.hallFloor, layout.corridorDepth - .16, m.tread);
   }
-  const front = layout.roomFront + .105, base = layout.rightFloor;
-  const doorCenters = [5.45, 8.7, 11.05, 15.15, 17.6, 19.45];
   for (const [i, x] of doorCenters.entries()) {
-    const timber = i === 0, width = timber ? 1.08 : 1.18, height = 2.14;
-    box(x, base + height / 2, front, width + .15, height + .12, .07, timber ? m.entranceWood : inset);
-    box(x, base + height / 2, front + .045, width, height, .045, timber ? m.doorPanel : blue);
-    if (!timber) {
-      box(x, base + height / 2, front + .077, .016, height, .014, inset);
-      for (const side of [-1, 1]) for (let j = 0; j < 7; j++) {
-        const px = x + side * width / 4, py = base + .18 + j * .285;
-        box(px, py, front + .075, width / 2 - .09, .21, .02, inset);
-        box(px, py, front + .088, width / 2 - .125, .175, .013, blue);
-      }
-    } else {
-      box(x, base + 1.65, front + .076, .38, .30, .045, m.entranceWood);
-      box(x, base + 1.65, front + .105, .32, .24, .016, glass);
+    if (i) onWall(x, front + .005, 0, () => panelDoor(0, base + .012, 0, 1.17, 2.14));
+    else {
+      frame(x, base + 1.08, front + .02, 1.19, 2.24, .06, .09, m.entranceWood);
+      box(x, base + 1.08, front - .018, 1.06, 2.14, .042, m.doorPanel);
+      frame(x, base + 1.65, front + .012, .39, .29, .028, .036, m.entranceWood);
+      box(x, base + 1.65, front + .002, .33, .23, .005, glass); latch(x - .30, base + .94, front + .05, .25);
     }
-    tube([[x - .25, base + .93, front + .13], [x + .25, base + .93, front + .13]], .018, m.metal);
-    box(x + .03, base + .84, front + .14, .08, .11, .045, m.metal);
-    box(x, base + .012, front + .025, width + .12, .024, .26, m.paving);
+    box(x, base + .006, front, 1.27, .012, .24, m.paving);
   }
-  for (const [x, width, columns] of [[7.02, 1.28, 3], [13.1, 1.22, 2]]) {
-    box(x, base + 1.26, front + .006, width + .10, 1.36, .075, inset);
-    box(x, base + 1.26, front + .05, width, 1.25, .025, glass);
-    for (let col = 0; col <= columns; col++) box(x - width / 2 + col * width / columns, base + 1.26, front + .09, .038, 1.33, .055, blue);
-    for (let row = 0; row <= 3; row++) box(x, base + .60 + row * .44, front + .09, width, .038, .06, blue);
-    for (let row = 0; row < 12; row++) box(x, base + .65 + row * .11, front + .13, width, .015, .016, m.metal);
-  }
-  for (const x of [5.45, 7.02, 8.7, 11.05, 13.1, 15.15, 17.6, 20.1]) {
-    box(x, 3.49, front + .005, .96, .36, .02, m.dark);
-    box(x, 3.60, front + .08, .96, .18, .055, blue);
-    for (let j = 0; j < 4; j++) box(x - .35 + j * .235, 3.60, front + .115, .19, .12, .01, inset);
-  }
-  for (const y of [3.04, 3.10, 3.19, 3.24]) tube([[4.12, y, front + .12], [12.7, y, front + .12], [21.75, y, front + .12]], .009, wire);
-  tube([[8.5, 3.03, front + .14], [12.5, 2.94, front + .14], [16.5, 3.03, front + .14], [20.5, 2.96, front + .14]], .006, m.dark);
-  for (const x of [8.05, 16.5]) {
-    box(x, 2.45, front + .10, .25, .18, .075, m.paving);
-    tube([[x, 2.55, front + .14], [x, 3.15, front + .14]], .012, wire);
-  }
-  // Room labels visible in the supplied images/footage; no invented room names.
-  function sign(text, x, y, z, rotation, width) {
-    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 96;
-    const c = canvas.getContext('2d'); c.fillStyle = '#e0dfd2'; c.fillRect(0, 0, 512, 96);
-    c.fillStyle = '#18201e'; c.font = 'bold 46px Arial'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, 256, 48, 480);
-    const map = new T.CanvasTexture(canvas); map.colorSpace = T.SRGBColorSpace;
-    const mesh = new T.Mesh(new T.PlaneGeometry(width, width * 96 / 512), new T.MeshStandardMaterial({ map, roughness: .9 }));
-    mesh.position.set(x, y, z); mesh.rotation.y = rotation; group.add(mesh);
-  }
-  sign('SIMULATION LAB', 5.45, base + 1.98, front + .085, 0, .98);
-  box(21.88, base + 1.55, layout.corridorCenter, .12, 3.1, layout.corridorDepth, m.wall);
-  box(21.80, base + 1.08, layout.corridorCenter, .065, 2.16, .92, m.entranceWood);
-  sign('SEMINAR HALL', 21.71, base + 2.4, layout.corridorCenter, -Math.PI / 2, 1.05);
-  // The photographed cross-passage beside the final room. Length fits the existing
-  // interpreted shell; the footage establishes details, not surveyed dimensions.
-  const passageX = 21.08, passageWidth = 1.46;
-  const passageEnd = layout.rear + .2, passageLength = layout.roomFront - passageEnd;
-  const passageZ = (layout.roomFront + passageEnd) / 2;
-  group.userData.sidePassage = { x: passageX, end: passageEnd, width: passageWidth };
-  const passageMap = floorMap.clone(); passageMap.repeat.set(2, 6); passageMap.needsUpdate = true;
-  const passageMaterial = floorMat.clone(); passageMaterial.map = passageMap;
-  const passageFloor = new T.Mesh(new T.PlaneGeometry(passageWidth, passageLength), passageMaterial);
-  passageFloor.rotation.x = -Math.PI / 2; passageFloor.position.set(passageX, base, passageZ); passageFloor.receiveShadow = true; group.add(passageFloor);
-  for (let z = passageEnd; z < layout.roomFront; z += .72) box(passageX, base + .002, z, passageWidth, .002, .007, grout);
-  box(passageX, base + .002, passageZ, .007, .002, passageLength, grout);
+  for (const [x, w, columns] of windows) windowFrame(x, base + 1.28, front, w, 1.36, columns);
+  for (const x of vents) ventilator(x, 3.47, front);
+  for (const y of [3.03, 3.09, 3.18, 3.23]) tube([[4.1, y, front + .08], [13, y, front + .08], [22.1, y, front + .08]], .008, wire);
+  tube([[8.5, 3.02, front + .10], [12.5, 2.91, front + .10], [16.5, 3.02, front + .10], [21.5, 2.92, front + .10]], .005, m.dark);
+  for (let x = 4.3; x < 22; x += .8) box(x, 3.13, front + .07, .018, .24, .024, wire);
+  for (const x of [8.05, 16.5]) { box(x, 2.46, front + .035, .19, .17, .04, m.paving); tube([[x, 2.55, front + .06], [x, 3.18, front + .06]], .01, wire); }
+  sign('SIMULATION LAB', 5.45, base + 1.99, front + .025, 0, .95);
+
+  const terminal = passage.terminalX;
+  wall(terminal, layout.corridorCenter, -Math.PI / 2, layout.corridorDepth, base, 3.8, [{ x: 0, y: base + 1.08, w: .96, h: 2.16 }, { x: 0, y: 3.47, w: .96, h: .39 }]);
+  onWall(terminal - .015, layout.corridorCenter, -Math.PI / 2, () => {
+    panelDoor(0, base + .012, 0, .95, 2.14); ventilator(0, 3.47, 0);
+  });
+  sign('ELECTRONICS LAB II', terminal - .03, base + 2.41, layout.corridorCenter, -Math.PI / 2, 1.1);
+
+  const { x: px, width: pw, end, pierZ } = passage, length = front - end, middle = (front + end) / 2;
+  const left = px - pw / 2, right = px + pw / 2, windowZ = [-1.65, -3.85, -6.25];
+  floor(px, middle, pw, length, base);
+  wall(left, middle, Math.PI / 2, length, base, 3.8, windowZ.map(z => ({ x: middle - z, y: base + 1.48, w: 1.46, h: 1.72 })));
+  wall(right, middle, -Math.PI / 2, length, base, 3.8, [
+    { x: -3.5 - middle, y: base + 1.48, w: .90, h: 1.40 },
+    { x: passage.hallDoorZ - middle, y: base + 1.08, w: .96, h: 2.16 },
+    { x: passage.hallDoorZ - middle, y: 3.47, w: .96, h: .39 },
+  ]);
+  box(px, 3.86, middle, pw, .16, length, m.wall);
+  // Preserve the outer wall beyond the filmed passage, leaving unseen rooms closed.
+  box(22.03, 1.9, (end - 16.5) / 2, .18, 3.8, 16.5 + end, m.wall);
   for (const side of [-1, 1]) {
-    const x = passageX + side * passageWidth / 2;
-    box(x, base + 1.55, passageZ, .12, 3.1, passageLength, m.wall);
-    box(x - side * .07, base + .12, passageZ, .035, .24, passageLength, m.tread);
-    tube([[x - side * .08, 3.25, layout.roomFront], [x - side * .08, 3.25, passageEnd]], .013, wire);
+    const runs = side < 0 ? [[end, front]] : [[end, passage.hallDoorZ - .54], [passage.hallDoorZ + .54, front]];
+    for (const [a, b] of runs) box(px + side * (pw / 2 - .025), base + .09, (a + b) / 2, .05, .18, b - a, skirting);
+    for (const y of [3.02, 3.09]) tube([[px + side * (pw / 2 - .025), y, front], [px + side * (pw / 2 - .025), y, end]], .009, wire);
   }
-  box(passageX, 3.86, passageZ, passageWidth, .16, passageLength, m.wall);
-  box(passageX, base + 1.55, passageEnd, passageWidth, 3.1, .12, m.wall);
-  box(passageX, base + 1.03, passageEnd + .075, .93, 2.06, .06, blue);
-  for (const side of [-1, 1]) for (let row = 0; row < 6; row++) {
-    box(passageX + side * .23, base + .2 + row * .33, passageEnd + .115, .37, .25, .025, inset);
+  for (const z of windowZ) onWall(left + .009, z, Math.PI / 2, () => {
+    windowFrame(0, base + 1.48, 0, 1.46, 1.72, 2, true);
+    const original = transform.clone(); transform.multiply(new T.Matrix4().makeTranslation(.73, 0, .06)); transform.multiply(new T.Matrix4().makeRotationY(-.92));
+    frame(-.35, base + 1.48, 0, .69, 1.67, .027, .032, blue);
+    for (const dy of [-.28, .28]) box(-.35, base + 1.48 + dy, -.01, .64, .028, .03, blue);
+    box(-.35, base + 1.48, -.015, .63, 1.61, .004, daylightGlass); transform = original;
+  });
+  onWall(right - .015, passage.hallDoorZ, -Math.PI / 2, () => {
+    frame(0, base + 1.08, .02, 1.07, 2.24, .055, .08, m.entranceWood);
+    box(0, base + 1.08, -.015, .95, 2.14, .038, m.doorPanel); latch(-.29, base + 1, .02, .22); ventilator(0, 3.47, 0);
+  });
+  sign('SEMINAR HALL', right - .03, base + 2.41, passage.hallDoorZ, -Math.PI / 2, 1.1);
+  group.userData.seminarHallEntrance = { x: right, z: passage.hallDoorZ };
+  const cream = new T.MeshStandardMaterial({ color: '#b9b18a', roughness: .62, metalness: .15 });
+  onWall(right - .015, -3.5, -Math.PI / 2, () => {
+    frame(0, base + 1.48, .025, 1, 1.50, .045, .07, cream);
+    box(0, base + 1.48, -.045, .90, 1.40, .008, glass);
+    for (const x of [-.36, -.18, 0, .18, .36]) tube([[x, base + .79, .045], [x, base + 2.17, .045]], .007, cream);
+    for (const y of [base + .92, base + 1.45, base + 2.04]) tube([[-.44, y, .045], [.44, y, .045]], .007, cream);
+  });
+  // Right-hand pier and low lintel create the recessed Strong Room bay.
+  box(right - .17, base + 1.55, pierZ, .34, 3.1, .36, m.wall);
+  box(right - .18, base + .10, pierZ, .36, .20, .38, skirting);
+  wall(px, pierZ + .18, 0, pw, base + 2.45, 3.8, [{ x: 0, y: 3.47, w: .96, h: .39 }]);
+  group.userData.strongRoomPier = { x: right - .17, z: pierZ };
+  wall(px, end, 0, pw, base, 3.8, [{ x: .12, y: base + 1.09, w: 1.08, h: 2.18 }]);
+  panelDoor(px + .12, base + .012, end + .015, 1.07, 2.16, 5); latch(px + .12, base + .61, end + .06);
+  sign('STRONG ROOM APLA', px + .12, base + 2.36, end + .026, 0, 1.15, '#7b2027');
+  onWall(px, pierZ + .185, 0, () => ventilator(0, 3.47, 0));
+
+  const gateZ = front + .02, gateMetal = blue.clone(); gateMetal.color.set('#85918c'); gateMetal.metalness = .4;
+  box(px, base + 2.13, gateZ, pw, .045, .045, gateMetal);
+  for (const side of [-1, 1]) box(px + side * (pw / 2 - .02), 3.30, gateZ, .035, .96, .04, gateMetal);
+  for (let row = 0; row < 4; row++) for (let col = 0; col < 7; col++) {
+    const x = px - pw / 2 + .17 + col * (pw - .34) / 6, y = 2.95 + row * .22;
+    const pts = [[-.12, 0], [-.06, .065], [.06, .065], [.12, 0], [.06, -.065], [-.06, -.065], [-.12, 0]];
+    for (let i = 1; i < pts.length; i++) tube([[x + pts[i - 1][0], y + pts[i - 1][1], gateZ], [x + pts[i][0], y + pts[i][1], gateZ]], .006, gateMetal);
+    box(x, y + .105, gateZ, .012, .08, .017, gateMetal); box(x, y + .105, gateZ, .095, .012, .017, gateMetal);
   }
-  tube([[passageX - .22, base + 1, passageEnd + .15], [passageX + .22, base + 1, passageEnd + .15]], .018, m.metal);
-  box(passageX, base + .90, passageEnd + .16, .075, .10, .04, m.metal);
-  sign('STRONG ROOM', passageX, base + 2.26, passageEnd + .08, 0, 1.02);
-  // Upper hexagonal grille and the hinged leaf folded against the right wall.
-  const gateZ = layout.roomFront + .035;
-  box(passageX, base + 2.13, gateZ, passageWidth, .06, .06, blue);
-  box(passageX, 3.73, gateZ, passageWidth, .045, .05, blue);
-  for (const side of [-1, 1]) box(passageX + side * .70, 3.25, gateZ, .04, .99, .05, blue);
-  for (let row = 0; row < 3; row++) for (let col = 0; col < 5; col++) {
-    const x = passageX - .57 + col * .285, y = 2.98 + row * .25;
-    const hex = [[x - .12, y, gateZ], [x - .06, y + .075, gateZ], [x + .06, y + .075, gateZ], [x + .12, y, gateZ], [x + .06, y - .075, gateZ], [x - .06, y - .075, gateZ], [x - .12, y, gateZ]];
-    for (let edge = 1; edge < hex.length; edge++) tube([hex[edge - 1], hex[edge]], .008, blue);
-    box(x, y + .125, gateZ, .015, .10, .02, blue);
+  for (const side of [-1, 1]) {
+    const hx = px + side * (pw / 2 - .10), leafZ = gateZ - .49;
+    for (const z of [gateZ, gateZ - .98]) tube([[hx, base + .03, z], [hx, base + 2.10, z]], .016, gateMetal);
+    for (const y of [base + .03, base + 1.19, base + 2.10]) tube([[hx, y, gateZ], [hx, y, gateZ - .98]], .015, gateMetal);
+    for (let i = 1; i < 7; i++) tube([[hx, base + .05, gateZ - i * .14], [hx, base + 1.19, gateZ - i * .14]], .007, gateMetal);
+    for (const r of [.15, .30, .45]) tube(Array.from({ length: 20 }, (_, i) => { const a = i * Math.PI / 19; return [hx, base + 1.19 + Math.sin(a) * r, leafZ + Math.cos(a) * r]; }), .010, gateMetal);
   }
-  const hingeX = passageX + .64, leafZ = gateZ - .52;
-  for (const z of [gateZ, gateZ - 1.04]) box(hingeX, base + 1.02, z, .035, 2.04, .04, blue);
-  for (const y of [base + .04, base + 1.2, base + 2.04]) box(hingeX, y, leafZ, .035, .04, 1.04, blue);
-  for (let i = 1; i < 7; i++) box(hingeX, base + .62, gateZ - i * .148, .025, 1.2, .02, blue);
-  for (const radius of [.16, .31, .47]) {
-    const points = Array.from({ length: 17 }, (_, i) => { const a = i * Math.PI / 16; return [hingeX, base + 1.2 + Math.sin(a) * radius, leafZ + Math.cos(a) * radius]; });
-    tube(points, .012, blue);
+  for (const [z, width, depth] of [[-.75, .65, 1.45], [-2.8, .60, 1.80], [-5.55, .62, 1.5]]) {
+    const x = left + width / 2 + .10;
+    const top = new T.ExtrudeGeometry(rectangle(width, depth), { depth: .028, bevelEnabled: true, bevelSize: .003, bevelThickness: .003, bevelSegments: 1, steps: 1 });
+    top.rotateX(-Math.PI / 2); top.translate(x, base + .79, z); add(top, m.doorPanel);
+    for (const dx of [-width * .40, width * .40]) for (const dz of [-depth * .42, depth * .42]) {
+      const leg = new T.CylinderGeometry(.025, .019, .78, 4); leg.rotateY(Math.PI / 4); leg.translate(x + dx, base + .39, z + dz); add(leg, m.entranceWood);
+    }
+    for (const dx of [-width * .40, width * .40]) box(x + dx, base + .71, z, .032, .10, depth * .86, m.entranceWood);
+    box(x, base + .22, z, width * .83, .028, .03, m.entranceWood);
   }
-  // Slim work tables seen along the left wall, leaving the walking line clear.
-  for (const z of [-.15, -1.65]) {
-    const x = passageX - .45;
-    box(x, base + .76, z, .43, .055, 1.13, m.doorPanel);
-    for (const dx of [-.16, .16]) for (const dz of [-.47, .47]) box(x + dx, base + .37, z + dz, .045, .74, .045, m.entranceWood);
-    box(x, base + .24, z, .035, .045, 1.0, m.entranceWood);
-  }
-  const purple = new T.MeshStandardMaterial({ color: '#756075', roughness: .85 });
-  for (const [z, material] of [[-.25, purple], [-1.9, m.paving]]) {
-    box(passageX + .65, base + 1.05, z, .055, 2.1, .79, material);
-    box(passageX + .61, base + 1.05, z, .018, 2.1, .018, blue);
-    box(passageX + .60, base + .93, z, .04, .035, .30, m.metal);
-  }
-  for (const z of [-.35, -1.85]) {
-    box(passageX - .65, base + 1.48, z, .04, 1.16, .97, inset);
-    box(passageX - .62, base + 1.48, z, .025, 1.08, .89, glass);
-    for (const dz of [-.46, 0, .46]) box(passageX - .59, base + 1.48, z + dz, .04, 1.16, .035, blue);
-    for (let row = 0; row < 9; row++) box(passageX - .57, base + .96 + row * .13, z, .025, .013, .91, m.metal);
-  }
-  for (const z of [.20, -1.7]) {
-    box(passageX, 3.55, z, .025, .4, .025, m.dark);
-    box(passageX, 3.34, z, .14, .07, .14, m.dark);
+  for (const z of [-.75, -4.2]) {
+    tube([[px, 3.76, z], [px, 3.32, z]], .012, m.dark);
+    const hub = new T.SphereGeometry(.065, 12, 8); hub.scale(1, .55, 1); hub.translate(px, 3.31, z); add(hub, m.dark);
     for (let blade = 0; blade < 3; blade++) {
-      const g = new T.BoxGeometry(.10, .018, .36);
-      g.translate(0, 0, .19); g.rotateY(blade * Math.PI * 2 / 3); g.translate(passageX, 3.30, z); add(g, m.dark);
+      const shape = new T.Shape(); shape.moveTo(-.025, .02); shape.lineTo(-.055, .40); shape.quadraticCurveTo(0, .47, .07, .40); shape.lineTo(.03, .02); shape.closePath();
+      const g = new T.ExtrudeGeometry(shape, { depth: .006, bevelEnabled: false, curveSegments: 5 }); g.rotateX(Math.PI / 2); g.rotateY(blade * Math.PI * 2 / 3); g.translate(px, 3.30, z); add(g, m.dark);
     }
   }
   for (const [material, geometries] of batches) {
-    const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = mesh.receiveShadow = true; group.add(mesh);
-    geometries.forEach(g => g.dispose());
+    const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = mesh.receiveShadow = !material.transparent; group.add(mesh); geometries.forEach(g => g.dispose());
   }
   group.traverse(o => { if (o.isMesh) o.layers.enable(1); });
   return group;

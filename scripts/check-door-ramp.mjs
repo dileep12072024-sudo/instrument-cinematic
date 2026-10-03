@@ -20,7 +20,8 @@ try {
     ramp.geometry.computeBoundingBox();
     const vertices = ramp.geometry.attributes.position;
     const topLevels = new Set(Array.from({ length: vertices.count }, (_, i) => vertices.getY(i).toFixed(2)));
-    return { parent: hardware.parent.name, parts: a.group.getObjectsByProperty('name', hardware.name).length, rampMin: ramp.geometry.boundingBox.min.toArray(), rampMax: ramp.geometry.boundingBox.max.toArray(), levels: [...topLevels], red: a.materials.eastRamp.color.getHexString(), nativeCursor: !document.querySelector('#liquid-cursor') };
+    const joinery = a.group.userData.entranceJoinery;
+    return { joinery, leafWidth: a.doors[0].pivot.getObjectByName('Solid timber leaf').geometry.parameters.width * a.doors[0].pivot.scale.x, parent: hardware.parent.name, parts: a.group.getObjectsByProperty('name', hardware.name).length, rampMin: ramp.geometry.boundingBox.min.toArray(), rampMax: ramp.geometry.boundingBox.max.toArray(), levels: [...topLevels], red: a.materials.eastRamp.color.getHexString(), nativeCursor: !document.querySelector('#liquid-cursor') };
   });
   assert.equal(details.parent, 'Right entrance door');
   assert.equal(details.parts, 1);
@@ -28,6 +29,7 @@ try {
   assert.deepEqual(details.levels.sort(), ['0.02', '0.16']);
   assert.ok(details.rampMin[0] > 20 && details.rampMax[0] < 22.1);
   assert.ok(details.nativeCursor);
+  assert.ok(details.leafWidth / details.joinery.sideWidth > .48 && details.leafWidth / details.joinery.sideWidth < .56, 'Folded door covers approximately one of the two fixed glazed bays');
   await page.locator('[data-chapter="1"]').click();
   await page.waitForFunction(() => __portrait.selected === 1 && __portrait.camera.position.z < 32);
   await page.locator('#door').click();
@@ -36,6 +38,7 @@ try {
   async function view(name, eye, target) {
     const colors = await page.evaluate(({ eye, target }) => {
       const p = __portrait;
+      p.controls.dispatchEvent({ type: 'start' });
       p.controls.minDistance = .2;
       p.camera.position.set(...eye); p.controls.target.set(...target); p.controls.update(); p.renderer.render(p.scene, p.camera);
       const gl = p.renderer.getContext(), pixels = new Uint8Array(64 * 64 * 4);
@@ -45,6 +48,10 @@ try {
     assert.ok(colors > 25, name);
     await page.screenshot({ path: `artifacts/${name}.png` });
   }
+  await view('entrance-open-proportions', [0, 1.83, .9], [0, 1.72, 7]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await view('entrance-open-proportions-mobile', [2.525, 1.83, 1.5], [2.525, 1.72, 7]);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.evaluate(() => document.querySelector('#door').click());
   await page.waitForFunction(() => __portrait.architecture.doors.every(d => Math.abs(d.pivot.rotation.y) < .002));
   await view('right-door-lock', [.8, 1.8, 4.4], [.8, 1.65, 6.82]);

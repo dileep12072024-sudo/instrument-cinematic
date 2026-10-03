@@ -173,7 +173,7 @@ export function buildArchitecture(scene) {
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(vertices, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(indices); geo.translate(x, 0, z); geo.applyMatrix4(parent); geo.computeVertexNormals();
     if (!batches.has(material)) batches.set(material, []); batches.get(material).push(geo);
   }
-  function face(cx, cz, rotation, width, height, bays, type, closedGround = false) {
+  function face(cx, cz, rotation, width, height, bays, type, closedGround = false, openGround = false) {
     const transform = new T.Matrix4().compose(new T.Vector3(cx, 0, cz), quaternion.setFromAxisAngle(new T.Vector3(0, 1, 0), rotation), new T.Vector3(1, 1, 1));
     const b = (x, y, z, w, h, d, material) => box(x, y, z, w, h, d, material, transform);
     const floors = Math.round((height - 1.4) / 4), floorH = (height - 1.4) / floors, bay = width / bays;
@@ -183,8 +183,10 @@ export function buildArchitecture(scene) {
     const corridor = type === 'corridor' || type === 'gate-return';
     for (let f = 0; f < floors; f++) {
       // The entrance is an actual opening, not doors placed over a solid ground-floor wall.
-      if ((type === 'tower-front' || type === 'tower-side') && f === 0) continue;
-      const y = f * floorH, openingY = y + (f === 0 ? 1.9 : 2.55), openingH = f === 0 ? 2.15 : 1.9;
+      if ((openGround || type === 'tower-front' || type === 'tower-side') && f === 0) continue;
+      const raisedScreen = type === 'corridor' && cx > 0 && f === 0 && rotation === 0;
+      const y = f * floorH, openingH = raisedScreen ? 2.04 : f === 0 ? 2.15 : 1.9;
+      const openingY = raisedScreen ? groundSpine.screenBottom + openingH / 2 : y + (f === 0 ? 1.9 : 2.55);
       const hasGate = (type === 'gate-return' || type === 'west-end') && f === 0;
       const gateMaterial = type === 'west-end' ? m.westGate : m.gate;
       if (!hasGate) b(0, y + (openingY - openingH / 2 - y) / 2, 0, width, openingY - openingH / 2 - y, .32, m.wall);
@@ -319,7 +321,8 @@ export function buildArchitecture(scene) {
             face(x - w / 2, z + 3.25 + gateWidth / 2, -Math.PI / 2, gateWidth, h, 1, 'gate-return');
             face(x - w / 2, z + (d / 2 + roomStart) / 2, -Math.PI / 2, length - gateWidth, h, 2, 'east-wing');
           }
-          face(x + side * w / 2, z + (3.25 - d / 2) / 2, side * Math.PI / 2, d / 2 + 3.25, h, Math.max(2, Math.round((d / 2 + 3.25) / 3.5)), 'room', 'rear-half');
+          // The filmed east passage supplies its own windowed ground-floor wall.
+          face(x + side * w / 2, z + (3.25 - d / 2) / 2, side * Math.PI / 2, d / 2 + 3.25, h, Math.max(2, Math.round((d / 2 + 3.25) / 3.5)), 'room', 'rear-half', type === 'room');
         } else {
           face(x + side * w / 2, z, side * Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'tower' ? 'tower-side' : type === 'west' ? 'west-outer' : 'room', type === 'tower' ? 'all' : false);
           if (type === 'tower') {
@@ -370,19 +373,26 @@ export function buildArchitecture(scene) {
   box(0, 3.78, 7, 8, .44, .35, m.wall);
   for (const x of [-3.85, 3.85]) box(x, 1.75, 7, .3, 3.5, .45, m.blue);
   box(0, 3.43, 7, 7.5, .3, .28, m.entranceWood);
-  for (const x of [-1.715, 1.715]) box(x, 1.7, 7, .075, 3.25, .28, m.entranceWood);
-  for (const x of [-2.75, 2.75]) {
-    box(x, .64, 7, 2.05, 1.08, .08, m.entranceWood);
-    box(x, 3.23, 7, 2.05, .15, .08, m.entranceWood);
-    box(x, 2.2, 7.06, 1.88, 1.98, .018, m.entranceGlazing);
+  const halfDoorway = 1.3, sideWidth = 3.75 - halfDoorway, sideCenter = (3.75 + halfDoorway) / 2;
+  group.userData.entranceJoinery = { halfDoorway, sideWidth };
+  for (const side of [-1, 1]) box(side * (halfDoorway + .015), 1.7, 7, .075, 3.25, .28, m.entranceWood);
+  for (const x of [-sideCenter, sideCenter]) {
+    const glassWidth = sideWidth - .17;
+    box(x, .64, 7, sideWidth, 1.08, .08, m.entranceWood);
+    box(x, 3.23, 7, sideWidth, .15, .08, m.entranceWood);
+    box(x, 2.2, 7.06, glassWidth, 1.98, .018, m.entranceGlazing);
     box(x, 2.2, 7.10, .065, 2.02, .08, m.entranceWood);
-    for (const s of [-1, 1]) box(x + s * .94, 2.2, 7.10, .065, 2.02, .08, m.entranceWood);
-    for (const offset of [-.49, .49]) box(x + offset, .63, 7.05, .83, .83, .025, m.doorPanel);
-    box(x, 1.17, 7.09, 2.05, .12, .1, m.entranceWood);
+    for (const s of [-1, 1]) box(x + s * glassWidth / 2, 2.2, 7.10, .065, 2.02, .08, m.entranceWood);
+    for (const side of [-1, 1]) {
+      box(x + side * sideWidth / 4, .63, 7.05, sideWidth / 2 - .18, .83, .025, m.doorPanel);
+      for (const offset of [-1, 0, 1]) box(x + side * sideWidth / 4 + offset * .28, 2.2, 6.97, .009, 1.96, .012, m.metal);
+    }
+    for (let row = 1; row < 6; row++) box(x, 1.21 + row * .33, 6.97, glassWidth, .009, .012, m.metal);
+    box(x, 1.17, 7.09, sideWidth, .12, .1, m.entranceWood);
   }
   const doors = [];
   for (const side of [-1, 1]) {
-    const pivot = new T.Group(); pivot.name = side < 0 ? 'Left entrance door' : 'Right entrance door'; pivot.position.set(side * 1.7, .1, 6.82); group.add(pivot);
+    const pivot = new T.Group(); pivot.name = side < 0 ? 'Left entrance door' : 'Right entrance door'; pivot.position.set(side * halfDoorway, .1, 6.82); pivot.scale.x = halfDoorway / 1.7; group.add(pivot);
     const leaf = new T.Mesh(new T.BoxGeometry(1.68, 3.2, .14), m.entranceWood); leaf.name = 'Solid timber leaf'; leaf.position.set(-side * .85, 1.6, 0); pivot.add(leaf);
     // Inset-style panel fields on both sides keep the folded-open doors finished too.
     const panels = [];

@@ -18,4 +18,8 @@ export const groundSpine = {
   corridorCenter: spine.z + spine.depth / 3,
   hallFloor: .164,
   rightFloor: .704,
+  screenBottom: 1.47,
 };
+
+// Proportions inferred from the continuous Strong Room approach, not survey lengths.
+export const seminarPassage = { x: 23.25, width: 2.24, end: -7.3, pierZ: -5.95, terminalX: 24.5, hallDoorZ: -.15 };
