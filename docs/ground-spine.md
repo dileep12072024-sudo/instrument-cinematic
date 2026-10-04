@@ -20,6 +20,8 @@ The Strong Room approach retains the right-hand pier and deeper plaster downstan
 
 October 4 screenshot correction: the original near windows overlapped the spine's rear wall at z=-3.25. The three window reveals now lie fully beyond that wall, at z=-4.4, -6.65 and -9.05; the Strong Room end is moved to -10.2, retaining the recessed bay behind its pier. The resulting 11.28-unit approach remains an interpretation, not a survey. Tables, the opposite window and fans move with the longer passage. Interior walls use light aged plaster albedo; the shadowed video crop is retained only as subtle bump relief. The entrance shell now joins the 4.2-high upper facade, sealing the accidental strip above the canopy without covering the real windows or vents.
 
+The October 4 video recheck places the second Seminar Hall entrance farther down the Strong Room passage; it is now at z=-3.25, over 4.5 model units from the main corridor-end door. The deepest passage table was moved clear of the projecting Strong Room pier. Entering the hall now enables the same panorama mode used outside, with the walk surface retaining pointer, touch and wheel look controls.
+
 ## Pending visual correction
 
 October 4 owner report: the smaller moon is visible in the starting composition but frequently leaves the screen when the building is straightened in the camera view. Check framing across arrival, straight-on building views and mobile without enlarging the moon again. Preserve night-only visibility and the transparent unlit portion. This is recorded for a separate sky-framing correction, not changed by the interior layout update.

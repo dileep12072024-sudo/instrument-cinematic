@@ -24,7 +24,7 @@ export const groundSpine = {
 // Proportions inferred from the continuous Strong Room approach, not survey lengths.
 export const seminarPassage = {
   x: 23.25, width: 2.24, end: -10.2, pierZ: -8.85,
-  terminalX: 24.5, hallDoorZ: -.15, labEnd: 7.85,
+  terminalX: 24.5, hallDoorZ: -3.25, labEnd: 7.85,
   // Keep the full reveal beyond the adjoining spine's rear wall, including its thickness.
   windowZ: [-4.4, -6.65, -9.05], windowWidth: 1.46,
 };

@@ -264,7 +264,8 @@ export function buildSpineInterior(parent, m) {
     for (let i = 1; i < 7; i++) tube([[hx, base + .05, gateZ - i * .14], [hx, base + 1.19, gateZ - i * .14]], .007, gateMetal);
     for (const r of [.15, .30, .45]) tube(Array.from({ length: 20 }, (_, i) => { const a = i * Math.PI / 19; return [hx, base + 1.19 + Math.sin(a) * r, leafZ + Math.cos(a) * r]; }), .010, gateMetal);
   }
-  for (const [z, width, depth] of [[-3.6, .65, 1.45], [-5.65, .60, 1.80], [-8.4, .62, 1.5]]) {
+  // Keep the deepest table clear of the projecting Strong Room pier at pierZ.
+  for (const [z, width, depth] of [[-3.6, .65, 1.45], [-5.65, .60, 1.80], [-7.15, .62, 1.5]]) {
     const x = left + width / 2 + .10;
     const top = new T.ExtrudeGeometry(rectangle(width, depth), { depth: .028, bevelEnabled: true, bevelSize: .003, bevelThickness: .003, bevelSegments: 1, steps: 1 });
     top.rotateX(-Math.PI / 2); top.translate(x, base + .79, z); add(top, m.doorPanel);

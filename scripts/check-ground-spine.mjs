@@ -27,6 +27,8 @@ try {
   await page.locator('#hour').evaluate(e => { e.value = '10'; e.dispatchEvent(new Event('input')); });
   await page.locator('[data-chapter="1"]').click();
   await page.locator('#enter-hall').click();
+  assert.equal(await page.locator('#panorama').getAttribute('aria-pressed'), 'true', 'Interior opens in panorama mode');
+  assert.ok(await page.locator('#experience').evaluate(e => e.classList.contains('panorama-view')));
   const positions = await page.evaluate(() => {
     const scene = __portrait.scene, spine = scene.getObjectByName('Ground-floor spine');
     return { roomFront: spine.userData.roomFront, stairStart: scene.getObjectByName('Entrance hall from September walkthrough').userData.stairStartZ, pier: spine.userData.strongRoomPier, screen: spine.userData.screenSillAboveFloor, seminar: spine.userData.seminarHallEntrance, main: spine.userData.seminarHallMainEntrance, lab: spine.userData.electronicsLabEntrance, downstand: spine.userData.strongRoomDownstand };
@@ -40,6 +42,7 @@ try {
   assert.deepEqual(positions.lab, { x: passage.x, z: passage.labEnd }, 'Electronics Lab terminates the opposite end of the passage');
   assert.ok(positions.lab.z > layout.front && passage.end < layout.roomFront);
   assert.ok(positions.downstand.top - positions.downstand.bottom > .8 && positions.downstand.depth === .36);
+  assert.ok(Math.abs(positions.main.z - positions.seminar.z) > 4.5, 'Seminar Hall entrances are separated along the real passage');
   const facade = await page.evaluate(() => {
     let exterior = false, blockedGate = false;
     __portrait.scene.traverse(mesh => {

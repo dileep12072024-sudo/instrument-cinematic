@@ -506,7 +506,7 @@ function leaveHall(returnToEntrance = true) {
 }
 $('#enter-hall').onclick = () => {
   if (!ready) return;
-  stopJourney(); setOrbit(false); setPanorama(false); transition = null; interactive = true;
+  stopJourney(); setOrbit(false); setPanorama(true); transition = null; interactive = true;
   $('#experience').classList.remove('footprint-view');
   doorsOpen = true; $('#door span').textContent = 'Close the doors'; $('#door').setAttribute('aria-pressed', 'true');
   architecture.doors.forEach(d => { d.pivot.rotation.y = d.openAngle; });
