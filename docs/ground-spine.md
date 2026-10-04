@@ -6,7 +6,7 @@ The owner confirmed on 29 September 2026 that the front corridor occupies one-th
 
 Right-wing references: supplied images `20260928_102145.jpg` through `20260928_102613.jpg`, and sampled frames at 10/18 seconds of `20260928_095714.mp4` and 35 seconds of `20260928_095915.mp4`. These show short steps up at the entrance, the Simulation Lab door, blue panel doors, barred windows, high ventilation openings, wiring and a Seminar Hall door at the far end. The right-wing floor rise, door spacing, dimensions and terminal wall position are approximations. Only closed room fronts are modeled; internal room contents and subdivisions are unknown. The west side has the confirmed depth division only, with no invented door sequence.
 
-The right-wing walkthrough follows the front third. It starts in the hall, crosses the gate and short stairs, then follows the corridor and turns into the side passage. A separate Seminar Hall surrounds route looks along that passage and returns to the front corridor. No Blender assets or vehicles are added.
+The right-wing walkthrough follows the front third. It starts in the hall, crosses the gate and short stairs, then follows the corridor and turns into the side passage. A separate Seminar Hall surrounds route looks along that passage and returns through the front-corridor junction toward Electronics Lab II. No Blender assets or vehicles are added.
 
 Continuation references: sampled frames at 2, 30, 60, 90, 120, 150 and 176 seconds of `20260928_100654.mp4`, and 2, 20, 40, 60 and 78 seconds of `20260928_101625.mp4`. Unseen lab interiors, people and vehicles are not reconstructed.
 
@@ -14,4 +14,10 @@ October correction: revisited `100654` at 35, 75, 95 and 105 seconds, `101625` a
 
 The front screen starts 0.766 units above the corridor floor with black stone skirting and a dark sill. Door leaves have recessed panels, thin bevelled frames, hinges and barrel bolts. Upper ventilators are shallow four-light timber frames with tilted lower flaps, not projecting boxes. Tile UVs use world dimensions, and shared paint/grain materials avoid large stretched blotches. Waiting benches, native cursor, weather and exterior roof geometry are unchanged.
 
-The owner's October 3 clarification places Seminar Hall along the right-hand wall of the passage leading to the Strong Room, not facing the grille or the exterior folding gate. Its doorway now occupies that side wall; no unobserved hall interior is invented. The doorway at the front-corridor junction is identified as Electronics Lab II in `100654` at 2 seconds. Exact offsets remain approximate.
+The owner confirmed the corrected layout on October 4: Seminar Hall has TWO doors, its main entrance at the end of the long front corridor and a second entrance along the Strong Room passage. Electronics Lab II is at the opposite terminal end of that passage from the Strong Room, adjacent to the exterior folding gate, not in place of Seminar Hall's main door. The video `100654` at 2 seconds and `095915` at 45 seconds distinguish those entrances. Exact offsets remain approximate; no unobserved hall or lab interior is invented.
+
+The Strong Room approach retains the right-hand pier and a deeper solid plaster downstand, without the invented ventilator in that wall. The ground-floor rear facade retains exterior plaster and blue trim instead of the interior plaster substitution. Passage windows remain actual openings through both finishes.
+
+## Pending visual correction
+
+October 4 owner report: the smaller moon is visible in the starting composition but frequently leaves the screen when the building is straightened in the camera view. Check framing across arrival, straight-on building views and mobile without enlarging the moon again. Preserve night-only visibility and the transparent unlit portion. This is recorded for a separate sky-framing correction, not changed by the interior layout update.

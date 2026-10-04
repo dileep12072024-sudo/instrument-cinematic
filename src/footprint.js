@@ -22,4 +22,4 @@ export const groundSpine = {
 };
 
 // Proportions inferred from the continuous Strong Room approach, not survey lengths.
-export const seminarPassage = { x: 23.25, width: 2.24, end: -7.3, pierZ: -5.95, terminalX: 24.5, hallDoorZ: -.15 };
+export const seminarPassage = { x: 23.25, width: 2.24, end: -7.3, pierZ: -5.95, terminalX: 24.5, hallDoorZ: -.15, labEnd: 7.85 };

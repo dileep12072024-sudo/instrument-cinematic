@@ -1,6 +1,6 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { footprint, groundSpine } from './footprint.js';
+import { footprint, groundSpine, seminarPassage } from './footprint.js';
 import { buildReferenceGarden } from './garden.js';
 import { buildEntranceHall } from './entrance-hall.js';
 
@@ -202,7 +202,7 @@ export function buildArchitecture(scene) {
         if (!tower || j === 0) b(x - bay / 2, y + floorH / 2, .05, .3, floorH, .45, m.blue);
         if (hasGate && j === bays - 1) {
           const gateBottom = .16, gateTop = high, gateHeight = gateTop - gateBottom;
-          b(x, (gateTop + gateBottom) / 2, -.4, ow, gateHeight, .06, m.dark);
+          if (type !== 'gate-return') b(x, (gateTop + gateBottom) / 2, -.4, ow, gateHeight, .06, m.dark);
           for (const s of [-1, 1]) b(x + s * (ow / 2 - .04), (gateTop + gateBottom) / 2, .08, .08, gateHeight, .12, gateMaterial);
           for (const yy of [gateBottom, gateTop]) b(x, yy, .08, ow, .08, .12, gateMaterial);
           const bars = Math.round(ow / .18);
@@ -323,6 +323,17 @@ export function buildArchitecture(scene) {
           }
           // The filmed east passage supplies its own windowed ground-floor wall.
           face(x + side * w / 2, z + (3.25 - d / 2) / 2, side * Math.PI / 2, d / 2 + 3.25, h, Math.max(2, Math.round((d / 2 + 3.25) / 3.5)), 'room', 'rear-half', type === 'room');
+          if (type === 'room') {
+            // Only the filmed window openings replace the old facade; retain its finish and trim.
+            const rear = -d / 2, end = seminarPassage.end, left = x - w / 2;
+            box(left, 2, (rear + end) / 2, .32, 4, end - rear, m.wall);
+            box(left, groundSpine.rightFloor / 2, (end + groundSpine.roomFront) / 2, .32, groundSpine.rightFloor, groundSpine.roomFront - end, m.wall);
+            box(left, 3.9, (rear + 3.25) / 2, .63, .19, 3.25 - rear + .24, m.trim);
+            box(left - .19, 4.45, (rear + 3.25) / 2, .075, .35, 3.25 - rear, m.blue);
+            for (const zz of [rear, rear + (3.25 - rear) / 6, rear + (3.25 - rear) / 3, end]) {
+              box(left - .05, 2, zz, .45, 4, .30, m.blue);
+            }
+          }
         } else {
           face(x + side * w / 2, z, side * Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'tower' ? 'tower-side' : type === 'west' ? 'west-outer' : 'room', type === 'tower' ? 'all' : false);
           if (type === 'tower') {

@@ -16,8 +16,8 @@ const rightWing = [
   { at: .36, x: 3.8, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Right-wing steps' },
   { at: .43, x: 4.7, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Right-wing corridor' },
   { at: .68, x: 12, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Right-wing corridor' },
-  { at: .84, x: passage.x, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Right-wing junction' },
-  { at: .94, x: passage.x, y: groundSpine.rightFloor + 1.666, z: passage.hallDoorZ, yaw: Math.PI / 2, name: 'Seminar Hall' },
+  { at: .84, x: passage.x, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI / 2, name: 'Seminar Hall main entrance' },
+  { at: .94, x: passage.x, y: groundSpine.rightFloor + 1.666, z: passage.hallDoorZ, yaw: Math.PI / 2, name: 'Seminar Hall side entrance' },
   { at: 1, x: passage.x, y: groundSpine.rightFloor + 1.666, z: passage.hallDoorZ, yaw: 0, name: 'Strong Room passage' },
 ];
 const seminarSurrounds = [
@@ -26,7 +26,8 @@ const seminarSurrounds = [
   { at: .42, x: passage.x, y: groundSpine.rightFloor + 1.666, z: -.8, yaw: 0, name: 'Side passage' },
   { at: .70, x: passage.x, y: groundSpine.rightFloor + 1.666, z: passage.end + 1.4, yaw: 0, name: 'Strong Room approach' },
   { at: .82, x: passage.x, y: groundSpine.rightFloor + 1.666, z: passage.end + 1.4, yaw: Math.PI, name: 'Looking back toward the grille' },
-  { at: 1, x: passage.x, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI * 1.5, name: 'Front corridor' },
+  { at: .90, x: passage.x, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI, name: 'Front corridor junction' },
+  { at: 1, x: passage.x, y: groundSpine.rightFloor + 1.666, z: passage.labEnd - 1.7, yaw: Math.PI, name: 'Electronics Lab II' },
 ];
 
 export function createEntranceWalk(camera, canvas, onExit, onChange) {

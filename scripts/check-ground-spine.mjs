@@ -24,13 +24,32 @@ try {
   await page.locator('#enter-hall').click();
   const positions = await page.evaluate(() => {
     const scene = __portrait.scene, spine = scene.getObjectByName('Ground-floor spine');
-    return { roomFront: spine.userData.roomFront, stairStart: scene.getObjectByName('Entrance hall from September walkthrough').userData.stairStartZ, pier: spine.userData.strongRoomPier, screen: spine.userData.screenSillAboveFloor, seminar: spine.userData.seminarHallEntrance };
+    return { roomFront: spine.userData.roomFront, stairStart: scene.getObjectByName('Entrance hall from September walkthrough').userData.stairStartZ, pier: spine.userData.strongRoomPier, screen: spine.userData.screenSillAboveFloor, seminar: spine.userData.seminarHallEntrance, main: spine.userData.seminarHallMainEntrance, lab: spine.userData.electronicsLabEntrance, downstand: spine.userData.strongRoomDownstand };
   });
   assert.equal(positions.roomFront, positions.stairStart);
   assert.equal(positions.pier.z, passage.pierZ);
   assert.ok(positions.screen > .7);
   assert.equal(positions.seminar.z, passage.hallDoorZ);
   assert.equal(positions.seminar.x, passage.x + passage.width / 2, 'Seminar Hall sits along the right wall of the Strong Room passage');
+  assert.deepEqual(positions.main, { x: passage.terminalX, z: layout.corridorCenter }, 'Main Seminar Hall door remains at the long-corridor end');
+  assert.deepEqual(positions.lab, { x: passage.x, z: passage.labEnd }, 'Electronics Lab terminates the opposite end of the passage');
+  assert.ok(positions.lab.z > layout.front && passage.end < layout.roomFront);
+  assert.ok(positions.downstand.top - positions.downstand.bottom > .8 && positions.downstand.depth === .36);
+  const facade = await page.evaluate(() => {
+    let exterior = false, blockedGate = false;
+    __portrait.scene.traverse(mesh => {
+      if (!mesh.isMesh || !mesh.geometry.attributes.position || Array.isArray(mesh.material)) return;
+      const p = mesh.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+        if (Math.abs(x - 21.84) < .001 && y === 0 && z < -7.3 && mesh.material.map?.image instanceof HTMLCanvasElement && mesh.material.bumpMap) exterior = true;
+        if (Math.abs(x - 22.43) < .001 && z > 3.5 && z < 7.6 && y < 3 && mesh.material.color?.getHexString() === '222a27') blockedGate = true;
+      }
+    });
+    return { exterior, blockedGate };
+  });
+  assert.equal(facade.exterior, true, 'Rear ground wall retains exterior plaster texture and bump map');
+  assert.equal(facade.blockedGate, false, 'Folding gate has no opaque placeholder behind its lattice');
   await page.locator('#walk-route').selectOption('right');
   async function seek(progress, name) {
     await page.locator('#walk-progress').evaluate((e, value) => { e.value = value; e.dispatchEvent(new Event('input')); }, progress);
@@ -55,21 +74,23 @@ try {
   await page.mouse.move(550, 350); await page.mouse.down(); await page.mouse.move(630, 350); await page.mouse.up();
   await page.waitForTimeout(400);
   assert.ok(await page.evaluate(() => __lookPoint.clone().project(__portrait.camera).x) > before + .05, 'Mouse drag pulls the visible scene right');
+  await seek(840, 'seminar-main-entrance');
   await seek(940, 'seminar-hall-entrance');
   await seek(1000, 'spine-return');
   await page.locator('#walk-route').selectOption('seminar');
-  for (const progress of [220, 600, 820]) {
+  for (const progress of [220, 600, 820, 1000]) {
     await page.locator('#walk-progress').evaluate((e, value) => { e.value = value; e.dispatchEvent(new Event('input')); }, progress);
     await page.waitForTimeout(500);
     const state = await page.evaluate(() => {
       const p = __portrait; p.entranceWalk.update(0); p.renderer.render(p.scene, p.camera);
       const gl = p.renderer.getContext(), pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
       gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-      return { x: p.camera.position.x, colors: new Set(pixels).size };
+      return { x: p.camera.position.x, z: p.camera.position.z, colors: new Set(pixels).size };
     });
     await page.screenshot({ path: `artifacts/seminar-${progress}.png` });
     console.log('seminar', progress, state);
     assert.ok(Math.abs(state.x - passage.x) < .001);
+    if (progress === 1000) assert.ok(Math.abs(state.z - (passage.labEnd - 1.7)) < .001);
     assert.ok(state.colors > 50, 'Side passage renders visible geometry');
   }
   await page.locator('#walk-route').selectOption('right');
@@ -93,6 +114,13 @@ try {
   assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 390 && bounds.y + bounds.height <= 844);
   await page.locator('#walk-exit').click();
   await page.waitForFunction(() => !__portrait.entranceWalk.active && __portrait.controls.enabled);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.evaluate(() => {
+    const p = __portrait; p.controls.dispatchEvent({ type: 'start' });
+    p.camera.position.set(12, 3.2, -11); p.controls.target.set(22, 2.2, -9);
+    p.controls.update(); p.renderer.render(p.scene, p.camera);
+  });
+  await page.screenshot({ path: 'artifacts/restored-rear-wing.png' });
   assert.deepEqual(errors, []);
   assert.deepEqual(failedAssets, []);
   console.log('PASS 2:1 depth split, aligned stairs, right-wing and side-passage routes, mouse/touch panorama, mobile layout and exit');

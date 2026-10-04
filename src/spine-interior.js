@@ -71,11 +71,11 @@ export function buildSpineInterior(parent, m) {
     for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / .72, p.getZ(i) / .72);
     add(g, floorMat);
   }
-  function wall(x, z, angle, width, bottom, top, openings = []) {
+  function wall(x, z, angle, width, bottom, top, openings = [], material = m.wall, depth = .18) {
     onWall(x, z, angle, () => {
       const shape = rectangle(width, top - bottom, 0, (bottom + top) / 2);
       for (const o of openings) shape.holes.push(rectangle(o.w, o.h, o.x, o.y));
-      extrude(shape, 0, 0, 0, .18, m.wall, 0);
+      extrude(shape, 0, 0, 0, depth, material, 0);
     });
   }
   function latch(x, y, z, width = .40) {
@@ -128,6 +128,11 @@ export function buildSpineInterior(parent, m) {
     }
     const flap = new T.BoxGeometry(.90, .12, .018); flap.rotateX(-.48); flap.translate(x, y - .11, z + .022); add(flap, darkWood);
   }
+  function seminarDoor() {
+    frame(0, base + 1.08, .02, 1.07, 2.24, .055, .08, m.entranceWood);
+    box(0, base + 1.08, -.015, .95, 2.14, .038, m.doorPanel);
+    latch(-.29, base + 1, .02, .22); ventilator(0, 3.47, 0);
+  }
   function sign(text, x, y, z, rotation, width, color = '#18201e') {
     const c = document.createElement('canvas'); c.width = 768; c.height = 128;
     const p = c.getContext('2d'); p.fillStyle = '#e5e1d6'; p.fillRect(0, 0, c.width, c.height);
@@ -179,23 +184,37 @@ export function buildSpineInterior(parent, m) {
 
   const terminal = passage.terminalX;
   wall(terminal, layout.corridorCenter, -Math.PI / 2, layout.corridorDepth, base, 3.8, [{ x: 0, y: base + 1.08, w: .96, h: 2.16 }, { x: 0, y: 3.47, w: .96, h: .39 }]);
-  onWall(terminal - .015, layout.corridorCenter, -Math.PI / 2, () => {
-    panelDoor(0, base + .012, 0, .95, 2.14); ventilator(0, 3.47, 0);
-  });
-  sign('ELECTRONICS LAB II', terminal - .03, base + 2.41, layout.corridorCenter, -Math.PI / 2, 1.1);
+  onWall(terminal - .015, layout.corridorCenter, -Math.PI / 2, seminarDoor);
+  sign('SEMINAR HALL', terminal - .03, base + 2.41, layout.corridorCenter, -Math.PI / 2, 1.1);
+  group.userData.seminarHallMainEntrance = { x: terminal, z: layout.corridorCenter };
 
   const { x: px, width: pw, end, pierZ } = passage, length = front - end, middle = (front + end) / 2;
   const left = px - pw / 2, right = px + pw / 2, windowZ = [-1.65, -3.85, -6.25];
   floor(px, middle, pw, length, base);
-  wall(left, middle, Math.PI / 2, length, base, 3.8, windowZ.map(z => ({ x: middle - z, y: base + 1.48, w: 1.46, h: 1.72 })));
+  const passageWindows = windowZ.map(z => ({ x: middle - z, y: base + 1.48, w: 1.46, h: 1.72 }));
+  wall(left, middle, Math.PI / 2, length, base, 3.8, passageWindows);
+  // Exterior finish stays separate from the photographed interior plaster, with the same openings.
+  wall(left - .185, middle, Math.PI / 2, length, base, 3.8, passageWindows, m.exteriorWall, .01);
   wall(right, middle, -Math.PI / 2, length, base, 3.8, [
     { x: -3.5 - middle, y: base + 1.48, w: .90, h: 1.40 },
     { x: passage.hallDoorZ - middle, y: base + 1.08, w: .96, h: 2.16 },
     { x: passage.hallDoorZ - middle, y: 3.47, w: .96, h: .39 },
   ]);
   box(px, 3.86, middle, pw, .16, length, m.wall);
-  // Preserve the outer wall beyond the filmed passage, leaving unseen rooms closed.
-  box(22.03, 1.9, (end - 16.5) / 2, .18, 3.8, 16.5 + end, m.wall);
+  // Continue to Electronics Lab opposite the Strong Room, alongside the exterior folding gate.
+  const labLength = passage.labEnd - layout.front, labMiddle = (passage.labEnd + layout.front) / 2;
+  floor(px, labMiddle, pw, labLength, base);
+  wall(right, labMiddle, -Math.PI / 2, labLength, base, 3.8);
+  box(px, 3.86, labMiddle, pw, .16, labLength, m.wall);
+  box(right - .025, base + .09, labMiddle, .05, .18, labLength, skirting);
+  wall(px, passage.labEnd, Math.PI, pw, base, 3.8, [
+    { x: 0, y: base + 1.08, w: .96, h: 2.16 }, { x: 0, y: 3.47, w: .96, h: .39 },
+  ]);
+  onWall(px, passage.labEnd - .015, Math.PI, () => {
+    panelDoor(0, base + .012, 0, .95, 2.14); ventilator(0, 3.47, 0);
+  });
+  sign('ELECTRONICS LAB II', px, base + 2.41, passage.labEnd - .03, Math.PI, 1.1);
+  group.userData.electronicsLabEntrance = { x: px, z: passage.labEnd };
   for (const side of [-1, 1]) {
     const runs = side < 0 ? [[end, front]] : [[end, passage.hallDoorZ - .54], [passage.hallDoorZ + .54, front]];
     for (const [a, b] of runs) box(px + side * (pw / 2 - .025), base + .09, (a + b) / 2, .05, .18, b - a, skirting);
@@ -208,10 +227,7 @@ export function buildSpineInterior(parent, m) {
     for (const dy of [-.28, .28]) box(-.35, base + 1.48 + dy, -.01, .64, .028, .03, blue);
     box(-.35, base + 1.48, -.015, .63, 1.61, .004, daylightGlass); transform = original;
   });
-  onWall(right - .015, passage.hallDoorZ, -Math.PI / 2, () => {
-    frame(0, base + 1.08, .02, 1.07, 2.24, .055, .08, m.entranceWood);
-    box(0, base + 1.08, -.015, .95, 2.14, .038, m.doorPanel); latch(-.29, base + 1, .02, .22); ventilator(0, 3.47, 0);
-  });
+  onWall(right - .015, passage.hallDoorZ, -Math.PI / 2, seminarDoor);
   sign('SEMINAR HALL', right - .03, base + 2.41, passage.hallDoorZ, -Math.PI / 2, 1.1);
   group.userData.seminarHallEntrance = { x: right, z: passage.hallDoorZ };
   const cream = new T.MeshStandardMaterial({ color: '#b9b18a', roughness: .62, metalness: .15 });
@@ -224,12 +240,12 @@ export function buildSpineInterior(parent, m) {
   // Right-hand pier and low lintel create the recessed Strong Room bay.
   box(right - .17, base + 1.55, pierZ, .34, 3.1, .36, m.wall);
   box(right - .18, base + .10, pierZ, .36, .20, .38, skirting);
-  wall(px, pierZ + .18, 0, pw, base + 2.45, 3.8, [{ x: 0, y: 3.47, w: .96, h: .39 }]);
+  wall(px, pierZ + .18, 0, pw, base + 2.25, 3.8, [], m.wall, .36);
   group.userData.strongRoomPier = { x: right - .17, z: pierZ };
+  group.userData.strongRoomDownstand = { bottom: base + 2.25, top: 3.8, depth: .36 };
   wall(px, end, 0, pw, base, 3.8, [{ x: .12, y: base + 1.09, w: 1.08, h: 2.18 }]);
   panelDoor(px + .12, base + .012, end + .015, 1.07, 2.16, 5); latch(px + .12, base + .61, end + .06);
   sign('STRONG ROOM APLA', px + .12, base + 2.36, end + .026, 0, 1.15, '#7b2027');
-  onWall(px, pierZ + .185, 0, () => ventilator(0, 3.47, 0));
 
   const gateZ = front + .02, gateMetal = blue.clone(); gateMetal.color.set('#85918c'); gateMetal.metalness = .4;
   box(px, base + 2.13, gateZ, pw, .045, .045, gateMetal);

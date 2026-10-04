@@ -271,6 +271,6 @@ export function buildEntranceHall(parent, exterior) {
     geometries.forEach(g => g.dispose());
   }
   group.traverse(object => { if (object.isMesh) object.layers.enable(1); });
-  buildSpineInterior(group, { ...exterior, wall, tread, floor: floorMaterial });
+  buildSpineInterior(group, { ...exterior, exteriorWall: exterior.wall, wall, tread, floor: floorMaterial });
   return { group, fan, floor, lights, stepsPerFlight: steps };
 }
