@@ -16,7 +16,9 @@ The front screen starts 0.766 units above the corridor floor with black stone sk
 
 The owner confirmed the corrected layout on October 4: Seminar Hall has TWO doors, its main entrance at the end of the long front corridor and a second entrance along the Strong Room passage. Electronics Lab II is at the opposite terminal end of that passage from the Strong Room, adjacent to the exterior folding gate, not in place of Seminar Hall's main door. The video `100654` at 2 seconds and `095915` at 45 seconds distinguish those entrances. Exact offsets remain approximate; no unobserved hall or lab interior is invented.
 
-The Strong Room approach retains the right-hand pier and a deeper solid plaster downstand, without the invented ventilator in that wall. The ground-floor rear facade retains exterior plaster and blue trim instead of the interior plaster substitution. Passage windows remain actual openings through both finishes.
+The Strong Room approach retains the right-hand pier and deeper plaster downstand. Reinspection of `100654` at 75 seconds shows a high timber ventilator in that downstand; it is retained, unlike the accidental exterior canopy seam. The ground-floor rear facade retains exterior plaster and blue trim instead of the interior plaster substitution. Passage windows remain actual openings through both finishes.
+
+October 4 screenshot correction: the original near windows overlapped the spine's rear wall at z=-3.25. The three window reveals now lie fully beyond that wall, at z=-4.4, -6.65 and -9.05; the Strong Room end is moved to -10.2, retaining the recessed bay behind its pier. The resulting 11.28-unit approach remains an interpretation, not a survey. Tables, the opposite window and fans move with the longer passage. Interior walls use light aged plaster albedo; the shadowed video crop is retained only as subtle bump relief. The entrance shell now joins the 4.2-high upper facade, sealing the accidental strip above the canopy without covering the real windows or vents.
 
 ## Pending visual correction
 

@@ -189,14 +189,14 @@ export function buildSpineInterior(parent, m) {
   group.userData.seminarHallMainEntrance = { x: terminal, z: layout.corridorCenter };
 
   const { x: px, width: pw, end, pierZ } = passage, length = front - end, middle = (front + end) / 2;
-  const left = px - pw / 2, right = px + pw / 2, windowZ = [-1.65, -3.85, -6.25];
+  const left = px - pw / 2, right = px + pw / 2, { windowZ, windowWidth } = passage;
   floor(px, middle, pw, length, base);
-  const passageWindows = windowZ.map(z => ({ x: middle - z, y: base + 1.48, w: 1.46, h: 1.72 }));
+  const passageWindows = windowZ.map(z => ({ x: middle - z, y: base + 1.48, w: windowWidth, h: 1.72 }));
   wall(left, middle, Math.PI / 2, length, base, 3.8, passageWindows);
   // Exterior finish stays separate from the photographed interior plaster, with the same openings.
   wall(left - .185, middle, Math.PI / 2, length, base, 3.8, passageWindows, m.exteriorWall, .01);
   wall(right, middle, -Math.PI / 2, length, base, 3.8, [
-    { x: -3.5 - middle, y: base + 1.48, w: .90, h: 1.40 },
+    { x: -6.4 - middle, y: base + 1.48, w: .90, h: 1.40 },
     { x: passage.hallDoorZ - middle, y: base + 1.08, w: .96, h: 2.16 },
     { x: passage.hallDoorZ - middle, y: 3.47, w: .96, h: .39 },
   ]);
@@ -221,7 +221,7 @@ export function buildSpineInterior(parent, m) {
     for (const y of [3.02, 3.09]) tube([[px + side * (pw / 2 - .025), y, front], [px + side * (pw / 2 - .025), y, end]], .009, wire);
   }
   for (const z of windowZ) onWall(left + .009, z, Math.PI / 2, () => {
-    windowFrame(0, base + 1.48, 0, 1.46, 1.72, 2, true);
+    windowFrame(0, base + 1.48, 0, windowWidth, 1.72, 2, true);
     const original = transform.clone(); transform.multiply(new T.Matrix4().makeTranslation(.73, 0, .06)); transform.multiply(new T.Matrix4().makeRotationY(-.92));
     frame(-.35, base + 1.48, 0, .69, 1.67, .027, .032, blue);
     for (const dy of [-.28, .28]) box(-.35, base + 1.48 + dy, -.01, .64, .028, .03, blue);
@@ -231,7 +231,7 @@ export function buildSpineInterior(parent, m) {
   sign('SEMINAR HALL', right - .03, base + 2.41, passage.hallDoorZ, -Math.PI / 2, 1.1);
   group.userData.seminarHallEntrance = { x: right, z: passage.hallDoorZ };
   const cream = new T.MeshStandardMaterial({ color: '#b9b18a', roughness: .62, metalness: .15 });
-  onWall(right - .015, -3.5, -Math.PI / 2, () => {
+  onWall(right - .015, -6.4, -Math.PI / 2, () => {
     frame(0, base + 1.48, .025, 1, 1.50, .045, .07, cream);
     box(0, base + 1.48, -.045, .90, 1.40, .008, glass);
     for (const x of [-.36, -.18, 0, .18, .36]) tube([[x, base + .79, .045], [x, base + 2.17, .045]], .007, cream);
@@ -240,12 +240,13 @@ export function buildSpineInterior(parent, m) {
   // Right-hand pier and low lintel create the recessed Strong Room bay.
   box(right - .17, base + 1.55, pierZ, .34, 3.1, .36, m.wall);
   box(right - .18, base + .10, pierZ, .36, .20, .38, skirting);
-  wall(px, pierZ + .18, 0, pw, base + 2.25, 3.8, [], m.wall, .36);
+  wall(px, pierZ + .18, 0, pw, base + 2.25, 3.8, [{ x: 0, y: 3.47, w: .96, h: .39 }], m.wall, .36);
   group.userData.strongRoomPier = { x: right - .17, z: pierZ };
   group.userData.strongRoomDownstand = { bottom: base + 2.25, top: 3.8, depth: .36 };
   wall(px, end, 0, pw, base, 3.8, [{ x: .12, y: base + 1.09, w: 1.08, h: 2.18 }]);
   panelDoor(px + .12, base + .012, end + .015, 1.07, 2.16, 5); latch(px + .12, base + .61, end + .06);
   sign('STRONG ROOM APLA', px + .12, base + 2.36, end + .026, 0, 1.15, '#7b2027');
+  onWall(px, pierZ + .185, 0, () => ventilator(0, 3.47, 0));
 
   const gateZ = front + .02, gateMetal = blue.clone(); gateMetal.color.set('#85918c'); gateMetal.metalness = .4;
   box(px, base + 2.13, gateZ, pw, .045, .045, gateMetal);
@@ -263,7 +264,7 @@ export function buildSpineInterior(parent, m) {
     for (let i = 1; i < 7; i++) tube([[hx, base + .05, gateZ - i * .14], [hx, base + 1.19, gateZ - i * .14]], .007, gateMetal);
     for (const r of [.15, .30, .45]) tube(Array.from({ length: 20 }, (_, i) => { const a = i * Math.PI / 19; return [hx, base + 1.19 + Math.sin(a) * r, leafZ + Math.cos(a) * r]; }), .010, gateMetal);
   }
-  for (const [z, width, depth] of [[-.75, .65, 1.45], [-2.8, .60, 1.80], [-5.55, .62, 1.5]]) {
+  for (const [z, width, depth] of [[-3.6, .65, 1.45], [-5.65, .60, 1.80], [-8.4, .62, 1.5]]) {
     const x = left + width / 2 + .10;
     const top = new T.ExtrudeGeometry(rectangle(width, depth), { depth: .028, bevelEnabled: true, bevelSize: .003, bevelThickness: .003, bevelSegments: 1, steps: 1 });
     top.rotateX(-Math.PI / 2); top.translate(x, base + .79, z); add(top, m.doorPanel);
@@ -273,7 +274,7 @@ export function buildSpineInterior(parent, m) {
     for (const dx of [-width * .40, width * .40]) box(x + dx, base + .71, z, .032, .10, depth * .86, m.entranceWood);
     box(x, base + .22, z, width * .83, .028, .03, m.entranceWood);
   }
-  for (const z of [-.75, -4.2]) {
+  for (const z of [-2.2, -6.8]) {
     tube([[px, 3.76, z], [px, 3.32, z]], .012, m.dark);
     const hub = new T.SphereGeometry(.065, 12, 8); hub.scale(1, .55, 1); hub.translate(px, 3.31, z); add(hub, m.dark);
     for (let blade = 0; blade < 3; blade++) {

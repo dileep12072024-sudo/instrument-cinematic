@@ -6,6 +6,11 @@ import { groundSpine as layout, seminarPassage as passage } from '../src/footpri
 assert.equal(layout.roomDepth, layout.corridorDepth * 2);
 assert.equal(layout.roomFront + layout.corridorDepth, layout.front);
 assert.ok(layout.roomFront - passage.end > 8, 'Strong Room approach must not be compressed into the spine');
+for (const z of passage.windowZ) {
+  assert.ok(z + passage.windowWidth / 2 + .08 < layout.rear - .16, 'Full window reveal clears the connecting corridor rear wall');
+  assert.ok(z - passage.windowWidth / 2 - .08 > passage.end + .15, 'Window reveal clears the Strong Room end pier');
+}
+assert.ok(layout.roomFront - passage.end > 11, 'Passage includes the spine overlap before the external window bays');
 assert.ok(layout.screenBottom - layout.rightFloor > .7, 'Screen starts above a substantial solid base');
 assert.ok(passage.x - passage.width / 2 >= 22 && passage.x + passage.width / 2 < 31, 'Passage fits inside the east wing');
 await mkdir('artifacts', { recursive: true });
@@ -42,7 +47,7 @@ try {
       const p = mesh.geometry.attributes.position;
       for (let i = 0; i < p.count; i++) {
         const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-        if (Math.abs(x - 21.84) < .001 && y === 0 && z < -7.3 && mesh.material.map?.image instanceof HTMLCanvasElement && mesh.material.bumpMap) exterior = true;
+        if (Math.abs(x - 21.84) < .001 && y === 0 && z < -10.2 && mesh.material.map?.image instanceof HTMLCanvasElement && mesh.material.bumpMap) exterior = true;
         if (Math.abs(x - 22.43) < .001 && z > 3.5 && z < 7.6 && y < 3 && mesh.material.color?.getHexString() === '222a27') blockedGate = true;
       }
     });
@@ -50,6 +55,27 @@ try {
   });
   assert.equal(facade.exterior, true, 'Rear ground wall retains exterior plaster texture and bump map');
   assert.equal(facade.blockedGate, false, 'Folding gate has no opaque placeholder behind its lattice');
+  const finish = await page.evaluate(() => {
+    const a = __portrait.architecture;
+    let paint = false;
+    __portrait.scene.traverse(mesh => {
+      if (mesh.material?.name === 'Aged entrance hall plaster') paint = mesh.material.map === a.materials.wall.map && mesh.material.bumpScale <= .002;
+    });
+    const geometry = a.group.children.find(mesh => mesh.material === a.materials.wall).geometry;
+    const p = geometry.attributes.position, indices = geometry.index;
+    const sealed = [-3, 0, 3].every(x => {
+      for (let i = 0; i < (indices?.count ?? p.count); i += 3) {
+        const ids = [i, i + 1, i + 2].map(j => indices ? indices.getX(j) : j);
+        if (ids.every(j => Math.abs(p.getZ(j) - 7.175) < .001) &&
+          Math.min(...ids.map(j => p.getX(j))) <= x && Math.max(...ids.map(j => p.getX(j))) >= x &&
+          Math.min(...ids.map(j => p.getY(j))) < 4.1 && Math.max(...ids.map(j => p.getY(j))) > 4.1) return true;
+      }
+      return false;
+    });
+    return { paint, sealed };
+  });
+  assert.ok(finish.paint, 'Interior uses light plaster albedo, not baked-in grey photographic shading');
+  assert.ok(finish.sealed, 'Entrance lintel closes the seam below the 4.2-high facade');
   await page.locator('#walk-route').selectOption('right');
   async function seek(progress, name) {
     await page.locator('#walk-progress').evaluate((e, value) => { e.value = value; e.dispatchEvent(new Event('input')); }, progress);
@@ -117,10 +143,15 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.evaluate(() => {
     const p = __portrait; p.controls.dispatchEvent({ type: 'start' });
-    p.camera.position.set(12, 3.2, -11); p.controls.target.set(22, 2.2, -9);
+    p.camera.position.set(12, 3.2, -9); p.controls.target.set(22, 2.2, -6.5);
     p.controls.update(); p.renderer.render(p.scene, p.camera);
   });
   await page.screenshot({ path: 'artifacts/restored-rear-wing.png' });
+  await page.evaluate(() => {
+    const p = __portrait; p.camera.position.set(0, 5.5, 23); p.controls.target.set(0, 4.1, 7);
+    p.controls.update(); p.renderer.render(p.scene, p.camera);
+  });
+  await page.screenshot({ path: 'artifacts/sealed-canopy-front.png' });
   assert.deepEqual(errors, []);
   assert.deepEqual(failedAssets, []);
   console.log('PASS 2:1 depth split, aligned stairs, right-wing and side-passage routes, mouse/touch panorama, mobile layout and exit');

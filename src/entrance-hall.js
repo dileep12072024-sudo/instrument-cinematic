@@ -48,7 +48,8 @@ export function buildEntranceHall(parent, exterior) {
   const loader = new T.TextureLoader();
   const plaster = loader.load('/media/entrance-hall/plaster.webp'); plaster.colorSpace = T.SRGBColorSpace;
   plaster.wrapS = plaster.wrapT = T.RepeatWrapping; plaster.anisotropy = 4;
-  const wall = exterior.wall.clone(); wall.name = 'Aged entrance hall plaster'; wall.color.set('#ffffff'); wall.map = plaster; wall.bumpMap = plaster; wall.bumpScale = .008; wall.roughness = .98;
+  // The video crop contains baked-in shade; use it only for fine surface relief, not paint colour.
+  const wall = exterior.wall.clone(); wall.name = 'Aged entrance hall plaster'; wall.color.set('#fffdf5'); wall.bumpMap = plaster; wall.bumpScale = .002; wall.roughness = .94;
   const trim = new T.MeshStandardMaterial({ color: '#273a33', roughness: .58, metalness: .15 });
   const recess = new T.MeshStandardMaterial({ color: '#607e9b', roughness: .96, map: exterior.wall.map });
   const floor = new T.Mesh(new T.PlaneGeometry(7.64, 13.6), floorMaterial);

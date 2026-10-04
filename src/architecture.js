@@ -330,7 +330,7 @@ export function buildArchitecture(scene) {
             box(left, groundSpine.rightFloor / 2, (end + groundSpine.roomFront) / 2, .32, groundSpine.rightFloor, groundSpine.roomFront - end, m.wall);
             box(left, 3.9, (rear + 3.25) / 2, .63, .19, 3.25 - rear + .24, m.trim);
             box(left - .19, 4.45, (rear + 3.25) / 2, .075, .35, 3.25 - rear, m.blue);
-            for (const zz of [rear, rear + (3.25 - rear) / 6, rear + (3.25 - rear) / 3, end]) {
+            for (const zz of [rear, rear + (3.25 - rear) / 6, rear + (3.25 - rear) / 3, end].filter(zz => zz <= end)) {
               box(left - .05, 2, zz, .45, 4, .30, m.blue);
             }
           }
@@ -345,6 +345,9 @@ export function buildArchitecture(scene) {
             box(x + side * w / 2, .8725, 4.37, .32, 1.745, 2.08, m.wall);
             box(x + side * w / 2, 3.4475, 4.37, .32, 1.105, 2.08, m.wall);
             box(x + side * w / 2, 3.8, groundSpine.corridorCenter, .32, .4, groundSpine.corridorDepth, m.wall);
+            // Tower storeys are 4.2 high; join the 4.0-high entrance shell to the upper facade.
+            const storey = (h - 1.4) / Math.round((h - 1.4) / 4);
+            box(x + side * w / 2, (4 + storey) / 2, z, .32, storey - 4, d, m.wall);
           }
         }
       }
@@ -381,7 +384,9 @@ export function buildArchitecture(scene) {
   // Cantilevered rear canopy: half the front canopy's depth, with no freestanding posts.
   box(0, 3.55, -7.9, 10, .24, 2, m.wall);
   box(0, 3.63, -8.9, 10.1, .3, .18, m.blue);
-  box(0, 3.78, 7, 8, .44, .35, m.wall);
+  const tower = footprint.find(part => part.type === 'tower');
+  const firstStorey = (tower.height - 1.4) / Math.round((tower.height - 1.4) / 4);
+  box(0, (3.56 + firstStorey) / 2, 7, 8, firstStorey - 3.56, .35, m.wall);
   for (const x of [-3.85, 3.85]) box(x, 1.75, 7, .3, 3.5, .45, m.blue);
   box(0, 3.43, 7, 7.5, .3, .28, m.entranceWood);
   const halfDoorway = 1.3, sideWidth = 3.75 - halfDoorway, sideCenter = (3.75 + halfDoorway) / 2;
