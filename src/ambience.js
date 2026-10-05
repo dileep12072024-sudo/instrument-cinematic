@@ -1,5 +1,21 @@
 export function createAmbience() {
   let context, master, birds, birdPromise, enabled = false, muted = false, volume = .4;
+  let rainGain, rainFilter, windGain, birdGain, lastMix = '';
+  let weather = { rainFactor: 0, windSpeed: 0 }, indoors = false, windSpeed = 0;
+
+  function mixWeather() {
+    if (!context || !rainGain) return;
+    const rain = Math.max(0, Math.min(1, weather.rainFactor || 0));
+    const wind = Math.max(0, Math.min(1, windSpeed / 60));
+    const key = `${rain.toFixed(2)}:${wind.toFixed(2)}:${indoors}:${!!birdGain}`;
+    if (key === lastMix) return;
+    lastMix = key;
+    const now = context.currentTime;
+    rainGain.gain.setTargetAtTime(rain * (indoors ? .18 : .65), now, .7);
+    rainFilter.frequency.setTargetAtTime(indoors ? 950 : 4200 + rain * 3200, now, .7);
+    windGain.gain.setTargetAtTime((.015 + wind * .5) * (indoors ? .2 : 1), now, .7);
+    birdGain?.gain.setTargetAtTime(.85 * (1 - rain * .95) * (indoors ? .35 : 1), now, .7);
+  }
 
   function prepare() {
     context = new AudioContext();
@@ -19,12 +35,29 @@ export function createAmbience() {
     const lowpass = context.createBiquadFilter(); lowpass.frequency.value = 1100; lowpass.Q.value = .4;
     const rustle = context.createBiquadFilter(); rustle.type = 'bandpass'; rustle.frequency.value = 2400; rustle.Q.value = .55;
     const rustleGain = context.createGain(); rustleGain.gain.value = .2;
-    const windGain = context.createGain(); windGain.gain.value = .3;
+    windGain = context.createGain(); windGain.gain.value = 0;
     master = context.createGain(); master.gain.value = 0;
     breeze.connect(highpass).connect(lowpass).connect(windGain);
     breeze.connect(rustle).connect(rustleGain).connect(windGain);
     windGain.connect(master);
     master.connect(context.destination);
+    // Layer a diffuse stereo hiss with irregular short impacts for rain on foliage/paving.
+    const rainBuffer = context.createBuffer(2, context.sampleRate * 17, context.sampleRate);
+    for (let channel = 0; channel < 2; channel++) {
+      const samples = rainBuffer.getChannelData(channel);
+      let impact = 0;
+      for (let i = 0; i < samples.length; i++) {
+        if (Math.random() < .0015) impact = .3 + Math.random() * .7;
+        impact *= .985;
+        samples[i] = (Math.random() * 2 - 1) * (.16 + impact * .5);
+      }
+    }
+    const rainSource = context.createBufferSource(); rainSource.buffer = rainBuffer; rainSource.loop = true;
+    const rainHighpass = context.createBiquadFilter(); rainHighpass.type = 'highpass'; rainHighpass.frequency.value = 240;
+    rainFilter = context.createBiquadFilter(); rainFilter.type = 'lowpass'; rainFilter.Q.value = .4;
+    rainGain = context.createGain(); rainGain.gain.value = 0;
+    rainSource.connect(rainHighpass).connect(rainFilter).connect(rainGain).connect(master); rainSource.start();
+    lastMix = ''; mixWeather();
     // Slow filter movement creates gusts without a repeating melody or sharp loop boundary.
     const gust = context.createOscillator(); gust.frequency.value = .075;
     const depth = context.createGain(); depth.gain.value = 350;
@@ -48,9 +81,8 @@ export function createAmbience() {
       }
     }
     birds = context.createBufferSource(); birds.buffer = loop; birds.loop = true;
-    const gain = context.createGain(); gain.gain.value = 0;
-    gain.gain.setTargetAtTime(.85, context.currentTime, .6);
-    birds.connect(gain).connect(master); birds.start();
+    birdGain = context.createGain(); birdGain.gain.value = 0;
+    birds.connect(birdGain).connect(master); birds.start(); mixWeather();
   }
 
   async function sync() {
@@ -67,6 +99,9 @@ export function createAmbience() {
   }
 
   return {
+    setWeather(value, sheltered = false, speed = value.windSpeed || 0) {
+      weather = value; indoors = sheltered; windSpeed = speed; mixWeather();
+    },
     async setEnabled(value) {
       enabled = value;
       try {
@@ -74,7 +109,8 @@ export function createAmbience() {
         await sync();
         if (enabled && !birds) {
           birdPromise ||= prepareBirds().finally(() => { birdPromise = null; });
-          await birdPromise;
+          // A missing recording must not silence the generated rain and wind.
+          await birdPromise.catch(error => console.warn(error.message));
         }
       } catch (error) { enabled = false; await context?.close(); context = null; birds = null; birdPromise = null; throw error; }
     },
@@ -88,5 +124,6 @@ export function createAmbience() {
     get volume() { return volume; },
     get context() { return context; },
     get birdsReady() { return !!birds; },
+    get weatherMix() { return { rain: rainGain?.gain.value || 0, wind: windGain?.gain.value || 0, indoors, rainCutoff: rainFilter?.frequency.value || 0 }; },
   };
 }

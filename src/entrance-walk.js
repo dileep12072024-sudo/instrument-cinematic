@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { groundSpine, seminarPassage as passage } from './footprint.js';
+import { classroom } from './classroom-wing.js';
 
 const stops = [
   { at: 0, z: 12.3, yaw: 0, name: 'The threshold' },
@@ -28,6 +29,17 @@ const seminarSurrounds = [
   { at: .82, x: passage.x, y: groundSpine.rightFloor + 1.666, z: passage.end + 1.4, yaw: Math.PI, name: 'Looking back toward the grille' },
   { at: .90, x: passage.x, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI, name: 'Front corridor junction' },
   { at: 1, x: passage.x, y: groundSpine.rightFloor + 1.666, z: passage.labEnd - 1.7, yaw: Math.PI, name: 'Electronics Lab II' },
+];
+// Start at the upstairs landing; the unmeasured stair connection is not a fly-through.
+const classroomRoute = [
+  { at: 0, x: -2.4, y: classroom.landing + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Upstairs classroom-wing entrance' },
+  { at: .10, x: -4.6, y: classroom.floor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Classroom wing' },
+  { at: .42, x: -16, y: classroom.floor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Classroom corridor' },
+  { at: .52, x: -20.7, y: classroom.floor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Classroom passage steps' },
+  { at: .60, x: -22, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Class Room III approach' },
+  { at: .70, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Class Room III' },
+  { at: .76, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: 0, name: 'Classroom side passage' },
+  { at: 1, x: -23.15, y: classroom.lowerFloor + 1.65, z: -6.6, yaw: 0, name: 'Classroom side-passage end' },
 ];
 
 export function createEntranceWalk(camera, canvas, onExit, onChange) {
@@ -58,7 +70,7 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
     seek(stop?.at ?? (direction > 0 ? 1 : 0));
   }
   slider.addEventListener('input', () => seek(Number(slider.value) / 1000));
-  document.querySelector('#walk-route').addEventListener('change', e => { route = { hall: stops, right: rightWing, seminar: seminarSurrounds }[e.target.value] || stops; seek(0); });
+  document.querySelector('#walk-route').addEventListener('change', e => { route = { hall: stops, right: rightWing, seminar: seminarSurrounds, classroom: classroomRoute }[e.target.value] || stops; seek(0); });
   play.onclick = () => { if (progress === 1) progress = 0; playing = !playing; sync(); };
   document.querySelector('#walk-back').onclick = () => step(-1);
   document.querySelector('#walk-forward').onclick = () => step(1);

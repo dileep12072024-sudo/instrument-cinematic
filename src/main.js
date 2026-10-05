@@ -6,6 +6,7 @@ import { buildArchitecture, buildLandscape } from './architecture.js';
 import { footprint } from './footprint.js';
 import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
+import { createRain, rainfall, windVector, isSheltered } from './weather-effects.js';
 import { createEntranceWalk } from './entrance-walk.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
 import './style.css';
@@ -58,7 +59,7 @@ $('#app').innerHTML = `
   <dialog id="video-dialog" class="video-dialog"><div class="dialog-top"><span class="eyebrow">THE CAMPUS / ORIGINAL FOOTAGE</span><button class="icon-btn close-dialog" aria-label="Close film">${icon('x')}</button></div><video controls playsinline preload="none" poster="/media/entrance.webp"><source src="/media/campus.mp4" type="video/mp4" /></video></dialog>
   <dialog id="about-dialog" class="about-dialog"><div class="dialog-top"><span class="eyebrow">ABOUT THE PORTRAIT</span><button class="icon-btn close-dialog" aria-label="Close about">${icon('x')}</button></div><h2>Built around<br><em>a real place.</em></h2><p>Department of Instrument Technology.<br>Andhra University, Visakhapatnam.</p><p>This independent architectural portrait is reconstructed from the supplied campus photographs, video, and footprint. The blue structural frame, open corridors, entrance, and different wing heights follow those references.</p><p>Geometry is constructed directly in Three.js. Dimensions, hidden elevations, planting, and materials are interpreted; this is not a measured survey or a photogrammetric scan.</p><a href="https://www.google.com/maps/search/?api=1&query=Andhra+University+Department+of+Instrument+Technology" target="_blank" rel="noopener" class="text-btn">Find the department ${icon('arrow-up-right')}</a><div class="credits">Original photographs & footage supplied by the project owner. Sky lighting: <a href="https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky" target="_blank" rel="noopener">Poly Haven / CC0</a>.</div></dialog>`;
 $('#about').insertAdjacentHTML('afterend', `<button id="sound" class="icon-btn" aria-label="Mute ambient sound" aria-pressed="true" data-tip="Mute ambient sound">${icon('volume-2')}</button>`);
-$('#walk-location').insertAdjacentHTML('beforebegin', '<select id="walk-route" aria-label="Interior route"><option value="hall">Central hall</option><option value="right">Ground-floor right wing</option><option value="seminar">Seminar Hall surrounds</option></select>');
+$('#walk-location').insertAdjacentHTML('beforebegin', '<select id="walk-route" aria-label="Interior route"><option value="hall">Central hall</option><option value="right">Ground-floor right wing</option><option value="seminar">Seminar Hall surrounds</option><option value="classroom">Upstairs classroom wing</option></select>');
 $('#light-panel').insertAdjacentHTML('beforeend', '<label class="range-label" for="ambient-volume">Ambient volume <output id="volume-output">40%</output></label><input id="ambient-volume" type="range" min="0" max="100" value="40" step="1"/>');
 $('#light-panel').insertAdjacentHTML('beforeend', '<label class="motion-row" for="live-clock">Live campus time<input id="live-clock" type="checkbox" checked /></label><p id="weather-detail" class="weather-detail" role="status">Fetching campus weather</p><p id="forecast" class="weather-detail"></p><a class="weather-source" href="https://open-meteo.com/" target="_blank" rel="noopener">Weather: Open-Meteo</a>');
 $('#hour').min = 0; $('#hour').max = 23.99;
@@ -168,30 +169,7 @@ function updateMoon(now = Date.now()) {
   $('#moon-detail').textContent = `Moon: ${(state.illumination * 100).toFixed(1)}% illuminated`;
 }
 
-function createRain() {
-  const count = 820, geometry = new THREE.PlaneGeometry(.035, 1.7);
-  const material = new THREE.MeshBasicMaterial({ color: '#c9dce6', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
-  const mesh = new THREE.InstancedMesh(geometry, material, count); mesh.name = 'Live rain'; mesh.frustumCulled = false; mesh.visible = false; scene.add(mesh);
-  const drops = Array.from({ length: count }, (_, i) => ({ x: ((i * 37.17) % 120) - 60, y: (i * 19.73) % 48 + 2, z: ((i * 53.11) % 96) - 40, speed: 23 + (i % 11) * 1.9, lean: -.08 - (i % 5) * .012 }));
-  const dummy = new THREE.Object3D();
-  return {
-    current: 0,
-    update(dt, target) {
-      this.current = reduced ? target : THREE.MathUtils.damp(this.current, target, 2.8, dt);
-      const enclosed = document.querySelector('#experience')?.classList.contains('interior-view');
-      mesh.visible = this.current > .004 && !enclosed;
-      material.opacity = THREE.MathUtils.lerp(0, .28, this.current);
-      if (!mesh.visible) return;
-      for (let i = 0; i < drops.length; i++) {
-        const drop = drops[i]; drop.y -= drop.speed * dt * (.72 + this.current * .45); if (drop.y < -.4) drop.y = 48 + (i % 17) * .3;
-        const lean = drop.lean * (1 + weatherState.windSpeed / 20);
-        dummy.position.set(drop.x + lean * (48 - drop.y), drop.y, drop.z); dummy.rotation.set(0, camera.rotation.y, Math.atan2(lean, 1)); dummy.scale.setScalar(.72 + this.current * .5); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
-      }
-      mesh.instanceMatrix.needsUpdate = true;
-    }
-  };
-}
-const rain = createRain();
+const rain = createRain(scene, camera);
 
 function updateWeatherLabel() {
   const temp = weatherState.temperature == null ? '' : ` / ${Math.round(weatherState.temperature)}°C`;
@@ -234,8 +212,11 @@ async function loadWeather() {
     const wet = WEATHER_RAIN_CODES.has(code) || precip > 0 || rainNow > 0 || showers > 0;
     weatherState.loaded = true; weatherState.observedAt = current.time * 1000; weatherState.stale = Math.abs(Date.now() - weatherState.observedAt) > 90 * 60000;
     weatherState.code = code; weatherState.temperature = current.temperature_2m; weatherState.cloudCover = THREE.MathUtils.clamp(current.cloud_cover, 0, 100);
-    weatherState.storm = [95, 96, 99].includes(code); weatherState.windSpeed = current.wind_speed_10m;
-    weatherState.rainFactor = wet ? THREE.MathUtils.clamp(.35 + precip * .14 + rainNow * .22 + showers * .16, .35, 1) : 0;
+    weatherState.storm = [95, 96, 99].includes(code); weatherState.windSpeed = Math.max(0, Number(current.wind_speed_10m) || 0);
+    weatherState.windDirection = Number(current.wind_direction_10m) || 0;
+    weatherState.windGusts = Math.max(weatherState.windSpeed, Number(current.wind_gusts_10m) || 0);
+    const rainReport = rainfall(current);
+    weatherState.rainFactor = rainReport.factor; weatherState.rainRate = rainReport.rate;
     weatherState.summary = weatherState.storm ? 'THUNDERSTORM' : wet ? 'RAIN' : [45, 48].includes(code) ? 'FOG' : weatherState.cloudCover > 72 ? 'OVERCAST' : weatherState.cloudCover > 35 ? 'PARTLY CLOUDY' : 'CLEAR'; weatherState.updatedAt = Date.now();
     if (wet) weatherState.cloudCover = Math.max(weatherState.cloudCover, 75);
     const daily = data.daily;
@@ -477,9 +458,14 @@ function animate(now) {
   }
   // Orbit speed follows wall time, including slower devices; damping is for pointer input.
   if (!entranceWalk?.active) controls.update(Math.min(frameDuration / 1000, 1));
-  if (!reduced) landscape.wind.value += dt * (1 + weatherState.windSpeed / 25);
+  if (!reduced) landscape.wind.value += dt;
+  const gust = (.5 + .5 * Math.sin(landscape.wind.value * .47)) ** 4;
+  const windSpeed = weatherState.windSpeed + ((weatherState.windGusts || weatherState.windSpeed) - weatherState.windSpeed) * gust;
+  landscape.windStrength.value = THREE.MathUtils.damp(landscape.windStrength.value, reduced ? 0 : Math.min(1.5, (windSpeed / 35) ** 1.5), 2, dt);
+  landscape.windDirection.value.copy(windVector(1, weatherState.windDirection)).normalize();
   if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
-  rain.update(reduced ? 0 : dt, weatherState.rainFactor);
+  rain.update(dt, weatherState, reduced);
+  sound.setWeather(weatherState, isSheltered(camera.position.x, camera.position.y, camera.position.z), windSpeed);
   sky.update(now / 1000, sunlight.night, weatherState, reduced);
   if (needsRender || !reduced) {
     renderer.render(scene, camera);

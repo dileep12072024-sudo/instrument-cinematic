@@ -103,6 +103,17 @@ export function buildEntranceHall(parent, exterior) {
   const soffit = new T.BoxGeometry(2.9, .17, 5.9); soffit.rotateX(-.46); soffit.translate(0, 4.1, -1.82); add(soffit, wall);
   box(0, 1.39, -4.65, 2.96, 2.45, .13, recess);
   box(0, 2.65, -4.55, 3.04, .12, .18, wall);
+  // User-confirmed fixed gates in the two recess corners, not the open wing entrances.
+  const cornerGates = new T.Group(); cornerGates.name = 'Closed under-stair corner gates'; group.add(cornerGates);
+  for (const side of [-1, 1]) {
+    const gate = new T.Group(); gate.name = side < 0 ? 'Left under-stair gate' : 'Right under-stair gate';
+    gate.position.set(side * 1.43, .164, -4.03); cornerGates.add(gate);
+    const part = (y, z, h, d) => { const mesh = new T.Mesh(new T.BoxGeometry(.035, h, d), trim); mesh.position.set(0, y, z); gate.add(mesh); };
+    for (const z of [-.46, .46]) part(1.06, z, 2.12, .045);
+    for (const y of [.025, 1.05, 2.10]) part(y, 0, .04, .94);
+    for (let i = -4; i <= 4; i++) part(1.06, i * .10, 2.04, .014);
+    part(.96, .04, .05, .20);
+  }
   const rear = new T.Group(); rear.name = 'Stair landing wall and narrow louvres'; group.add(rear);
   box(0, 6.5, -6.32, 7.58, 3.0, .14, wall);
   box(0, 2.14, -6.32, 7.58, 3.95, .14, wall);

@@ -3,6 +3,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint, groundSpine, seminarPassage } from './footprint.js';
 import { buildReferenceGarden } from './garden.js';
 import { buildEntranceHall } from './entrance-hall.js';
+import { buildClassroomWing } from './classroom-wing.js';
+import { applyWind } from './weather-effects.js';
 
 let seed = 1937;
 const random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
@@ -173,7 +175,7 @@ export function buildArchitecture(scene) {
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(vertices, 3)); geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2)); geo.setIndex(indices); geo.translate(x, 0, z); geo.applyMatrix4(parent); geo.computeVertexNormals();
     if (!batches.has(material)) batches.set(material, []); batches.get(material).push(geo);
   }
-  function face(cx, cz, rotation, width, height, bays, type, closedGround = false, openGround = false) {
+  function face(cx, cz, rotation, width, height, bays, type, closedGround = false, openGround = false, onlyFloor = null) {
     const transform = new T.Matrix4().compose(new T.Vector3(cx, 0, cz), quaternion.setFromAxisAngle(new T.Vector3(0, 1, 0), rotation), new T.Vector3(1, 1, 1));
     const b = (x, y, z, w, h, d, material) => box(x, y, z, w, h, d, material, transform);
     const floors = Math.round((height - 1.4) / 4), floorH = (height - 1.4) / floors, bay = width / bays;
@@ -182,6 +184,26 @@ export function buildArchitecture(scene) {
     const tower = type.startsWith('tower') || type === 'east-wing' || westOuter;
     const corridor = type === 'corridor' || type === 'gate-return';
     for (let f = 0; f < floors; f++) {
+      if (onlyFloor !== null && f !== onlyFloor) continue;
+      // The filmed upstairs classroom passage supplies the west tower opening and return windows.
+      if (f === 1 && type === 'tower-side' && cx < 0) {
+        const bottom = floorH, top = 2 * floorH;
+        for (const [a, c] of [[-7, 1.083333], [3.25, 7]]) {
+          box(cx, (bottom + top) / 2, (a + c) / 2, .32, top - bottom, c - a, m.wall);
+        }
+        box(cx, (7.78 + top) / 2, 2.166667, .32, top - 7.78, 2.166667, m.wall);
+        continue;
+      }
+      if (f === 1 && onlyFloor === null && type === 'room' && cx < 0 && rotation === Math.PI / 2) {
+        // Preserve the original facade outside the filmed side-passage window band.
+        for (const [a, c] of [[cz - width / 2, -8.813333]]) {
+          face(cx, (a + c) / 2, rotation, c - a, height, Math.max(1, Math.round((c - a) / 3.5)), type, closedGround, openGround, 1);
+        }
+        // Continue the opening through the corridor junction, not just the window band.
+        box(cx, 4.032, -2.781667, .32, .064, 12.063333, m.wall);
+        box(cx, 7.89, -2.781667, .32, .22, 12.063333, m.wall);
+        continue;
+      }
       // The entrance is an actual opening, not doors placed over a solid ground-floor wall.
       if ((openGround || type === 'tower-front' || type === 'tower-side') && f === 0) continue;
       const raisedScreen = type === 'corridor' && cx > 0 && f === 0 && rotation === 0;
@@ -226,7 +248,7 @@ export function buildArchitecture(scene) {
         } else if (solid) {
           b(x, openingY, 0, ow, openingH, .32, m.wall);
         } else if (lattice) {
-          if (f !== 0 || !type.includes('corridor')) b(x, openingY, -.27, ow, openingH, .05, m.dark);
+          if ((f !== 0 || !type.includes('corridor')) && !(type === 'low-corridor' && f === 1 && rotation === 0)) b(x, openingY, -.27, ow, openingH, .05, m.dark);
           if (f === 0) {
             concreteScreen(x, openingY, ow, openingH, transform);
           } else {
@@ -286,9 +308,15 @@ export function buildArchitecture(scene) {
       b(width / 2, y + floorH / 2, 0, .6, floorH, .32, m.wall);
       b(width / 2, y + floorH / 2, .05, .3, floorH, .45, m.blue);
       if (f !== 0 || type !== 'west' && type !== 'east-wing') b(0, y + floorH - .1, .1, width + .24, .19, .63, m.trim);
-      if (f === 0 && !westOuter) b(0, y + floorH + .45, .19, width, .35, .075, m.blue);
+      if (f === 0 && !westOuter) {
+        if (type === 'room' && cx < 0 && rotation === Math.PI / 2) {
+          const rear = cz - width / 2, junction = 1.083333;
+          box(cx + .19, y + floorH + .45, (rear + junction) / 2, .075, .35, junction - rear, m.blue);
+        } else b(0, y + floorH + .45, .19, width, .35, .075, m.blue);
+      }
       if (f === 0 && (westWindow || type === 'east-wing')) b(0, 3.15, .38, width + .25, .14, 1.05, m.trim);
     }
+    if (onlyFloor !== null) return;
     const roofY = height - 1.4;
     b(0, roofY + .7, 0, width, 1.4, .32, m.wall);
     b(0, roofY + 1.35, .05, width + .2, .16, .49, m.trim);
@@ -474,6 +502,7 @@ export function buildArchitecture(scene) {
   }
   screenTemplates.forEach(geo => geo.dispose());
   const interior = buildEntranceHall(group, m);
+  buildClassroomWing(group, { ...m, tread: interior.floor.material });
   for (const { pivot } of doors) pivot.traverse(object => { if (object.isMesh) object.layers.enable(1); });
   return { group, doors, materials: m, interior };
 }
@@ -594,11 +623,8 @@ export function buildLandscape(scene) {
   });
   canopyShadows.castShadow = true; group.add(canopyShadows);
   const wind = { value: 0 };
-  leafMat.onBeforeCompile = shader => {
-    shader.uniforms.uWind = wind;
-    shader.vertexShader = 'uniform float uWind;\n' + shader.vertexShader;
-    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.x += sin(uWind * 0.75 + instanceMatrix[3].x * 0.5 + instanceMatrix[3].z * 0.3) * 0.025 * (position.y + 0.5);');
-  };
+  const windStrength = { value: 0 }, windDirection = { value: new T.Vector2(0, 1) };
+  applyWind(leafMat, wind, windStrength, windDirection);
   group.add(foliage);
   const debrisMat = mat('#8b7957', { side: T.DoubleSide });
   const debris = new T.InstancedMesh(new T.PlaneGeometry(.14, .055), debrisMat, 1900);
@@ -620,6 +646,6 @@ export function buildLandscape(scene) {
     stones.setColorAt(i, new T.Color().setHSL(.08, .1 + random() * .2, .35 + random() * .3));
   }
   stones.receiveShadow = true; group.add(stones);
-  const garden = buildReferenceGarden(group, groundHeight, wind);
-  return { group, foliage, wind, garden, groundMaterial: groundMat, soilMaterial: soilMat, pavingMaterial: pavingMat };
+  const garden = buildReferenceGarden(group, groundHeight, wind, windStrength, windDirection);
+  return { group, foliage, wind, windStrength, windDirection, garden, groundMaterial: groundMat, soilMaterial: soilMat, pavingMaterial: pavingMat };
 }

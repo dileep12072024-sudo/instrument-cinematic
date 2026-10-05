@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { applyWind } from './weather-effects.js';
 
 // Positions interpreted from the Left / Central / Right photographic survey.
 // Coordinates remain approximate until measured site dimensions are available.
@@ -46,7 +47,7 @@ function leafGeometry() {
   geo.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2)); geo.setIndex(indices); geo.computeVertexNormals(); return geo;
 }
 
-export function buildReferenceGarden(group, groundHeight, wind) {
+export function buildReferenceGarden(group, groundHeight, wind, windStrength, windDirection) {
   let seed = 731;
   const random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
   const dummy = new T.Object3D(), branches = [], leaves = [], blossoms = [];
@@ -139,12 +140,10 @@ export function buildReferenceGarden(group, groundHeight, wind) {
   }
   const trunks = new T.Mesh(mergeGeometries(branches), barkMat); trunks.name = 'Reference forked trunks and shrub stems'; trunks.castShadow = trunks.receiveShadow = true; group.add(trunks); branches.forEach(g => g.dispose());
   const leafMat = new T.MeshStandardMaterial({ color: '#aebf87', side: T.DoubleSide, roughness: .58 });
-  leafMat.onBeforeCompile = shader => {
-    shader.uniforms.uWind = wind;
-    shader.vertexShader = 'uniform float uWind;\n' + shader.vertexShader;
-    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed.x += sin(uWind * 1.2 + instanceMatrix[3].x * 1.7 + instanceMatrix[3].z) * .035 * position.y;');
-    shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= .86 + .14 * abs(normalize(vNormal).y);');
-  };
+  applyWind(leafMat, wind, windStrength, windDirection);
+  applyWind(barkMat, wind, windStrength, windDirection);
+  trunks.customDepthMaterial = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking });
+  applyWind(trunks.customDepthMaterial, wind, windStrength, windDirection);
   const foliage = new T.InstancedMesh(leafGeometry(), leafMat, leaves.length); foliage.name = 'Individual curved foliage';
   leaves.forEach(({ position, size, rotation, tint }, i) => {
     dummy.position.copy(position); dummy.rotation.set(...rotation); dummy.scale.set(size * (tint ? 1.4 : 1), size, size); dummy.updateMatrix(); foliage.setMatrixAt(i, dummy.matrix);
@@ -152,6 +151,7 @@ export function buildReferenceGarden(group, groundHeight, wind) {
   });
   foliage.receiveShadow = true; group.add(foliage);
   const flowerMat = new T.MeshStandardMaterial({ color: '#e9609a', side: T.DoubleSide, roughness: .7 });
+  applyWind(flowerMat, wind, windStrength, windDirection);
   const flowers = new T.InstancedMesh(new T.CircleGeometry(.06, 5), flowerMat, blossoms.length); flowers.name = 'Pink flower clusters';
   blossoms.forEach((p, i) => { dummy.position.copy(p); dummy.rotation.set(random() * 3, random() * 6, random() * 6); dummy.scale.setScalar(1); dummy.updateMatrix(); flowers.setMatrixAt(i, dummy.matrix); }); group.add(flowers);
   const groundLeaves = new T.InstancedMesh(leafGeometry(), leafMat, 9000); groundLeaves.name = 'Patchy verge groundcover';
