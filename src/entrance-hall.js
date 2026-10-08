@@ -2,6 +2,7 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { groundSpine } from './footprint.js';
 import { buildSpineInterior } from './spine-interior.js';
+import { buildStairways } from './stairways.js';
 
 // Evidence and approximate dimensions: docs/entrance-video.md.
 export function buildEntranceHall(parent, exterior) {
@@ -83,48 +84,10 @@ export function buildEntranceHall(parent, exterior) {
     }
   }
   box(0, 3.80, 4.25, 7.62, .08, 5.15, wall);
-  // Twin stair flights and their solid sloping parapets, visible at 24-32s.
-  const steps = 18, rise = .205, run = .33, startZ = groundSpine.roomFront;
-  group.userData.stairStartZ = startZ;
-  for (const side of [-1, 1]) {
-    for (let i = 0; i < steps; i++) {
-      const top = .164 + (i + 1) * rise, z = startZ - (i + .5) * run;
-      box(side * 2.67, (top + .164) / 2, z, 2.02, top - .164, run, tread);
-      box(side * 2.67, top + .005, z + run / 2 - .017, 2.02, .016, .035, exterior.trim);
-    }
-    const shape = new T.Shape(); shape.moveTo(startZ, .164); shape.lineTo(startZ, 1.12);
-    shape.lineTo(startZ - steps * run, .96 + steps * rise); shape.lineTo(startZ - steps * run, .164); shape.closePath();
-    const g = new T.ExtrudeGeometry(shape, { depth: .18, bevelEnabled: false, steps: 1 });
-    g.rotateY(-Math.PI / 2); g.translate(side * 1.55 + .09, 0, 0); add(g, wall);
-    rod([side * 1.55, 1.12, startZ], [side * 1.55, .96 + steps * rise, startZ - steps * run], .037, wall);
-    box(side * 2.67, 3.78, startZ - steps * run - .55, 2.02, .15, 1.1, tread);
-  }
-  // Only the underside of the central returning stair is evidenced by this clip.
-  const soffit = new T.BoxGeometry(2.9, .17, 5.9); soffit.rotateX(-.46); soffit.translate(0, 4.1, -1.82); add(soffit, wall);
-  box(0, 1.39, -4.65, 2.96, 2.45, .13, recess);
-  box(0, 2.65, -4.55, 3.04, .12, .18, wall);
-  // User-confirmed fixed gates in the two recess corners, not the open wing entrances.
-  const cornerGates = new T.Group(); cornerGates.name = 'Closed under-stair corner gates'; group.add(cornerGates);
-  for (const side of [-1, 1]) {
-    const gate = new T.Group(); gate.name = side < 0 ? 'Left under-stair gate' : 'Right under-stair gate';
-    gate.position.set(side * 1.43, .164, -4.03); cornerGates.add(gate);
-    const part = (y, z, h, d) => { const mesh = new T.Mesh(new T.BoxGeometry(.035, h, d), trim); mesh.position.set(0, y, z); gate.add(mesh); };
-    for (const z of [-.46, .46]) part(1.06, z, 2.12, .045);
-    for (const y of [.025, 1.05, 2.10]) part(y, 0, .04, .94);
-    for (let i = -4; i <= 4; i++) part(1.06, i * .10, 2.04, .014);
-    part(.96, .04, .05, .20);
-  }
-  const rear = new T.Group(); rear.name = 'Stair landing wall and narrow louvres'; group.add(rear);
-  box(0, 6.5, -6.32, 7.58, 3.0, .14, wall);
-  box(0, 2.14, -6.32, 7.58, 3.95, .14, wall);
-  for (const side of [-1, 1]) {
-    box(side * 1.1, 4.62, -6.32, 2.2, 1.02, .14, wall);
-    box(side * 3.45, 4.62, -6.32, .7, 1.02, .14, wall);
-    const glass = new T.MeshStandardMaterial({ color: '#c1d4c2', emissive: '#9bad91', emissiveIntensity: .35, roughness: .28 });
-    box(side * 2.65, 4.64, -6.22, .82, 1.1, .03, glass);
-    for (const s of [-1, 1]) box(side * 2.65 + s * .44, 4.64, -6.17, .055, 1.18, .09, trim);
-    for (let k = 0; k <= 6; k++) box(side * 2.65, 4.11 + k * .18, -6.16, .88, .035, .1, trim);
-  }
+  group.userData.stairStartZ = groundSpine.roomFront;
+  const stairways = buildStairways(group, { ...exterior, wall, tread });
+  box(0, 1.23, -5.72, 2.96, 2.13, .13, recess);
+  box(0, 2.32, -5.65, 3.04, .12, .18, wall);
   // Stacked timber and a crate in the blue recess are visible, but no invented contents.
   for (let i = 0; i < 11; i++) {
     const g = new T.BoxGeometry(2.0 + rand() * .6, .025, .25 + rand() * .18);
@@ -284,5 +247,5 @@ export function buildEntranceHall(parent, exterior) {
   }
   group.traverse(object => { if (object.isMesh) object.layers.enable(1); });
   buildSpineInterior(group, { ...exterior, exteriorWall: exterior.wall, wall, tread, floor: floorMaterial });
-  return { group, fan, floor, lights, stepsPerFlight: steps };
+  return { group, fan, floor, lights, stepsPerFlight: stairways.userData.flights[0].sideSteps };
 }

@@ -102,7 +102,7 @@ try {
   });
   await page.mouse.move(550, 350); await page.mouse.down(); await page.mouse.move(630, 350); await page.mouse.up();
   await page.waitForTimeout(400);
-  assert.ok(await page.evaluate(() => __lookPoint.clone().project(__portrait.camera).x) > before + .05, 'Mouse drag pulls the visible scene right');
+  assert.ok(await page.evaluate(() => __lookPoint.clone().project(__portrait.camera).x) < before - .05, 'Mouse drag right turns the view right, matching exterior controls');
   await seek(840, 'seminar-main-entrance');
   await seek(940, 'seminar-hall-entrance');
   await seek(1000, 'spine-return');

@@ -5,7 +5,7 @@ import ffmpeg from 'ffmpeg-static';
 
 const dir = 'artifacts/classroom-video';
 mkdirSync(dir, { recursive: true });
-for (const name of ['094055', '094701', '094920', '103154', '103849']) {
+for (const name of (process.argv.length > 2 ? process.argv.slice(2) : ['094055', '094701', '094920', '103154', '103849'])) {
   const source = `/mnt/c/Users/Dileep/Pictures/Internal parts/20260928_${name}.mp4`;
   const info = spawnSync(ffmpeg, ['-hide_banner', '-i', source], { encoding: 'utf8' }).stderr;
   const [, h, m, s] = info.match(/Duration: (\d+):(\d+):([\d.]+)/);

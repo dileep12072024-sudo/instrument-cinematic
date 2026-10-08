@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { groundSpine, seminarPassage as passage } from './footprint.js';
 import { classroom } from './classroom-wing.js';
+import { stairs, stairFlights } from './stair-layout.js';
 
 const stops = [
   { at: 0, z: 12.3, yaw: 0, name: 'The threshold' },
@@ -30,7 +31,7 @@ const seminarSurrounds = [
   { at: .90, x: passage.x, y: groundSpine.rightFloor + 1.666, z: groundSpine.corridorCenter, yaw: Math.PI, name: 'Front corridor junction' },
   { at: 1, x: passage.x, y: groundSpine.rightFloor + 1.666, z: passage.labEnd - 1.7, yaw: Math.PI, name: 'Electronics Lab II' },
 ];
-// Start at the upstairs landing; the unmeasured stair connection is not a fly-through.
+// The classroom route is a direct entry; the stair route connects every landing.
 const classroomRoute = [
   { at: 0, x: -2.4, y: classroom.landing + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Upstairs classroom-wing entrance' },
   { at: .10, x: -4.6, y: classroom.floor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Classroom wing' },
@@ -41,6 +42,56 @@ const classroomRoute = [
   { at: .76, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: 0, name: 'Classroom side passage' },
   { at: 1, x: -23.15, y: classroom.lowerFloor + 1.65, z: -6.6, yaw: 0, name: 'Classroom side-passage end' },
 ];
+
+function walkingRoute(points) {
+  let distance = 0;
+  const result = points.map(([x, floor, z, yaw, name], i) => {
+    if (i) distance += Math.hypot(x - points[i - 1][0], floor - points[i - 1][1], z - points[i - 1][2]) + (yaw !== points[i - 1][3] ? .5 : 0);
+    return { x, y: floor + 1.65, z, yaw, name, at: distance };
+  });
+  return result.map(p => ({ ...p, at: p.at / distance }));
+}
+const stairPoints = [[2.67, stairs.ground, 2.1, 0, 'Ground-floor stair approach']];
+stairFlights.forEach((f, i) => {
+  stairPoints.push(
+    [2.67, f.base, stairs.front, 0, `${i + 1}: Side flight`],
+    [2.67, f.half, stairs.rear, 0, 'Rear landing'],
+    [2.67, f.half, stairs.landingZ, -Math.PI / 2, 'Rear landing'],
+    [0, f.half, stairs.landingZ, -Math.PI, 'Central return flight'],
+    [0, f.half, stairs.rear, -Math.PI, 'Central return flight'],
+    [0, f.top, stairs.returnEnd, -Math.PI, i === 2 ? 'Blue roof-access door' : `${i + 1}: Front landing`],
+    [0, f.top, 2.166667, i === 0 ? -2.1 : -Math.PI, i === 0 ? 'Library and classroom wing' : i === 1 ? 'Second-floor terrace landing' : 'Upper terrace'],
+  );
+  if (i < 2) stairPoints.push([2.67, f.top, 2.166667, 0, 'Next stair flight']);
+});
+export const stairRoute = walkingRoute(stairPoints);
+const leftTerraceRoute = walkingRoute([
+  [0, stairs.second, 2.166667, -Math.PI / 2, 'Second-floor landing'],
+  [-4.3, stairs.second, 2.166667, -Math.PI / 2, 'Terrace grille gate'],
+  [-6.6, stairs.second, 1.6, -Math.PI / 2, 'Corrugated canopy'],
+  [-14, stairs.second, 1.6, -Math.PI / 2, 'Classroom-wing roof'],
+  [-20.9, stairs.second, 1.9, -Math.PI / 2, 'Lower terrace steps'],
+  [-22.3, 8.11, 1.9, -Math.PI / 2, 'Open terrace'],
+  [-28, 8.11, 1.9, 0, 'Open terrace'],
+  [-28, 8.11, -11.8, Math.PI, 'Looking back across the classroom roof'],
+]);
+const rightTerraceRoute = walkingRoute([
+  [0, stairs.top, 1.0, Math.PI / 2, 'Roof-access doorway'],
+  [2.9, stairs.top, 2.166667, Math.PI / 2, 'Upper terrace steps'],
+  [3.99, stairs.top, 2.166667, Math.PI / 2, 'Upper terrace steps'],
+  [5.3, 12.11, 2.166667, Math.PI / 2, 'Upper right terrace'],
+  [12, 12.11, 1.3, Math.PI / 2, 'White water tanks'],
+  [21, 12.11, 1.3, Math.PI / 2, 'Empty tank plinth'],
+  [25, 12.11, 1.3, 0, 'Main roof'],
+  [25, 12.11, -11.8, Math.PI, 'Black water tank'],
+  [25, 12.11, 12.8, -Math.PI / 2, 'Far roof parapet'],
+]);
+const upperCorridorRoute = walkingRoute([
+  [0, stairs.second, 2.166667, Math.PI / 2, 'Second-floor landing'],
+  [4, stairs.second, 2.166667, Math.PI / 2, 'Three corridor steps'],
+  [4.9, 8.704, 2.166667, Math.PI / 2, 'Upper right corridor'],
+  [20.3, 8.704, 2.166667, Math.PI / 2, 'Upper corridor end'],
+]);
 
 export function createEntranceWalk(camera, canvas, onExit, onChange) {
   let active = false, playing = false, progress = 0, yaw = 0, pitch = 0, pointer = null;
@@ -63,14 +114,14 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
     onChange();
   }
   function seek(value) {
-    progress = T.MathUtils.clamp(value, 0, 1); playing = false; yaw = pitch = 0; sync();
+    progress = T.MathUtils.clamp(value, 0, 1); playing = false; sync();
   }
   function step(direction) {
     const stop = direction > 0 ? route.find(s => s.at > progress + .002) : route.findLast(s => s.at < progress - .002);
     seek(stop?.at ?? (direction > 0 ? 1 : 0));
   }
   slider.addEventListener('input', () => seek(Number(slider.value) / 1000));
-  document.querySelector('#walk-route').addEventListener('change', e => { route = { hall: stops, right: rightWing, seminar: seminarSurrounds, classroom: classroomRoute }[e.target.value] || stops; seek(0); });
+  document.querySelector('#walk-route').addEventListener('change', e => { route = { hall: stops, right: rightWing, seminar: seminarSurrounds, classroom: classroomRoute, stairs: stairRoute, terraceLeft: leftTerraceRoute, terraceRight: rightTerraceRoute, upperCorridor: upperCorridorRoute }[e.target.value] || stops; yaw = pitch = 0; seek(0); });
   play.onclick = () => { if (progress === 1) progress = 0; playing = !playing; sync(); };
   document.querySelector('#walk-back').onclick = () => step(-1);
   document.querySelector('#walk-forward').onclick = () => step(1);
@@ -82,10 +133,10 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
   });
   canvas.addEventListener('pointermove', e => {
     if (!active || pointer?.id !== e.pointerId) return;
-    // Grab the panorama rather than steer the gaze; preserve screen-relative sensitivity.
+    // Follow the pointer, matching the exterior's perceived turn direction.
     const sensitivity = Math.PI / Math.max(1, canvas.clientHeight || 800);
-    yaw -= (e.clientX - pointer.x) * sensitivity;
-    pitch = T.MathUtils.clamp(pitch + (e.clientY - pointer.y) * sensitivity, -1.05, 1.05);
+    yaw += (e.clientX - pointer.x) * sensitivity;
+    pitch = T.MathUtils.clamp(pitch - (e.clientY - pointer.y) * sensitivity, -1.25, 1.25);
     pointer.x = e.clientX; pointer.y = e.clientY; onChange();
   });
   const release = e => { if (pointer?.id === e.pointerId) pointer = null; };
@@ -107,13 +158,15 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
     get active() { return active; }, get progress() { return progress; }, get playing() { return playing; },
     enter() { active = true; playing = false; progress = 0; yaw = pitch = 0; route = stops; document.querySelector('#walk-route').value = 'hall'; sync(); canvas.focus({ preventScroll: true }); },
     exit() { active = playing = false; pointer = null; sync(); },
+    resetLook() { yaw = pitch = 0; onChange(); },
     update(dt) {
       if (!active) return;
       if (playing) { progress = Math.min(1, progress + dt / 36); if (progress === 1) playing = false; sync(); }
       const next = route.findIndex(stop => stop.at > progress), b = route[next < 0 ? route.length - 1 : next];
       const a = route[Math.max(0, (next < 0 ? route.length - 1 : next) - 1)];
       const raw = T.MathUtils.clamp((progress - a.at) / (b.at - a.at), 0, 1), t = raw * raw * (3 - 2 * raw);
-      const angle = T.MathUtils.lerp(a.yaw, b.yaw, t) + yaw;
+      const turn = Math.atan2(Math.sin(b.yaw - a.yaw), Math.cos(b.yaw - a.yaw));
+      const angle = a.yaw + turn * t + yaw;
       camera.position.set(T.MathUtils.lerp(a.x || 0, b.x || 0, t), T.MathUtils.lerp(a.y || 1.83, b.y || 1.83, t), T.MathUtils.lerp(a.z, b.z, t));
       camera.lookAt(camera.position.x + Math.sin(angle) * Math.cos(pitch), camera.position.y + Math.sin(pitch), camera.position.z - Math.cos(angle) * Math.cos(pitch));
     },

@@ -107,10 +107,11 @@ export function buildClassroomWing(parent, m) {
   const libraryStart = new Map([...batches].map(([material, gs]) => [material, gs.length]));
   const libraryChildren = new Set(group.children);
   door(0, classroom.landing, 0, 1.02, 'LIBRARY');
-  const libraryTransform = new T.Matrix4().makeRotationY(-Math.PI / 2); libraryTransform.setPosition(1.10, 0, 1.45);
+  const libraryTransform = new T.Matrix4().makeRotationY(Math.PI / 2); libraryTransform.setPosition(-1.28, 0, 1.45);
   for (const [material, gs] of batches) for (let j = libraryStart.get(material) || 0; j < gs.length; j++) gs[j].applyMatrix4(libraryTransform);
   for (const child of group.children) if (!libraryChildren.has(child)) child.applyMatrix4(libraryTransform);
-  box(1.15, (classroom.landing + ceiling) / 2, 1.45, .12, ceiling - classroom.landing, 1.8, plaster);
+  for (const z of [.57, 2.33]) box(-1.33, (classroom.landing + ceiling) / 2, z, .14, ceiling - classroom.landing, .64, plaster);
+  box(-1.33, (classroom.landing + 2.5 + ceiling) / 2, 1.45, .14, ceiling - classroom.landing - 2.5, 1.12, plaster);
   box(0, classroom.landing + .055, .30, 2.17, .11, .3, stone); box(0, classroom.landing + .165, 0, 2.17, .11, .3, stone);
   // Window wall aligns with the existing five pierced facade bays.
   box(-1.10, y + .63, -9, .16, 1.26, 18, plaster);

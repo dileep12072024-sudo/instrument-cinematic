@@ -195,6 +195,8 @@ export function buildSpineInterior(parent, m) {
   wall(left, middle, Math.PI / 2, length, base, 3.8, passageWindows);
   // Exterior finish stays separate from the photographed interior plaster, with the same openings.
   wall(left - .185, middle, Math.PI / 2, length, base, 3.8, passageWindows, m.exteriorWall, .01);
+  const fadedPanel = new T.MeshStandardMaterial({ color: '#9b8091', map: paint, roughness: .94 });
+  box(left + .008, base + 1.55, -1.65, .015, 3.04, 2.85, fadedPanel);
   wall(right, middle, -Math.PI / 2, length, base, 3.8, [
     { x: -6.4 - middle, y: base + 1.48, w: .90, h: 1.40 },
     { x: passage.hallDoorZ - middle, y: base + 1.08, w: .96, h: 2.16 },
@@ -244,7 +246,7 @@ export function buildSpineInterior(parent, m) {
   group.userData.strongRoomPier = { x: right - .17, z: pierZ };
   group.userData.strongRoomDownstand = { bottom: base + 2.25, top: 3.8, depth: .36 };
   wall(px, end, 0, pw, base, 3.8, [{ x: .12, y: base + 1.09, w: 1.08, h: 2.18 }]);
-  panelDoor(px + .12, base + .012, end + .015, 1.07, 2.16, 5); latch(px + .12, base + .61, end + .06);
+  panelDoor(px + .12, base + .012, end + .015, 1.07, 2.16, 7); latch(px + .12, base + .61, end + .06);
   sign('STRONG ROOM APLA', px + .12, base + 2.36, end + .026, 0, 1.15, '#7b2027');
   onWall(px, pierZ + .185, 0, () => ventilator(0, 3.47, 0));
 
@@ -265,7 +267,7 @@ export function buildSpineInterior(parent, m) {
     for (const r of [.15, .30, .45]) tube(Array.from({ length: 20 }, (_, i) => { const a = i * Math.PI / 19; return [hx, base + 1.19 + Math.sin(a) * r, leafZ + Math.cos(a) * r]; }), .010, gateMetal);
   }
   // Keep the deepest table clear of the projecting Strong Room pier at pierZ.
-  for (const [z, width, depth] of [[-3.6, .65, 1.45], [-5.65, .60, 1.80], [-7.15, .62, 1.5]]) {
+  for (const [z, width, depth] of [[-3.3, .72, 1.6], [-6.1, .60, 2.0], [-8.2, .62, 1.4]]) {
     const x = left + width / 2 + .10;
     const top = new T.ExtrudeGeometry(rectangle(width, depth), { depth: .028, bevelEnabled: true, bevelSize: .003, bevelThickness: .003, bevelSegments: 1, steps: 1 });
     top.rotateX(-Math.PI / 2); top.translate(x, base + .79, z); add(top, m.doorPanel);
@@ -276,6 +278,7 @@ export function buildSpineInterior(parent, m) {
     box(x, base + .22, z, width * .83, .028, .03, m.entranceWood);
   }
   for (const z of [-2.2, -6.8]) {
+    tube([[left + .02, 3.63, z], [right - .02, 3.63, z]], .019, wire);
     tube([[px, 3.76, z], [px, 3.32, z]], .012, m.dark);
     const hub = new T.SphereGeometry(.065, 12, 8); hub.scale(1, .55, 1); hub.translate(px, 3.31, z); add(hub, m.dark);
     for (let blade = 0; blade < 3; blade++) {

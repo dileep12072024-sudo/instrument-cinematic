@@ -34,7 +34,7 @@ dialog{background:#18221f;color:#edf2e4;border:1px solid #e9f0df29;border-radius
 .walk-controls input{min-width:30px;flex:1;accent-color:var(--accent);margin:0}
 .walk-controls .icon-btn span{display:contents}
 .walk-controls .icon-btn:disabled{opacity:.35;cursor:default}
-.interior-view .scene-heading,.interior-view .chapter-bar,.interior-view .plan,.interior-view .scene-number,.interior-view .entrance-actions,.interior-view .scene-tools,.interior-view #film{display:none}
+.interior-view .scene-heading,.interior-view .chapter-bar,.interior-view .plan,.interior-view .scene-number,.interior-view .entrance-actions,.interior-view #film,.interior-view #orbit{display:none}
 .interior-view .shade{background:linear-gradient(180deg,#101a1977 0%,transparent 24%,transparent 80%,#101a1944 100%)}
 @media(max-width:699px){.entrance-actions{bottom:133px;left:22px;right:22px;transform:none;gap:8px}.entrance-actions .door-action{font-size:10px;padding:10px 12px}.entrance-actions .primary-btn{font-size:10px;padding:10px 12px;gap:8px}.walk-panel{bottom:max(16px,env(safe-area-inset-bottom));padding:12px}.walk-controls{gap:4px}.walk-controls .icon-btn{width:36px;height:40px}.interior-view .scene-meta{top:94px}}
 @media(max-height:680px) and (min-width:700px){.entrance-actions{bottom:115px}.walk-panel{bottom:16px}}

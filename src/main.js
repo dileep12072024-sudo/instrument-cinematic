@@ -60,6 +60,7 @@ $('#app').innerHTML = `
   <dialog id="about-dialog" class="about-dialog"><div class="dialog-top"><span class="eyebrow">ABOUT THE PORTRAIT</span><button class="icon-btn close-dialog" aria-label="Close about">${icon('x')}</button></div><h2>Built around<br><em>a real place.</em></h2><p>Department of Instrument Technology.<br>Andhra University, Visakhapatnam.</p><p>This independent architectural portrait is reconstructed from the supplied campus photographs, video, and footprint. The blue structural frame, open corridors, entrance, and different wing heights follow those references.</p><p>Geometry is constructed directly in Three.js. Dimensions, hidden elevations, planting, and materials are interpreted; this is not a measured survey or a photogrammetric scan.</p><a href="https://www.google.com/maps/search/?api=1&query=Andhra+University+Department+of+Instrument+Technology" target="_blank" rel="noopener" class="text-btn">Find the department ${icon('arrow-up-right')}</a><div class="credits">Original photographs & footage supplied by the project owner. Sky lighting: <a href="https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky" target="_blank" rel="noopener">Poly Haven / CC0</a>.</div></dialog>`;
 $('#about').insertAdjacentHTML('afterend', `<button id="sound" class="icon-btn" aria-label="Mute ambient sound" aria-pressed="true" data-tip="Mute ambient sound">${icon('volume-2')}</button>`);
 $('#walk-location').insertAdjacentHTML('beforebegin', '<select id="walk-route" aria-label="Interior route"><option value="hall">Central hall</option><option value="right">Ground-floor right wing</option><option value="seminar">Seminar Hall surrounds</option><option value="classroom">Upstairs classroom wing</option></select>');
+$('#walk-route').insertAdjacentHTML('beforeend', '<option value="stairs">Stairs: ground to roof</option><option value="terraceLeft">Classroom-wing terrace</option><option value="upperCorridor">Second-floor right corridor</option><option value="terraceRight">Upper right terrace</option>');
 $('#light-panel').insertAdjacentHTML('beforeend', '<label class="range-label" for="ambient-volume">Ambient volume <output id="volume-output">40%</output></label><input id="ambient-volume" type="range" min="0" max="100" value="40" step="1"/>');
 $('#light-panel').insertAdjacentHTML('beforeend', '<label class="motion-row" for="live-clock">Live campus time<input id="live-clock" type="checkbox" checked /></label><p id="weather-detail" class="weather-detail" role="status">Fetching campus weather</p><p id="forecast" class="weather-detail"></p><a class="weather-source" href="https://open-meteo.com/" target="_blank" rel="noopener">Weather: Open-Meteo</a>');
 $('#hour').min = 0; $('#hour').max = 23.99;
@@ -500,12 +501,12 @@ $('#enter-hall').onclick = () => {
   architecture.doors.forEach(d => { d.pivot.rotation.y = d.openAngle; });
   renderer.shadowMap.needsUpdate = entranceLight.shadow.needsUpdate = true;
   architecture.interior.lights.forEach(light => { light.shadow.needsUpdate = true; });
-  controls.enabled = false; camera.fov = 68; camera.updateProjectionMatrix();
+  controls.enabled = false; camera.fov = 78; camera.updateProjectionMatrix();
   $('#experience').classList.add('interior-view'); $('#scene-mode').textContent = 'ENTRANCE HALL';
   entranceWalk.enter(); entranceWalk.update(0); needsRender = true;
 };
 $('.brand').onclick = e => { e.preventDefault(); selectChapter(0); };
-$('#reset').onclick = () => selectChapter(0);
+$('#reset').onclick = () => { if (entranceWalk?.active) { entranceWalk.resetLook(); camera.fov = 78; camera.updateProjectionMatrix(); } else selectChapter(0); };
 $('#film').onclick = startJourney;
 $('#sound').onclick = async () => {
   $('#sound').disabled = true;
@@ -524,6 +525,7 @@ function syncSound() {
 document.addEventListener('visibilitychange', syncSound);
 $('#orbit').onclick = () => { stopJourney(); transition = null; interactive = true; setOrbit(!isOrbiting); };
 $('#panorama').onclick = () => {
+  if (entranceWalk?.active) { setPanorama(!panorama); needsRender = true; return; }
   stopJourney(); transition = null; interactive = true; setOrbit(false);
   setPanorama(!panorama);
   if (panorama) {
@@ -534,6 +536,7 @@ $('#panorama').onclick = () => {
 };
 for (const [id, factor] of [['zoom-in', .8], ['zoom-out', 1.25]]) $(`#${id}`).onclick = () => {
   if (!controls) return;
+  if (entranceWalk?.active) { camera.fov = THREE.MathUtils.clamp(camera.fov * factor, 48, 90); camera.updateProjectionMatrix(); needsRender = true; return; }
   stopJourney(); interactive = true; setOrbit(false);
   const v = camera.position.clone().sub(controls.target); v.setLength(THREE.MathUtils.clamp(v.length() * factor, controls.minDistance, controls.maxDistance));
   fly(v.add(controls.target).toArray(), controls.target.toArray(), 600);

@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { footprint } from './footprint.js';
+import { terraceCovers } from './stair-layout.js';
 
 // Roof slabs and cantilevered canopies define shelter independently of the camera.
 export const shelters = [
@@ -7,6 +8,7 @@ export const shelters = [
   { x: 0, z: 8.8, width: 10, depth: 4, top: 3.67 },
   { x: 0, z: -7.9, width: 10, depth: 2, top: 3.67 },
   { x: 31.42, z: 0, width: 1.15, depth: 33.3, top: 3.225 },
+  ...terraceCovers,
 ];
 
 export function isSheltered(x, y, z, margin = 0) {

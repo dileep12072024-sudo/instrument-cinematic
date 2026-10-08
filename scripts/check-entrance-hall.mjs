@@ -75,8 +75,8 @@ try {
   await page.waitForTimeout(400);
   assert.notDeepEqual(await page.evaluate(() => __portrait.camera.quaternion.toArray()), quaternion, 'Drag looks around the hall');
   const directionAfter = await page.evaluate(() => __portrait.camera.getWorldDirection(__portrait.camera.position.clone()).toArray());
-  assert.ok(directionAfter.reduce((sum, v, i) => sum + (v - directionBefore.forward[i]) * directionBefore.right[i], 0) < -.1, 'Dragging right pulls the panorama right');
-  assert.ok(directionAfter[1] > directionBefore.forward[1], 'Dragging down pulls the panorama down');
+  assert.ok(directionAfter.reduce((sum, v, i) => sum + (v - directionBefore.forward[i]) * directionBefore.right[i], 0) > .1, 'Dragging right turns the view right');
+  assert.ok(directionAfter[1] < directionBefore.forward[1], 'Dragging down turns the view down');
   await page.setViewportSize({ width: 390, height: 844 });
   await position(240, 'hall-mobile-entry');
   await position(470, 'hall-mobile-stairs');

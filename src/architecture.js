@@ -4,6 +4,7 @@ import { footprint, groundSpine, seminarPassage } from './footprint.js';
 import { buildReferenceGarden } from './garden.js';
 import { buildEntranceHall } from './entrance-hall.js';
 import { buildClassroomWing } from './classroom-wing.js';
+import { buildTerraces } from './terraces.js';
 import { applyWind } from './weather-effects.js';
 
 let seed = 1937;
@@ -186,14 +187,16 @@ export function buildArchitecture(scene) {
     for (let f = 0; f < floors; f++) {
       if (onlyFloor !== null && f !== onlyFloor) continue;
       // The filmed upstairs classroom passage supplies the west tower opening and return windows.
-      if (f === 1 && type === 'tower-side' && cx < 0) {
-        const bottom = floorH, top = 2 * floorH;
+      if (type === 'tower-side' && (f === 1 && cx < 0 || f === 2)) {
+        const bottom = f * floorH, top = (f + 1) * floorH;
         for (const [a, c] of [[-7, 1.083333], [3.25, 7]]) {
           box(cx, (bottom + top) / 2, (a + c) / 2, .32, top - bottom, c - a, m.wall);
         }
-        box(cx, (7.78 + top) / 2, 2.166667, .32, top - 7.78, 2.166667, m.wall);
+        const lintel = f === 1 ? 7.78 : 11.25;
+        box(cx, (lintel + top) / 2, 2.166667, .32, top - lintel, 2.166667, m.wall);
         continue;
       }
+      if (f === 2 && type === 'corridor' && rotation === 0) continue;
       if (f === 1 && onlyFloor === null && type === 'room' && cx < 0 && rotation === Math.PI / 2) {
         // Preserve the original facade outside the filmed side-passage window band.
         for (const [a, c] of [[cz - width / 2, -8.813333]]) {
@@ -318,6 +321,16 @@ export function buildArchitecture(scene) {
     }
     if (onlyFloor !== null) return;
     const roofY = height - 1.4;
+    // Real roof connections must cut through the old perimeter parapets.
+    if (type === 'tower-side' && cx > 0) {
+      for (const [a, c] of [[-7, 1.083333], [3.25, 7]]) box(cx, roofY + .7, (a + c) / 2, .32, 1.4, c - a, m.wall);
+      return;
+    }
+    if (type === 'room' && (cx === -22 || cx === 22) && cz < 0) {
+      const rear = cz - width / 2;
+      box(cx, roofY + .7, (rear - 3.25) / 2, .32, 1.4, -3.25 - rear, m.wall);
+      return;
+    }
     b(0, roofY + .7, 0, width, 1.4, .32, m.wall);
     b(0, roofY + 1.35, .05, width + .2, .16, .49, m.trim);
     for (let j = 0; j <= bays; j++) if (!tower || j === 0 || j === bays) b(-width / 2 + j * bay, roofY + .72, .07, .26, 1.6, .42, m.blue);
@@ -335,7 +348,7 @@ export function buildArchitecture(scene) {
   function block(x, z, w, d, h, bays, type) {
     face(x, z + d / 2, 0, w, h, bays, type === 'tower' ? 'tower-front' : type === 'west' ? 'west-end' : type);
     const rearBays = type === 'tower' ? 3 : bays;
-    face(x, z - d / 2, Math.PI, w, h, rearBays, type === 'west' ? 'west-outer' : 'room', type === 'tower' || type.includes('corridor'));
+    if (type !== 'tower') face(x, z - d / 2, Math.PI, w, h, rearBays, type === 'west' ? 'west-outer' : 'room', type.includes('corridor'));
     if (!type.includes('corridor')) {
       for (const side of [-1, 1]) {
         const innerWing = type === 'west' && side === 1 || type === 'room' && x > 20 && side === -1;
@@ -382,11 +395,12 @@ export function buildArchitecture(scene) {
     }
     box(x, .02, z, w, .18, d, m.roof);
     for (let y = 4; y < h - 1.3; y += 4) {
-      // Leave the first-floor stairwell open above the two visible flights.
-      if (type === 'tower' && y === 4) box(x, y - .07, 4.15, w, .2, 5.7, m.roof);
+      // Every stair level needs an opening, including the final roof return.
+      if (type === 'tower') box(x, y - .07, 4.15, w, .2, 5.7, m.roof);
       else box(x, y - .07, z, w, .2, d, m.roof);
     }
-    box(x, h - 1.4, z, w + .35, .2, d + .35, m.roof);
+    if (type === 'tower') box(x, h - 1.4, 4.15, w + .35, .2, 5.7, m.roof);
+    else box(x, h - 1.4, z, w + .35, .2, d + .35, m.roof);
   }
   for (const p of footprint) block(p.x, p.z, p.width, p.depth, p.height, p.bays, p.type);
   // Outdoor condensers sit on the narrow ledge of the right-hand outer elevation.
@@ -456,9 +470,9 @@ export function buildArchitecture(scene) {
       const handle = new T.Mesh(new T.CylinderGeometry(.022, .022, .4, 8), m.metal); handle.position.set(-side * 1.49, 1.5, z); pivot.add(handle);
     }
     if (side === 1) {
-      // The photographed bolt is on the inner face, withdrawn so the leaf can swing freely.
+      // Exterior-face hardware stays with the leaf as it folds inward.
       const hardware = [], add = (geometry, x, y, z) => {
-        geometry.translate(x, y, z); hardware.push(geometry);
+        geometry.translate(x, y, -z); hardware.push(geometry);
       };
       const bolt = new T.CylinderGeometry(.022, .022, .68, 10);
       bolt.rotateZ(Math.PI / 2); add(bolt, -1.22, 1.08, -.17);
@@ -478,7 +492,7 @@ export function buildArchitecture(scene) {
       const lockBody = new T.CylinderGeometry(.064, .058, .045, 16);
       lockBody.rotateX(Math.PI / 2); add(lockBody, -1.5, .817, -.18);
       const fittings = new T.Mesh(mergeGeometries(hardware), m.metal);
-      fittings.name = 'Interior sliding bolt and hanging padlock';
+      fittings.name = 'Exterior sliding bolt and hanging padlock';
       fittings.castShadow = fittings.receiveShadow = true; pivot.add(fittings);
       hardware.forEach(geometry => geometry.dispose());
     }
@@ -503,6 +517,7 @@ export function buildArchitecture(scene) {
   screenTemplates.forEach(geo => geo.dispose());
   const interior = buildEntranceHall(group, m);
   buildClassroomWing(group, { ...m, tread: interior.floor.material });
+  buildTerraces(group, m);
   for (const { pivot } of doors) pivot.traverse(object => { if (object.isMesh) object.layers.enable(1); });
   return { group, doors, materials: m, interior };
 }
