@@ -88,14 +88,6 @@ export function buildEntranceHall(parent, exterior) {
   const stairways = buildStairways(group, { ...exterior, wall, tread });
   box(0, 1.23, -5.72, 2.96, 2.13, .13, recess);
   box(0, 2.32, -5.65, 3.04, .12, .18, wall);
-  // Stacked timber and a crate in the blue recess are visible, but no invented contents.
-  for (let i = 0; i < 11; i++) {
-    const g = new T.BoxGeometry(2.0 + rand() * .6, .025, .25 + rand() * .18);
-    g.rotateY((rand() - .5) * .1); g.translate(.08, .24 + i * .035, -3.8 + (rand() - .5) * .35); add(g, exterior.doorPanel);
-  }
-  box(.12, .78, -4.03, 1.5, .35, .55, exterior.entranceWood);
-  for (const x of [-.51, .75]) box(x, .78, -3.72, .08, .43, .05, exterior.doorPanel);
-  const board = new T.BoxGeometry(.75, 1.6, .035); board.rotateZ(-.09); board.rotateX(-.12); board.translate(-1.26, .96, -2.8); add(board, exterior.doorPanel);
 
   // At 48s the camera looks outward: both three-seat benches are on the entrance's right.
   const seating = new T.Group(); seating.name = 'Right-side waiting benches'; group.add(seating);

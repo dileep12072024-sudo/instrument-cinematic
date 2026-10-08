@@ -24,23 +24,24 @@ export function buildStairways(parent, m) {
     soffit.rotateX(-Math.atan((top - bottom - .02) / (end - start)));
     soffit.translate(x, (bottom + top) / 2 - .21, (start + end) / 2); add(soffit, m.wall);
   }
-  function parapet(x, start, end, bottom, top) {
+  function parapet(x, start, end, bottom, top, solid = false) {
     const shape = new T.Shape(); shape.moveTo(start, bottom - .14); shape.lineTo(start, bottom + .93);
-    shape.lineTo(end, top + .93); shape.lineTo(end, top - .14); shape.closePath();
+    shape.lineTo(end, top + .93); shape.lineTo(end, solid ? bottom - .14 : top - .14); shape.closePath();
     const g = new T.ExtrudeGeometry(shape, { depth: .16, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(x + .08, 0, 0); add(g, m.wall);
   }
   stairFlights.forEach((f, level) => {
     const material = level === 2 ? m.roof : m.tread;
     for (const side of f.sides) {
-      flight(side * 2.67, 2.02, stairs.front, stairs.rear, f.base, f.half, f.sideSteps, material);
-      parapet(side * 1.55, stairs.front, stairs.rear, f.base, f.half);
+      flight(side * 2.67, 2.02, f.start ?? stairs.front, stairs.rear, f.base, f.half, f.sideSteps, material);
+      parapet(side * 1.55, f.start ?? stairs.front, stairs.rear, f.base, f.half, level === 0);
     }
     box(0, f.half - .1, stairs.landingZ, 7.55, .2, 2.1, material);
     box(0, f.half - .22, stairs.landingZ, 7.55, .04, 2.1, m.wall);
     flight(0, 2.9, stairs.rear, stairs.returnEnd, f.half, f.top, f.returnSteps, material);
     for (const side of [-1, 1]) parapet(side * 1.53, stairs.rear, stairs.returnEnd, f.half, f.top);
-    box(0, f.top - .08, .20, 3.0, .16, 1.8, material);
   });
+  // The twin flights stop here; only the gate-side flight continues upward.
+  box(2.67, stairs.second + .48, -.72, 2.06, .96, .16, m.wall);
   // Recess gates have a real under-landing cavity extending to both outer walls.
   const gates = new T.Group(); gates.name = 'Closed under-stair corner gates'; group.add(gates);
   for (const side of [-1, 1]) {
@@ -59,7 +60,7 @@ export function buildStairways(parent, m) {
   const glass = new T.MeshStandardMaterial({ color: '#dce8e3', transparent: true, opacity: .18, roughness: .12, depthWrite: false });
   const aluminium = new T.MeshStandardMaterial({ color: '#d4d7d0', metalness: .65, roughness: .33 });
   let bottom = 0;
-  for (const [sill, height, centres, width] of [[2.9, 1.45, [-2.65, 2.65], .95], [6.8, 1.5, [-2.65, 0, 2.65], 1.35], [10.95, 1.65, [-2.65, 0, 2.65], 1.5]]) {
+  for (const [sill, height, centres, width] of [[2.9, 1.45, [-2.65, 0, 2.65], 1.35], [6.8, 1.5, [-2.65, 0, 2.65], 1.35], [10.95, 1.65, [-2.65, 0, 2.65], 1.5]]) {
     box(0, (bottom + sill) / 2, -6.9, 8, sill - bottom, .2, m.wall);
     let left = -4;
     for (const x of centres) {

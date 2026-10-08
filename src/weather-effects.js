@@ -1,10 +1,14 @@
 import * as T from 'three';
 import { footprint } from './footprint.js';
-import { terraceCovers } from './stair-layout.js';
+import { terraceCovers, terraceLevels } from './stair-layout.js';
 
 // Roof slabs and cantilevered canopies define shelter independently of the camera.
 export const shelters = [
-  ...footprint.map(p => ({ x: p.x, z: p.z, width: p.width + .35, depth: p.depth + .35, top: p.height - 1.3 })),
+  ...footprint.map(p => ({
+    x: p.type === 'low-corridor' ? -12.4375 : p.x, z: p.z,
+    width: p.type === 'low-corridor' ? 17.225 : p.width + .35, depth: p.depth + .35,
+    top: p.type === 'west' ? terraceLevels.leftWing : p.type === 'low-corridor' ? terraceLevels.leftStrip : p.type === 'corridor' || p.type === 'tower' ? terraceLevels.rightStrip : p.height - 1.3,
+  })),
   { x: 0, z: 8.8, width: 10, depth: 4, top: 3.67 },
   { x: 0, z: -7.9, width: 10, depth: 2, top: 3.67 },
   { x: 31.42, z: 0, width: 1.15, depth: 33.3, top: 3.225 },

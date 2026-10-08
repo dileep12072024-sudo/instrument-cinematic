@@ -204,7 +204,7 @@ export function buildArchitecture(scene) {
         }
         // Continue the opening through the corridor junction, not just the window band.
         box(cx, 4.032, -2.781667, .32, .064, 12.063333, m.wall);
-        box(cx, 7.89, -2.781667, .32, .22, 12.063333, m.wall);
+        box(cx, 7.45, -2.781667, .32, .10, 12.063333, m.wall);
         continue;
       }
       // The entrance is an actual opening, not doors placed over a solid ground-floor wall.
@@ -320,7 +320,7 @@ export function buildArchitecture(scene) {
       if (f === 0 && (westWindow || type === 'east-wing')) b(0, 3.15, .38, width + .25, .14, 1.05, m.trim);
     }
     if (onlyFloor !== null) return;
-    const roofY = height - 1.4;
+    const roofY = height - 1.4 + (height === 9.4 && Math.abs(cx) >= 22 ? -.5 : height === 13.4 && cx > 4 && cx < 22 ? .57 : 0);
     // Real roof connections must cut through the old perimeter parapets.
     if (type === 'tower-side' && cx > 0) {
       for (const [a, c] of [[-7, 1.083333], [3.25, 7]]) box(cx, roofY + .7, (a + c) / 2, .32, 1.4, c - a, m.wall);
@@ -394,13 +394,15 @@ export function buildArchitecture(scene) {
       }
     }
     box(x, .02, z, w, .18, d, m.roof);
-    for (let y = 4; y < h - 1.3; y += 4) {
+    const roofBase = h - 1.4 - (type === 'west' ? .5 : 0);
+    for (let y = 4; y < roofBase - .001; y += 4) {
       // Every stair level needs an opening, including the final roof return.
       if (type === 'tower') box(x, y - .07, 4.15, w, .2, 5.7, m.roof);
       else box(x, y - .07, z, w, .2, d, m.roof);
     }
-    if (type === 'tower') box(x, h - 1.4, 4.15, w + .35, .2, 5.7, m.roof);
-    else box(x, h - 1.4, z, w + .35, .2, d + .35, m.roof);
+    if (type === 'tower') box(x, 12.56, 4.15, w + .35, .2, 5.7, m.roof);
+    else if (type === 'low-corridor') box(-12.4375, roofBase, z, 17.225, .2, d + .35, m.roof);
+    else box(x, roofBase, z, w + .35, .2, d + .35, m.roof);
   }
   for (const p of footprint) block(p.x, p.z, p.width, p.depth, p.height, p.bays, p.type);
   // Outdoor condensers sit on the narrow ledge of the right-hand outer elevation.
@@ -588,7 +590,7 @@ export function buildLandscape(scene) {
   const tileMap = texture(tiles); tileMap.repeat.set(16, 6);
   const tileMat = mat('#ded0c5', { map: tileMap, bumpMap: tileMap, bumpScale: .009 });
   box(9.9, .03, 3.55, 0, .145, 8.95, tileMat).name = 'Pink patterned entrance apron';
-  const treePositions = [[-43, 16, 14], [41, 11, 13], [-45, -10, 14], [44, -15, 12], [-13, -25, 13], [9, -25, 15], [30, -29, 13], [-30, -29, 15]];
+  const treePositions = [[-37, 10, 14], [-37, -6, 14], [-29, 18, 14], [-43, 16, 14], [41, 11, 13], [-45, -10, 14], [44, -15, 12], [-13, -25, 13], [9, -25, 15], [30, -29, 13], [-30, -29, 15]];
   for (let i = 0; i < 26; i++) {
     const a = random() * Math.PI * 2, r = 60 + random() * 50;
     const z = Math.sin(a) * r;

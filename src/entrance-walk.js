@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { groundSpine, seminarPassage as passage } from './footprint.js';
 import { classroom } from './classroom-wing.js';
-import { stairs, stairFlights } from './stair-layout.js';
+import { stairs, stairFlights, terraceLevels as levels } from './stair-layout.js';
 
 const stops = [
   { at: 0, z: 12.3, yaw: 0, name: 'The threshold' },
@@ -53,35 +53,39 @@ function walkingRoute(points) {
 }
 const stairPoints = [[2.67, stairs.ground, 2.1, 0, 'Ground-floor stair approach']];
 stairFlights.forEach((f, i) => {
+  const sideX = f.sides.includes(1) ? 2.67 : -2.67;
   stairPoints.push(
-    [2.67, f.base, stairs.front, 0, `${i + 1}: Side flight`],
-    [2.67, f.half, stairs.rear, 0, 'Rear landing'],
-    [2.67, f.half, stairs.landingZ, -Math.PI / 2, 'Rear landing'],
+    [sideX, f.base, f.start ?? stairs.front, 0, `${i + 1}: Side flight`],
+    [sideX, f.half, stairs.rear, 0, 'Rear landing'],
+    [sideX, f.half, stairs.landingZ, -Math.sign(sideX) * Math.PI / 2, 'Rear landing'],
     [0, f.half, stairs.landingZ, -Math.PI, 'Central return flight'],
     [0, f.half, stairs.rear, -Math.PI, 'Central return flight'],
     [0, f.top, stairs.returnEnd, -Math.PI, i === 2 ? 'Blue roof-access door' : `${i + 1}: Front landing`],
-    [0, f.top, 2.166667, i === 0 ? -2.1 : -Math.PI, i === 0 ? 'Library and classroom wing' : i === 1 ? 'Second-floor terrace landing' : 'Upper terrace'],
+    [0, f.top, i === 2 ? .35 : 2.166667, i === 0 ? -2.1 : -Math.PI, i === 0 ? 'Library and classroom wing' : i === 1 ? 'Second-floor terrace landing' : 'Roof doorway'],
   );
-  if (i < 2) stairPoints.push([2.67, f.top, 2.166667, 0, 'Next stair flight']);
+  if (i < 2) stairPoints.push([stairFlights[i + 1].sides.includes(1) ? 2.67 : -2.67, f.top, 2.166667, 0, 'Next stair flight']);
 });
+stairPoints.push([0, levels.rightStrip, 1.35, -Math.PI, 'Upper terrace']);
 export const stairRoute = walkingRoute(stairPoints);
 const leftTerraceRoute = walkingRoute([
   [0, stairs.second, 2.166667, -Math.PI / 2, 'Second-floor landing'],
-  [-4.3, stairs.second, 2.166667, -Math.PI / 2, 'Terrace grille gate'],
-  [-6.6, stairs.second, 1.6, -Math.PI / 2, 'Corrugated canopy'],
-  [-14, stairs.second, 1.6, -Math.PI / 2, 'Classroom-wing roof'],
-  [-20.9, stairs.second, 1.9, -Math.PI / 2, 'Lower terrace steps'],
-  [-22.3, 8.11, 1.9, -Math.PI / 2, 'Open terrace'],
-  [-28, 8.11, 1.9, 0, 'Open terrace'],
-  [-28, 8.11, -11.8, Math.PI, 'Looking back across the classroom roof'],
+  [-4.05, stairs.second, 2.166667, -Math.PI / 2, 'Terrace grille gate'],
+  [-5.15, levels.leftStrip, 2.166667, -Math.PI / 2, 'Outside gate steps'],
+  [-6.6, levels.leftStrip, 1.6, -Math.PI / 2, 'Corrugated canopy'],
+  [-14, levels.leftStrip, 1.6, -Math.PI / 2, 'Classroom-wing roof'],
+  [-21.05, levels.leftStrip, 1.9, -Math.PI / 2, 'Lower terrace steps'],
+  [-22.15, levels.leftWing, 1.9, -Math.PI / 2, 'Open terrace'],
+  [-28, levels.leftWing, 1.9, 0, 'Open terrace'],
+  [-28, levels.leftWing, -11.8, Math.PI, 'Looking back across the classroom roof'],
 ]);
 const rightTerraceRoute = walkingRoute([
-  [0, stairs.top, 1.0, Math.PI / 2, 'Roof-access doorway'],
-  [2.9, stairs.top, 2.166667, Math.PI / 2, 'Upper terrace steps'],
-  [3.99, stairs.top, 2.166667, Math.PI / 2, 'Upper terrace steps'],
-  [5.3, 12.11, 2.166667, Math.PI / 2, 'Upper right terrace'],
-  [12, 12.11, 1.3, Math.PI / 2, 'White water tanks'],
-  [21, 12.11, 1.3, Math.PI / 2, 'Empty tank plinth'],
+  [0, stairs.top, .35, -Math.PI, 'Roof-access doorway'],
+  [0, levels.rightStrip, 1.35, -Math.PI, 'Upper terrace steps'],
+  [0, levels.rightStrip, 2.166667, Math.PI / 2, 'Upper terrace'],
+  [5.3, levels.rightStrip, 2.166667, Math.PI / 2, 'Upper right terrace'],
+  [12, levels.rightStrip, 1.3, Math.PI / 2, 'White water tanks'],
+  [22, levels.rightStrip, 1.9, Math.PI / 2, 'Wing terrace steps'],
+  [23.1, levels.rightWing, 1.9, Math.PI / 2, 'Lower roof junction'],
   [25, 12.11, 1.3, 0, 'Main roof'],
   [25, 12.11, -11.8, Math.PI, 'Black water tank'],
   [25, 12.11, 12.8, -Math.PI / 2, 'Far roof parapet'],

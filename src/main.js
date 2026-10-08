@@ -8,6 +8,7 @@ import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
 import { createRain, rainfall, windVector, isSheltered } from './weather-effects.js';
 import { createEntranceWalk } from './entrance-walk.js';
+import { createPanoramaLook } from './panorama-look.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
 import './style.css';
 
@@ -99,7 +100,7 @@ try {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#b6c5c9'); scene.fog = new THREE.Fog('#b6c5c9', 80, 300);
 const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 500);
-let controls, architecture, landscape, entranceWalk;
+let controls, architecture, landscape, entranceWalk, panoramaLook;
 let selected = 0, transition = null, journey = false, journeyStart = 0, isOrbiting = false, doorsOpen = false, hour = 16.5, targetHour = 16.5;
 let ready = false, drift = !reduced, quality = 'auto', needsRender = true, lastRendered = 0, lastShadowUpdate = 0;
 let interactive = false;
@@ -109,6 +110,7 @@ function setPanorama(enabled) {
   $('#panorama').setAttribute('aria-pressed', enabled);
   $('#experience').classList.toggle('panorama-view', enabled);
   if (!controls) return;
+  controls.enabled = !enabled && !entranceWalk?.active;
   controls.enablePan = enabled;
   controls.screenSpacePanning = true;
   controls.minDistance = enabled ? 2 : 13;
@@ -368,6 +370,11 @@ async function boot() {
   controls.addEventListener('start', () => { transition = null; interactive = true; stopJourney(); setOrbit(false); });
   controls.addEventListener('change', () => { needsRender = true; });
   entranceWalk = createEntranceWalk(camera, renderer.domElement, () => leaveHall(), () => { needsRender = true; });
+  panoramaLook = createPanoramaLook(camera, renderer.domElement, () => panorama && !entranceWalk.active, () => {
+    const direction = camera.getWorldDirection(new THREE.Vector3());
+    controls.target.copy(camera.position).addScaledVector(direction, 15);
+    needsRender = true;
+  });
   $('#loading-status').textContent = 'Reconstructing the architecture';
   await new Promise(resolve => requestAnimationFrame(resolve));
   architecture = buildArchitecture(scene);
@@ -458,7 +465,7 @@ function animate(now) {
     }
   }
   // Orbit speed follows wall time, including slower devices; damping is for pointer input.
-  if (!entranceWalk?.active) controls.update(Math.min(frameDuration / 1000, 1));
+  if (!entranceWalk?.active && !panorama) controls.update(Math.min(frameDuration / 1000, 1));
   if (!reduced) landscape.wind.value += dt;
   const gust = (.5 + .5 * Math.sin(landscape.wind.value * .47)) ** 4;
   const windSpeed = weatherState.windSpeed + ((weatherState.windGusts || weatherState.windSpeed) - weatherState.windSpeed) * gust;
@@ -501,12 +508,12 @@ $('#enter-hall').onclick = () => {
   architecture.doors.forEach(d => { d.pivot.rotation.y = d.openAngle; });
   renderer.shadowMap.needsUpdate = entranceLight.shadow.needsUpdate = true;
   architecture.interior.lights.forEach(light => { light.shadow.needsUpdate = true; });
-  controls.enabled = false; camera.fov = 78; camera.updateProjectionMatrix();
+  controls.enabled = false; camera.fov = 68; camera.updateProjectionMatrix();
   $('#experience').classList.add('interior-view'); $('#scene-mode').textContent = 'ENTRANCE HALL';
   entranceWalk.enter(); entranceWalk.update(0); needsRender = true;
 };
 $('.brand').onclick = e => { e.preventDefault(); selectChapter(0); };
-$('#reset').onclick = () => { if (entranceWalk?.active) { entranceWalk.resetLook(); camera.fov = 78; camera.updateProjectionMatrix(); } else selectChapter(0); };
+$('#reset').onclick = () => { if (entranceWalk?.active) { entranceWalk.resetLook(); camera.fov = 68; camera.updateProjectionMatrix(); } else selectChapter(0); };
 $('#film').onclick = startJourney;
 $('#sound').onclick = async () => {
   $('#sound').disabled = true;
@@ -523,25 +530,25 @@ function syncSound() {
   sound.setMuted(document.hidden || $('#video-dialog').open).catch(() => {});
 }
 document.addEventListener('visibilitychange', syncSound);
-$('#orbit').onclick = () => { stopJourney(); transition = null; interactive = true; setOrbit(!isOrbiting); };
+$('#orbit').onclick = () => { if (entranceWalk?.active) return; setPanorama(false); stopJourney(); transition = null; interactive = true; setOrbit(!isOrbiting); };
 $('#panorama').onclick = () => {
   if (entranceWalk?.active) { setPanorama(!panorama); needsRender = true; return; }
   stopJourney(); transition = null; interactive = true; setOrbit(false);
   setPanorama(!panorama);
   if (panorama) {
     $('#experience').classList.remove('footprint-view');
-    controls.target.set(0, 6, 0);
     needsRender = true;
   }
 };
 for (const [id, factor] of [['zoom-in', .8], ['zoom-out', 1.25]]) $(`#${id}`).onclick = () => {
   if (!controls) return;
   if (entranceWalk?.active) { camera.fov = THREE.MathUtils.clamp(camera.fov * factor, 48, 90); camera.updateProjectionMatrix(); needsRender = true; return; }
+  if (panorama) { panoramaLook.move(factor < 1 ? 1 : -1); return; }
   stopJourney(); interactive = true; setOrbit(false);
   const v = camera.position.clone().sub(controls.target); v.setLength(THREE.MathUtils.clamp(v.length() * factor, controls.minDistance, controls.maxDistance));
   fly(v.add(controls.target).toArray(), controls.target.toArray(), 600);
 };
-$('#plan').onclick = $('#mobile-plan').onclick = () => { stopJourney(); interactive = true; setOrbit(false); $('#experience').classList.add('footprint-view'); fly([0, small() ? 210 : 100, .1], [0, 0, 0]); };
+$('#plan').onclick = $('#mobile-plan').onclick = () => { setPanorama(false); stopJourney(); interactive = true; setOrbit(false); $('#experience').classList.add('footprint-view'); fly([0, small() ? 210 : 100, .1], [0, 0, 0]); };
 $('#door').onclick = () => { doorsOpen = !doorsOpen; $('#door span').textContent = doorsOpen ? 'Close the doors' : 'Open the doors'; $('#door').setAttribute('aria-pressed', doorsOpen); };
 $('#light').onclick = () => { const open = $('#light-panel').hidden; $('#light-panel').hidden = !open; $('#light').setAttribute('aria-expanded', open); };
 $('#light-close').onclick = () => { $('#light-panel').hidden = true; $('#light').setAttribute('aria-expanded', false); $('#light').focus(); };
@@ -560,7 +567,7 @@ renderer?.domElement.addEventListener('keydown', e => {
   if (e.key === '+' || e.key === '=') $('#zoom-in').click();
   if (e.key === '-') $('#zoom-out').click();
   if (e.key === 'Home') selectChapter(0);
-  if (e.key.startsWith('Arrow')) {
+  if (!panorama && e.key.startsWith('Arrow')) {
     stopJourney(); transition = null; setOrbit(false); interactive = true;
     const s = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
     if (e.key === 'ArrowLeft') s.theta -= .09; if (e.key === 'ArrowRight') s.theta += .09;

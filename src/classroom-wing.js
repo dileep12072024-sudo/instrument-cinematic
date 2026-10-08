@@ -101,7 +101,9 @@ export function buildClassroomWing(parent, m) {
   floor(0, -18.85, 2.17, 2.9, classroom.lowerFloor);
   // Two shallow steps, seen clearly on the return clip 103849 at 0-9s.
   box(0, y - .05, -17.05, 2.17, .10, .30, stone); box(0, y - .15, -17.35, 2.17, .10, .30, stone);
-  box(0, ceiling, -10.15, 2.35, .12, 20.3, plaster);
+  const sideCeiling = 7.4;
+  box(0, ceiling, -8.5, 2.35, .12, 17, plaster);
+  box(0, sideCeiling, -18.65, 2.35, .12, 3.3, plaster);
   floor(0, 1.1, 2.17, 2.2, classroom.landing);
   // Library is beside the classroom entrance on the upper landing (094920, 12s).
   const libraryStart = new Map([...batches].map(([material, gs]) => [material, gs.length]));
@@ -134,15 +136,15 @@ export function buildClassroomWing(parent, m) {
   }
   box(1.10, (y + ceiling) / 2, -(previous + 18) / 2, .16, ceiling - y, 18 - previous, plaster);
   // Far door and the perpendicular, lower side passage are both visible in 103154.
-  box(-1.10, (classroom.lowerFloor + ceiling) / 2, -19.15, .16, ceiling - classroom.lowerFloor, 2.3, plaster);
-  for (const x of [-.84, .84]) box(x, (classroom.lowerFloor + ceiling) / 2, -20.35, .49, ceiling - classroom.lowerFloor, .16, plaster);
-  box(0, (classroom.lowerFloor + 2.42 + ceiling) / 2, -20.35, 1.2, ceiling - classroom.lowerFloor - 2.42, .16, plaster);
+  box(-1.10, (classroom.lowerFloor + sideCeiling) / 2, -19.15, .16, sideCeiling - classroom.lowerFloor, 2.3, plaster);
+  for (const x of [-.84, .84]) box(x, (classroom.lowerFloor + sideCeiling) / 2, -20.35, .49, sideCeiling - classroom.lowerFloor, .16, plaster);
+  box(0, (classroom.lowerFloor + 2.42 + sideCeiling) / 2, -20.35, 1.2, sideCeiling - classroom.lowerFloor - 2.42, .16, plaster);
   door(0, classroom.lowerFloor, -20.24, 1.08, 'CLASS ROOM - III');
   floor(6.0, -19.15, 9.8, 2.3, classroom.lowerFloor);
-  box(6.0, ceiling, -19.15, 9.8, .12, 2.5, plaster);
-  box(6.0, (classroom.lowerFloor + ceiling) / 2, -20.4, 9.8, ceiling - classroom.lowerFloor, .18, plaster);
+  box(6.0, sideCeiling, -19.15, 9.8, .12, 2.5, plaster);
+  box(6.0, (classroom.lowerFloor + sideCeiling) / 2, -20.4, 9.8, sideCeiling - classroom.lowerFloor, .18, plaster);
   box(6.0, classroom.lowerFloor + .65, -17.97, 9.8, 1.3, .16, plaster);
-  box(6.0, (classroom.lowerFloor + 2.8 + ceiling) / 2, -17.97, 9.8, ceiling - classroom.lowerFloor - 2.8, .16, plaster);
+  box(6.0, (classroom.lowerFloor + 2.8 + sideCeiling) / 2, -17.97, 9.8, sideCeiling - classroom.lowerFloor - 2.8, .16, plaster);
   for (const x of [1.2, 4.4, 7.6, 10.8]) box(x, classroom.lowerFloor + 2.03, -17.97, .3, 1.46, .16, plaster);
   for (const x of [2.8, 6, 9.2]) window(x, classroom.lowerFloor + 2.03, -18.05, 2.85, Math.PI);
   for (const x of [2.5, 5.8, 8.9]) {
@@ -158,7 +160,7 @@ export function buildClassroomWing(parent, m) {
   });
   const stain = new T.Mesh(new T.PlaneGeometry(9.3, 2.3), new T.MeshStandardMaterial({ map: wear, transparent: true, depthWrite: false, roughness: 1 }));
   stain.position.set(6, classroom.lowerFloor + 1.15, -18.065); stain.rotation.y = Math.PI; group.add(stain);
-  box(11, (classroom.lowerFloor + ceiling) / 2, -19.15, .15, ceiling - classroom.lowerFloor, 2.5, plaster);
+  box(11, (classroom.lowerFloor + sideCeiling) / 2, -19.15, .15, sideCeiling - classroom.lowerFloor, 2.5, plaster);
   const terminalStart = new Map([...batches].map(([material, gs]) => [material, gs.length]));
   door(0, classroom.lowerFloor, 0, 1.02, '', false);
   const terminalTransform = new T.Matrix4().makeRotationY(-Math.PI / 2); terminalTransform.setPosition(10.88, 0, -19.15);
@@ -173,10 +175,10 @@ export function buildClassroomWing(parent, m) {
   // Slim conduits and cross beams follow the filmed ceiling; no invented room fixtures.
   for (const x of [-1.02, 1.02]) {
     box(x, y + .09, -8.45, .05, .18, 16.9, stone);
-    for (let j = 0; j < 3; j++) tube([[x, ceiling - .28 - j * .045, .8], [x, ceiling - .28 - j * .045, -20.1]], .012, aluminium);
-    for (let u = 1; u < 20; u += 1.5) box(x, ceiling - .33, -u, .032, .19, .022, dark);
+    for (let j = 0; j < 3; j++) tube([[x, ceiling - .28 - j * .045, .8], [x, ceiling - .28 - j * .045, -17.8], [x, sideCeiling - .28 - j * .045, -18.2], [x, sideCeiling - .28 - j * .045, -20.1]], .012, aluminium);
+    for (let u = 1; u < 20; u += 1.5) box(x, (u < 18 ? ceiling : sideCeiling) - .33, -u, .032, .19, .022, dark);
   }
-  for (const u of [0, 7.1, 14.8, 18.8]) box(0, ceiling - .14, -u, 2.16, .30, .22, plaster);
+  for (const u of [0, 7.1, 14.8, 18.8]) box(0, (u < 18 ? ceiling : sideCeiling) - .14, -u, 2.16, .30, .22, plaster);
   const lamp = new T.MeshStandardMaterial({ color: '#e9eee5', emissive: '#dceada', emissiveIntensity: 1.4 });
   for (const u of [4, 11, 17.4]) {
     box(1.00, ceiling - .42, -u, .07, .075, 1.14, aluminium);
