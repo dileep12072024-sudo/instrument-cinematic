@@ -60,7 +60,7 @@ export function buildStairways(parent, m) {
   const glass = new T.MeshStandardMaterial({ color: '#dce8e3', transparent: true, opacity: .18, roughness: .12, depthWrite: false });
   const aluminium = new T.MeshStandardMaterial({ color: '#d4d7d0', metalness: .65, roughness: .33 });
   let bottom = 0;
-  for (const [sill, height, centres, width] of [[2.9, 1.45, [-2.65, 0, 2.65], 1.35], [6.8, 1.5, [-2.65, 0, 2.65], 1.35], [10.95, 1.65, [-2.65, 0, 2.65], 1.5]]) {
+  for (const [sill, height, centres, width] of [[3.95, 1.45, [-2.65, 0, 2.65], 1.35], [6.8, 1.5, [-2.65, 0, 2.65], 1.35], [10.95, 1.65, [-2.65, 0, 2.65], 1.5]]) {
     box(0, (bottom + sill) / 2, -6.9, 8, sill - bottom, .2, m.wall);
     let left = -4;
     for (const x of centres) {

@@ -23,6 +23,7 @@ The opening sequences were additionally inspected at one-second intervals for `1
 - The user explicitly confirmed that the final side flight is on the terrace-gate side (world -X), with a low wall where the opposite flight stops.
 - The ground side flights start at Z=.2 instead of Z=1.083333. Their inner parapets extend down to the floor, framing the blue-backed recess. Stored debris is omitted with the user's permission.
 - All three rear window rows have three actual glazed openings.
+- October 9: the lowest three-window row has its sill at 3.95, above the rear canopy fascia at 3.78. Frames and wall openings move together, retaining a visible masonry gap instead of intersecting the canopy.
 - The lower gate is at 8.444, its outside strip at 8.11 and the broad classroom roof at 7.61. The broad-wing ceiling and slab were lowered together to maintain clearance. Steps and an adjoining short slope connect the roofs.
 - The blue roof threshold is at 12.11. Three forward-facing steps climb to 12.68, and the outer roof returns to 12.11 through its own steps and adjacent slope. These dimensions remain estimates from the references, not measurements.
 - Duplicate front landing surfaces were removed; roof slabs stop before the descending steps. The headhouse retains a rectangular blank-sided form, blue corner strips and a gently pitched corrugated cover.

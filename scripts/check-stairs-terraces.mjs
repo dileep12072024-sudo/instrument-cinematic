@@ -64,11 +64,14 @@ try {
       return hit?.point.y;
     };
     const stairways = scene.getObjectByName('Connected stairways: ground to roof');
-    const windowHit = new T.Raycaster(new T.Vector3(.3, 3.6, -6.5), new T.Vector3(0, 0, -1), 0, 1).intersectObject(stairways, true)[0];
+    const windowHit = new T.Raycaster(new T.Vector3(.3, 4.5, -6.5), new T.Vector3(0, 0, -1), 0, 1).intersectObject(stairways, true)[0];
+    const rearWindowBottom = new T.Box3().setFromObject(windowHit.object).min.y;
+    const rearCanopyTop = height(0, -8.9, 6);
     const gate = scene.getObjectByName('Terrace double grille gate');
     const joinFaces = [[-22.03, 7.61], [22.95, 12.11]].map(([x, y]) => new T.Raycaster(new T.Vector3(x, y + .5, 1.83), new T.Vector3(0, -1, 0), 0, .6).intersectObject(architecture.group, true).filter(hit => Math.abs(hit.point.y - y) < .005).length);
     return { failures, cavities, lockFace: lock.geometry.boundingBox.min.z,
       joinFaces,
+      rearWindowCanopyGap: rearWindowBottom - rearCanopyTop,
       heights: { gateSide: height(-2.67, -2, 10.5), stoppedSide: height(2.67, -2, 10.5), groundApproach: height(2.67, .9, 1), leftStrip: height(-15, 1), leftWing: height(-28, 1), leftStepEnd: height(-22, 1.9), rightStrip: height(12, 1), rightWing: height(25, 1), roofDoor: height(0, .35, 13), roofExit: height(0, 1.5, 13) },
       thirdWindow: windowHit?.object.material.transparent,
       inwardGate: gate.children.every(leaf => new T.Box3().setFromObject(leaf).max.x > gate.position.x + .9),
@@ -80,6 +83,7 @@ try {
   assert.ok(Math.abs(diagnostics.heights.groundApproach - .164) < .02, 'Ground twin flights must not project into the hall');
   for (const [name, expected] of Object.entries({ leftStrip: 8.11, leftWing: 7.61, leftStepEnd: 7.61, rightStrip: 12.68, rightWing: 12.11, roofDoor: 12.11, roofExit: 12.68 })) assert.ok(Math.abs(diagnostics.heights[name] - expected) < .02, name);
   assert.equal(diagnostics.thirdWindow, true, 'Central first-floor rear window must be glazed, not solid wall');
+  assert.ok(diagnostics.rearWindowCanopyGap > .1, 'All three first-floor rear windows must clear the canopy fascia');
   assert.equal(diagnostics.inwardGate, true, 'Terrace gate leaves must open inside');
   assert.deepEqual(diagnostics.joinFaces, [1, 1], 'Roof joins must not have coplanar duplicate treads');
   for (const [route, progress, name] of [['hall', 700, 'lower-gates'], ['stairs', 195, 'first-return'], ['stairs', 297, 'library-landing'], ['stairs', 820, 'top-windows'], ['stairs', 900, 'roof-stair'], ['terraceLeft', 100, 'left-gate'], ['terraceLeft', 450, 'left-roof'], ['terraceRight', 450, 'upper-tanks'], ['terraceRight', 850, 'upper-roof'], ['upperCorridor', 250, 'upper-corridor'], ['seminar', 220, 'strong-room-entry'], ['seminar', 490, 'strong-room-passage']]) {
@@ -118,6 +122,7 @@ try {
   await page.setViewportSize({ width: 1280, height: 800 });
   for (const [name, eye, target] of [
     ['gate-side-flight', [.2, 10.094, 2.9], [-1.5, 10.6, -3]],
+    ['rear-window-canopy-clearance', [0, 6.5, -16], [0, 4.2, -6.9]],
     ['terrace-gate-steps', [-8, 9.76, 2.17], [-3.9, 9.5, 2.17]],
     ['left-elevation', [-28, 9.4, 5.5], [-14, 8.9, 0]],
     ['roof-exit-steps', [0, 13.76, -.4], [0, 12.4, 1.4]],
