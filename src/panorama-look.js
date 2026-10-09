@@ -1,41 +1,37 @@
 import * as T from 'three';
+import { bindDragLook } from './drag-look.js';
 
 // Free exploration turns at the eye, without orbiting a distant building centre.
 export function createPanoramaLook(camera, canvas, active, changed) {
-  let pointer = null;
   const angles = new T.Euler(0, 0, 0, 'YXZ');
+  const target = { x: 0, y: 0 };
+  const destination = camera.position.clone();
+  let turning = false, moving = false;
   const direction = new T.Vector3();
   canvas.addEventListener('contextmenu', e => { if (active()) e.preventDefault(); });
   function move(distance) {
+    if (!moving) destination.copy(camera.position);
     camera.getWorldDirection(direction);
-    camera.position.addScaledVector(direction, distance);
+    destination.addScaledVector(direction, distance); moving = true;
     changed();
   }
-  canvas.addEventListener('pointerdown', e => {
-    if (!active() || pointer) return;
-    canvas.focus({ preventScroll: true });
-    pointer = { id: e.pointerId, x: e.clientX, y: e.clientY, pan: e.button === 2 };
-    canvas.setPointerCapture(e.pointerId);
-  });
-  canvas.addEventListener('pointermove', e => {
-    if (!active() || pointer?.id !== e.pointerId) return;
-    const dx = e.clientX - pointer.x, dy = e.clientY - pointer.y;
-    if (pointer.pan) {
+  bindDragLook(canvas, active, () => {
+    angles.setFromQuaternion(camera.quaternion, 'YXZ');
+    target.x = angles.x; target.y = angles.y; turning = false;
+    destination.copy(camera.position); moving = false;
+  }, (dx, dy, pan) => {
+    if (pan) {
       direction.set(1, 0, 0).applyQuaternion(camera.quaternion);
-      camera.position.addScaledVector(direction, -dx * .018);
-      camera.position.y += dy * .018;
+      destination.addScaledVector(direction, -dx * .018);
+      destination.y += dy * .018; moving = true;
     } else {
-      angles.setFromQuaternion(camera.quaternion, 'YXZ');
-      angles.y -= dx * .0025;
-      angles.x = T.MathUtils.clamp(angles.x - dy * .0025, -1.35, 1.35);
-      angles.z = 0;
-      camera.quaternion.setFromEuler(angles);
+      const sensitivity = 1.8 / Math.max(360, canvas.clientHeight || 800);
+      target.y -= dx * sensitivity;
+      target.x = T.MathUtils.clamp(target.x - dy * sensitivity, -1.35, 1.35);
+      turning = true;
     }
-    pointer.x = e.clientX; pointer.y = e.clientY;
     changed();
   });
-  const release = e => { if (pointer?.id === e.pointerId) pointer = null; };
-  for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(event, release);
   canvas.addEventListener('wheel', e => {
     if (!active()) return;
     e.preventDefault(); move(-Math.sign(e.deltaY) * .7);
@@ -48,15 +44,34 @@ export function createPanoramaLook(camera, canvas, active, changed) {
     }
     if (['a', 'd', 'q', 'e'].includes(key)) {
       e.preventDefault();
+      if (!moving) destination.copy(camera.position);
       direction.set(key === 'a' ? -1 : key === 'd' ? 1 : 0, 0, 0).applyQuaternion(camera.quaternion);
       direction.y = key === 'q' ? -1 : key === 'e' ? 1 : 0;
-      camera.position.addScaledVector(direction, .7); changed();
+      destination.addScaledVector(direction, .7); moving = true; changed();
     }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      e.preventDefault(); angles.setFromQuaternion(camera.quaternion, 'YXZ');
-      angles.y += e.key === 'ArrowLeft' ? .09 : -.09; angles.z = 0;
-      camera.quaternion.setFromEuler(angles); changed();
+      e.preventDefault();
+      if (!turning) { angles.setFromQuaternion(camera.quaternion, 'YXZ'); target.x = angles.x; target.y = angles.y; }
+      target.y += e.key === 'ArrowLeft' ? .09 : -.09; turning = true; changed();
     }
   });
-  return { move };
+  return {
+    move,
+    update(dt) {
+      if (!active()) { turning = moving = false; return; }
+      if (moving) {
+        camera.position.lerp(destination, 1 - Math.exp(-12 * dt));
+        if (camera.position.distanceToSquared(destination) < .00000001) { camera.position.copy(destination); moving = false; }
+        changed();
+      }
+      if (!turning) return;
+      angles.x = T.MathUtils.damp(angles.x, target.x, 12, dt);
+      angles.y = T.MathUtils.damp(angles.y, target.y, 12, dt);
+      angles.z = 0;
+      if (Math.abs(angles.x - target.x) + Math.abs(angles.y - target.y) < .00001) {
+        angles.x = target.x; angles.y = target.y; turning = false;
+      }
+      camera.quaternion.setFromEuler(angles); changed();
+    },
+  };
 }

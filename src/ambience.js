@@ -1,20 +1,21 @@
 export function createAmbience() {
   let context, master, birds, birdPromise, enabled = false, muted = false, volume = .4;
   let rainGain, rainFilter, windGain, birdGain, lastMix = '';
-  let weather = { rainFactor: 0, windSpeed: 0 }, indoors = false, windSpeed = 0;
+  let weather = { rainFactor: 0, windSpeed: 0 }, indoors = false, windSpeed = 0, daylight = 0;
+  const birdLevel = () => .85 * daylight * (1 - Math.max(0, Math.min(1, weather.rainFactor || 0)) * .95) * (indoors ? .35 : 1);
 
   function mixWeather() {
     if (!context || !rainGain) return;
     const rain = Math.max(0, Math.min(1, weather.rainFactor || 0));
     const wind = Math.max(0, Math.min(1, windSpeed / 60));
-    const key = `${rain.toFixed(2)}:${wind.toFixed(2)}:${indoors}:${!!birdGain}`;
+    const key = `${rain.toFixed(2)}:${wind.toFixed(2)}:${indoors}:${!!birdGain}:${daylight.toFixed(2)}`;
     if (key === lastMix) return;
     lastMix = key;
     const now = context.currentTime;
     rainGain.gain.setTargetAtTime(rain * (indoors ? .18 : .65), now, .7);
     rainFilter.frequency.setTargetAtTime(indoors ? 950 : 4200 + rain * 3200, now, .7);
     windGain.gain.setTargetAtTime((.015 + wind * .5) * (indoors ? .2 : 1), now, .7);
-    birdGain?.gain.setTargetAtTime(.85 * (1 - rain * .95) * (indoors ? .35 : 1), now, .7);
+    birdGain?.gain.setTargetAtTime(birdLevel(), now, .7);
   }
 
   function prepare() {
@@ -99,6 +100,8 @@ export function createAmbience() {
   }
 
   return {
+    setDaylight(value) { daylight = Math.max(0, Math.min(1, value)); mixWeather(); },
+    get birdLevel() { return birdLevel(); },
     setWeather(value, sheltered = false, speed = value.windSpeed || 0) {
       weather = value; indoors = sheltered; windSpeed = speed; mixWeather();
     },

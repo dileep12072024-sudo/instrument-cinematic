@@ -18,7 +18,7 @@ document.querySelector = selector => {
 const camera = new PerspectiveCamera(), canvas = new Element();
 const walk = createEntranceWalk(camera, canvas, () => {}, () => {});
 const send = (type, fields) => canvas.dispatchEvent(Object.assign(new Event(type), fields));
-const direction = () => { walk.update(0); return camera.getWorldDirection(new Vector3()); };
+const direction = () => { walk.update(1); return camera.getWorldDirection(new Vector3()); };
 for (const pointerType of ['mouse', 'touch']) {
   walk.enter();
   send('pointerdown', { pointerType, pointerId: 1, clientX: 100, clientY: 100 });

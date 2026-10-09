@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { bindDragLook } from './drag-look.js';
 import { groundSpine, seminarPassage as passage } from './footprint.js';
 import { classroom } from './classroom-wing.js';
 import { stairs, stairFlights, terraceLevels as levels } from './stair-layout.js';
@@ -98,7 +99,8 @@ const upperCorridorRoute = walkingRoute([
 ]);
 
 export function createEntranceWalk(camera, canvas, onExit, onChange) {
-  let active = false, playing = false, progress = 0, yaw = 0, pitch = 0, pointer = null;
+  let active = false, playing = false, progress = 0, yaw = 0, pitch = 0;
+  let shownYaw = 0, shownPitch = 0;
   let route = stops;
   const panel = document.querySelector('#walk-panel'), slider = document.querySelector('#walk-progress');
   const play = document.querySelector('#walk-play');
@@ -125,27 +127,20 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
     seek(stop?.at ?? (direction > 0 ? 1 : 0));
   }
   slider.addEventListener('input', () => seek(Number(slider.value) / 1000));
-  document.querySelector('#walk-route').addEventListener('change', e => { route = { hall: stops, right: rightWing, seminar: seminarSurrounds, classroom: classroomRoute, stairs: stairRoute, terraceLeft: leftTerraceRoute, terraceRight: rightTerraceRoute, upperCorridor: upperCorridorRoute }[e.target.value] || stops; yaw = pitch = 0; seek(0); });
+  document.querySelector('#walk-route').addEventListener('change', e => { route = { hall: stops, right: rightWing, seminar: seminarSurrounds, classroom: classroomRoute, stairs: stairRoute, terraceLeft: leftTerraceRoute, terraceRight: rightTerraceRoute, upperCorridor: upperCorridorRoute }[e.target.value] || stops; shownYaw = shownPitch = yaw = pitch = 0; seek(0); });
   play.onclick = () => { if (progress === 1) progress = 0; playing = !playing; sync(); };
   document.querySelector('#walk-back').onclick = () => step(-1);
   document.querySelector('#walk-forward').onclick = () => step(1);
   document.querySelector('#walk-exit').onclick = onExit;
-  canvas.addEventListener('pointerdown', e => {
-    if (!active || pointer) return;
-    pointer = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId);
+  const releaseDrag = bindDragLook(canvas, () => active, () => {
     playing = false; sync();
-  });
-  canvas.addEventListener('pointermove', e => {
-    if (!active || pointer?.id !== e.pointerId) return;
+  }, (dx, dy) => {
     // Follow the pointer, matching the exterior's perceived turn direction.
-    const sensitivity = Math.PI / Math.max(1, canvas.clientHeight || 800);
-    yaw += (e.clientX - pointer.x) * sensitivity;
-    pitch = T.MathUtils.clamp(pitch - (e.clientY - pointer.y) * sensitivity, -1.25, 1.25);
-    pointer.x = e.clientX; pointer.y = e.clientY; onChange();
+    const sensitivity = 1.8 / Math.max(360, canvas.clientHeight || 800);
+    yaw += dx * sensitivity;
+    pitch = T.MathUtils.clamp(pitch - dy * sensitivity, -1.25, 1.25);
+    onChange();
   });
-  const release = e => { if (pointer?.id === e.pointerId) pointer = null; };
-  canvas.addEventListener('pointerup', release); canvas.addEventListener('pointercancel', release);
-  canvas.addEventListener('lostpointercapture', release);
   canvas.addEventListener('wheel', e => {
     if (!active) return;
     e.preventDefault(); seek(progress + Math.sign(e.deltaY) * .012);
@@ -160,19 +155,25 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
   document.addEventListener('keydown', e => { if (active && e.key === 'Escape' && !document.querySelector('dialog[open]')) onExit(); });
   return {
     get active() { return active; }, get progress() { return progress; }, get playing() { return playing; },
-    enter() { active = true; playing = false; progress = 0; yaw = pitch = 0; route = stops; document.querySelector('#walk-route').value = 'hall'; sync(); canvas.focus({ preventScroll: true }); },
-    exit() { active = playing = false; pointer = null; sync(); },
-    resetLook() { yaw = pitch = 0; onChange(); },
+    enter() { active = true; playing = false; progress = 0; shownYaw = shownPitch = yaw = pitch = 0; route = stops; document.querySelector('#walk-route').value = 'hall'; sync(); canvas.focus({ preventScroll: true }); },
+    exit() { active = playing = false; releaseDrag(); sync(); },
+    resetLook() { shownYaw = shownPitch = yaw = pitch = 0; onChange(); },
     update(dt) {
       if (!active) return;
+      if (shownYaw !== yaw || shownPitch !== pitch) {
+        shownYaw = T.MathUtils.damp(shownYaw, yaw, 12, dt);
+        shownPitch = T.MathUtils.damp(shownPitch, pitch, 12, dt);
+        if (Math.abs(shownYaw - yaw) + Math.abs(shownPitch - pitch) < .00001) { shownYaw = yaw; shownPitch = pitch; }
+        onChange();
+      }
       if (playing) { progress = Math.min(1, progress + dt / 36); if (progress === 1) playing = false; sync(); }
       const next = route.findIndex(stop => stop.at > progress), b = route[next < 0 ? route.length - 1 : next];
       const a = route[Math.max(0, (next < 0 ? route.length - 1 : next) - 1)];
       const raw = T.MathUtils.clamp((progress - a.at) / (b.at - a.at), 0, 1), t = raw * raw * (3 - 2 * raw);
       const turn = Math.atan2(Math.sin(b.yaw - a.yaw), Math.cos(b.yaw - a.yaw));
-      const angle = a.yaw + turn * t + yaw;
+      const angle = a.yaw + turn * t + shownYaw;
       camera.position.set(T.MathUtils.lerp(a.x || 0, b.x || 0, t), T.MathUtils.lerp(a.y || 1.83, b.y || 1.83, t), T.MathUtils.lerp(a.z, b.z, t));
-      camera.lookAt(camera.position.x + Math.sin(angle) * Math.cos(pitch), camera.position.y + Math.sin(pitch), camera.position.z - Math.cos(angle) * Math.cos(pitch));
+      camera.lookAt(camera.position.x + Math.sin(angle) * Math.cos(shownPitch), camera.position.y + Math.sin(shownPitch), camera.position.z - Math.cos(angle) * Math.cos(shownPitch));
     },
   };
 }

@@ -9,6 +9,7 @@ import { createAmbience } from './ambience.js';
 import { createRain, rainfall, windVector, isSheltered } from './weather-effects.js';
 import { createEntranceWalk } from './entrance-walk.js';
 import { createPanoramaLook } from './panorama-look.js';
+import { createBirds, birdDaylight } from './birds.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
 import './style.css';
 
@@ -92,12 +93,13 @@ document.addEventListener('keydown', resumeDefaultSound, true);
 
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 } catch {
   $('#loader').innerHTML = '<p>This browser cannot start the 3D scene.</p><small>You can still explore the original photographs and film.</small><button id="fallback-archive" class="primary-btn">Open the archive</button>';
   $('#viewport').style.background = 'url(/media/entrance.webp) center/cover';
 }
 const scene = new THREE.Scene();
+const birds = createBirds(scene);
 scene.background = new THREE.Color('#b6c5c9'); scene.fog = new THREE.Fog('#b6c5c9', 80, 300);
 const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 500);
 let controls, architecture, landscape, entranceWalk, panoramaLook;
@@ -140,7 +142,7 @@ const warm = new THREE.MeshStandardMaterial({ color: '#f1d6a7', emissive: '#ffbd
 for (const x of [-2, 2]) {
   const p = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5), warm); p.position.set(x, 10.8, 7.02); scene.add(p); litWindows.push(p);
 }
-const defaultPixelRatio = () => Math.min(devicePixelRatio, small() ? 1.4 : 1.65);
+const defaultPixelRatio = () => Math.min(devicePixelRatio, 1.35);
 const frameSamples = [];
 // Live weather point supplied for the Andhra University campus.
 const LOCATION = { latitude: 17.6801, longitude: 83.2016, timezone: 'Asia/Kolkata', label: 'ANDHRA UNIVERSITY / VISAKHAPATNAM' };
@@ -247,6 +249,7 @@ async function loadWeather() {
 
 function updateLighting(h) {
   sunlight = solarState(liveClock ? new Date() : campusDate(h), LOCATION);
+  sound.setDaylight(birdDaylight(sunlight.altitude));
   const evening = sunlight.night;
   const golden = 1 - THREE.MathUtils.smoothstep(sunlight.altitude, 0, 25);
   const wet = weatherState.rainFactor;
@@ -427,6 +430,7 @@ function animate(now) {
   if (document.hidden || !ready) return;
   const modalOpen = !!document.querySelector('dialog[open]');
   if (modalOpen) return;
+  panoramaLook.update(Math.min(frameDuration / 1000, .1));
   if (entranceWalk?.active) {
     entranceWalk.update(Math.min(frameDuration / 1000, .1));
   } else if (transition) {
@@ -473,14 +477,15 @@ function animate(now) {
   landscape.windDirection.value.copy(windVector(1, weatherState.windDirection)).normalize();
   if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
   rain.update(dt, weatherState, reduced);
+  birds.update(dt, sunlight.altitude, reduced);
   sound.setWeather(weatherState, isSheltered(camera.position.x, camera.position.y, camera.position.z), windSpeed);
   sky.update(now / 1000, sunlight.night, weatherState, reduced);
   if (needsRender || !reduced) {
     renderer.render(scene, camera);
     if (++frames % 60 === 0) drawPlan();
-    if (quality === 'auto' && !reduced && frames > 90) {
-      frameSamples.push(frameDuration); if (frameSamples.length > 90) frameSamples.shift();
-      if (frameSamples.length === 90 && frames % 90 === 0 && frameSamples.reduce((a, b) => a + b, 0) / 90 > 25 && renderer.getPixelRatio() > .85) renderer.setPixelRatio(Math.max(.85, renderer.getPixelRatio() - .2));
+    if (quality === 'auto' && !reduced && frames > 12) {
+      frameSamples.push(frameDuration); if (frameSamples.length > 12) frameSamples.shift();
+      if (frameSamples.length === 12 && frames % 12 === 0 && frameSamples.reduce((a, b) => a + b, 0) / 12 > 28 && renderer.getPixelRatio() > .65) renderer.setPixelRatio(Math.max(.65, renderer.getPixelRatio() * .8));
     }
     needsRender = false; lastRendered = now;
   }
