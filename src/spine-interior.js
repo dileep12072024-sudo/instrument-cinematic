@@ -280,9 +280,10 @@ export function buildSpineInterior(parent, m) {
   for (const z of [-2.2, -6.8]) {
     tube([[left + .02, 3.63, z], [right - .02, 3.63, z]], .019, wire);
     tube([[px, 3.76, z], [px, 3.32, z]], .012, m.dark);
-    const hub = new T.SphereGeometry(.065, 12, 8); hub.scale(1, .55, 1); hub.translate(px, 3.31, z); add(hub, m.dark);
+    const hub = new T.SphereGeometry(.13, 24, 12); hub.scale(1, .55, 1); hub.translate(px, 3.31, z); add(hub, m.dark);
+    const cup = new T.CylinderGeometry(.09, .035, .10, 20); cup.translate(px, 3.70, z); add(cup, m.dark);
     for (let blade = 0; blade < 3; blade++) {
-      const shape = new T.Shape(); shape.moveTo(-.025, .02); shape.lineTo(-.055, .40); shape.quadraticCurveTo(0, .47, .07, .40); shape.lineTo(.03, .02); shape.closePath();
+      const shape = new T.Shape(); shape.moveTo(-.025, .08); shape.lineTo(-.07, .49); shape.quadraticCurveTo(0, .60, .085, .49); shape.lineTo(.03, .08); shape.closePath();
       const g = new T.ExtrudeGeometry(shape, { depth: .006, bevelEnabled: false, curveSegments: 5 }); g.rotateX(Math.PI / 2); g.rotateY(blade * Math.PI * 2 / 3); g.translate(px, 3.30, z); add(g, m.dark);
     }
   }

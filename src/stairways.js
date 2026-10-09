@@ -44,16 +44,22 @@ export function buildStairways(parent, m) {
   box(2.67, stairs.second + .48, -.72, 2.06, .96, .16, m.wall);
   // Recess gates have a real under-landing cavity extending to both outer walls.
   const gates = new T.Group(); gates.name = 'Closed under-stair corner gates'; group.add(gates);
+  const gatePaint = new T.MeshStandardMaterial({ name: 'Blue painted recess ironwork', color: '#426d91', metalness: .38, roughness: .58 });
   for (const side of [-1, 1]) {
     const gate = new T.Group(); gate.name = side < 0 ? 'Left under-stair gate' : 'Right under-stair gate';
     gate.position.set(side * 1.52, stairs.ground, -5.05); gate.userData.clearDepth = 2.1; gates.add(gate);
-    const bar = (y, z, h, d, thickness = .026) => { const mesh = new T.Mesh(new T.BoxGeometry(thickness, h, d), m.metal); mesh.position.set(0, y, z); gate.add(mesh); };
+    const bar = (y, z, h, d, thickness = .026) => { const mesh = new T.Mesh(new T.BoxGeometry(thickness, h, d), gatePaint); mesh.position.set(0, y, z); gate.add(mesh); };
     for (const z of [-.49, .49]) bar(1.05, z, 2.1, .045, .045);
     for (const y of [.025, 1.02, 2.08]) bar(y, 0, .045, 1.02);
     for (let j = -4; j <= 4; j++) bar(1.05, j * .105, 2.05, .015);
     bar(.98, 0, .055, .25, .045);
-    box(side * 1.52, 2.35, -5.05, .18, .18, 1.16, m.wall);
-    for (const z of [-5.66, -4.44]) box(side * 1.52, 1.23, z, .18, 2.14, .14, m.wall);
+    for (const z of [-.535, .535]) bar(1.06, z, 2.18, .055, .09);
+    bar(2.145, 0, .06, 1.12, .09);
+    box(side * 1.55, 2.364, -5.05, .20, .24, 2.1, m.wall);
+    for (const z of [-5.87, -4.23]) box(side * 1.55, 1.204, z, .20, 2.08, .46, m.wall);
+    for (const y of [.48, 1.87]) {
+      const hinge = new T.Mesh(new T.CylinderGeometry(.025, .025, .12, 12), gatePaint); hinge.position.set(0, y, -.49); gate.add(hinge);
+    }
     box(side * 2.65, stairs.ground + .006, -5.05, 2.08, .012, 1.32, m.tread);
   }
   // Rear windows are openings through the shell, including the three top-landing windows.
@@ -66,7 +72,18 @@ export function buildStairways(parent, m) {
     for (const x of centres) {
       const a = x - width / 2, b = x + width / 2;
       box((left + a) / 2, sill + height / 2, -6.9, a - left, height, .2, m.wall);
-      box(x, sill + height / 2, -6.89, width, height, .018, glass);
+      const window = new T.Group(); window.name = 'Rear window with casement shutters and grille'; group.add(window);
+      for (const side of [-1, 1]) {
+        const sash = new T.Group(); sash.name = 'Glazed opening shutter'; sash.position.set(x + side * width / 2, sill, -6.77); sash.rotation.y = side * .22; window.add(sash);
+        const part = (xx, yy, w, h, material) => { const mesh = new T.Mesh(new T.BoxGeometry(w, h, material === glass ? .012 : .035), material); mesh.position.set(xx, yy, 0); sash.add(mesh); };
+        const centre = -side * width / 4;
+        part(centre, height / 2, width / 2 - .07, height - .07, glass);
+        for (const xx of [0, -side * width / 2]) part(xx, height / 2, .035, height, aluminium);
+        for (const yy of [0, height]) part(centre, yy, width / 2, .035, aluminium);
+        part(-side * (width / 2 - .07), height * .45, .025, .13, m.metal);
+      }
+      for (let dx = -width / 2 + .14; dx < width / 2; dx += .14) box(x + dx, sill + height / 2, -6.94, .014, height, .018, gatePaint);
+      for (let yy = sill + .30; yy < sill + height; yy += .30) box(x, yy, -6.94, width, .014, .018, gatePaint);
       for (const dx of [-width / 2, 0, width / 2]) box(x + dx, sill + height / 2, -6.77, .045, height, .065, aluminium);
       for (const y of [sill, sill + height]) box(x, y, -6.77, width, .045, .065, aluminium);
       left = b;

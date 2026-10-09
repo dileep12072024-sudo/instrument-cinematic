@@ -193,7 +193,8 @@ export function buildArchitecture(scene) {
           box(cx, (bottom + top) / 2, (a + c) / 2, .32, top - bottom, c - a, m.wall);
         }
         const lintel = f === 1 ? 7.78 : 11.25;
-        box(cx, (lintel + top) / 2, 2.166667, .32, top - lintel, 2.166667, m.wall);
+        const lintelTop = f === 2 ? 12.0 : top;
+        box(cx, (lintel + lintelTop) / 2, 2.166667, .32, lintelTop - lintel, 2.166667, m.wall);
         continue;
       }
       if (f === 2 && type === 'corridor' && rotation === 0) continue;
@@ -400,7 +401,7 @@ export function buildArchitecture(scene) {
       if (type === 'tower') box(x, y - .07, 4.15, w, .2, 5.7, m.roof);
       else box(x, y - .07, z, w, .2, d, m.roof);
     }
-    if (type === 'tower') box(x, 12.56, 4.15, w + .35, .2, 5.7, m.roof);
+    if (type === 'tower') box(x, 11.99, 4.15, w + .35, .2, 5.7, m.roof);
     else if (type === 'low-corridor') box(-12.4375, roofBase, z, 17.225, .2, d + .35, m.roof);
     else box(x, roofBase, z, w + .35, .2, d + .35, m.roof);
   }

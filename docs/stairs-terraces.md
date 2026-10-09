@@ -18,16 +18,25 @@ Videos were sampled at 12 timestamps each with `node scripts/inspect-classroom-v
 
 ## October 8 Corrections
 
-The opening sequences were additionally inspected at one-second intervals for `110452` (first 24 seconds) and `112159` (first 15 seconds), and two-second intervals for `111313` (first 48 seconds). These establish exterior steps up to the lower gate, the inward-opening leaves, and steps climbing forward from the blue roof door rather than descending sideways.
+The opening sequences were additionally inspected at one-second intervals for `110452` (first 24 seconds) and `112159` (first 15 seconds), and two-second intervals for `111313` (first 48 seconds). The user's October 9 clarification corrects the earlier interpretation of the upper exit: the camera has already turned and moved to the corner, so the steps climb along the terrace, not directly out of the blue doorway.
 
 - The user explicitly confirmed that the final side flight is on the terrace-gate side (world -X), with a low wall where the opposite flight stops.
 - The ground side flights start at Z=.2 instead of Z=1.083333. Their inner parapets extend down to the floor, framing the blue-backed recess. Stored debris is omitted with the user's permission.
 - All three rear window rows have three actual glazed openings.
 - October 9: the lowest three-window row has its sill at 3.95, above the rear canopy fascia at 3.78. Frames and wall openings move together, retaining a visible masonry gap instead of intersecting the canopy.
-- The lower gate is at 8.444, its outside strip at 8.11 and the broad classroom roof at 7.61. The broad-wing ceiling and slab were lowered together to maintain clearance. Steps and an adjoining short slope connect the roofs.
-- The blue roof threshold is at 12.11. Three forward-facing steps climb to 12.68, and the outer roof returns to 12.11 through its own steps and adjacent slope. These dimensions remain estimates from the references, not measurements.
+- The lower gate is at 8.444, its outside strip at 8.11 and the broad classroom roof at 7.61. The roof junction has a capped vertical face alongside the steps, not a broad ramp.
+- The blue roof threshold and outside apron are at 12.11. After turning along the enclosure, three steps at the east corner climb to 12.36. The far wing returns to 12.11. This .25 height change is half the .50 change on the classroom roof, as requested. Dimensions remain proportional estimates, not measurements.
 - Duplicate front landing surfaces were removed; roof slabs stop before the descending steps. The headhouse retains a rectangular blank-sided form, blue corner strips and a gently pitched corrugated cover.
 - Free exploration now rotates around the camera's eye, not the building centre. Wheel/zoom moves forward and back, right-drag pans, and the full-screen dark overlay is absent in exploration and walkthroughs. The default interior field of view is 68 degrees.
+
+## October 9 Follow-up
+
+- Panorama now exits the guided route at the current camera position; the walkthrough no longer overwrites free movement. The canvas receives keyboard focus. WASD and Q/E provide translation as well as wheel and right-drag controls.
+- Upper side flights start at the preceding central return's endpoint, with the front landing connecting the turn. The ground twin flights are unchanged.
+- Recess gates use blue painted ironwork, continuous masonry reveals, fitted frames and hinges. The terrace leaves fold inward against the inner wall instead of projecting across the stair approach.
+- All nine rear windows have glazed casement shutters, handles and fixed blue grilles. The first row retains clearance above the canopy.
+- The terrace-side enclosure and its canopy extend farther across the classroom-facing elevation. The upper headhouse is deeper, with an outward-open blue door onto a level apron. The east opening's lintel is below the apron, removing the exposed wall across the route.
+- Ceiling fans have thin curved blades, rounded motor housings and ceiling cups rather than rectangular blades.
 
 ## Modeling Boundaries
 

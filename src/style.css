@@ -24,6 +24,10 @@ dialog{background:#18221f;color:#edf2e4;border:1px solid #e9f0df29;border-radius
 @media(max-width:699px){.mobile-plan{display:grid}}
 .weather-live{color:#dce7d1bd;white-space:nowrap}.weather-divider{width:13px}
 .panorama-view .scene-heading,.panorama-view .door-action,.panorama-view .plan{display:none}
+.topbar,.scene-meta,.scene-number,.chapter-bar{pointer-events:none}
+.topbar a,.topbar button,.chapter-bar button{pointer-events:auto}
+.panorama-view #viewport>canvas,.interior-view #viewport>canvas{cursor:grab}
+.panorama-view #viewport>canvas:active,.interior-view #viewport>canvas:active{cursor:grabbing}
 .entrance-actions{position:absolute;bottom:175px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;z-index:4}
 .entrance-actions .door-action{position:static;transform:none;white-space:nowrap}
 .entrance-actions .primary-btn{white-space:nowrap}

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { Euler, PerspectiveCamera, Vector3 } from 'three';
 import { createPanoramaLook } from '../src/panorama-look.js';
 
-class Canvas extends EventTarget { setPointerCapture() {} }
+class Canvas extends EventTarget { setPointerCapture() {} focus() {} }
 const canvas = new Canvas(), camera = new PerspectiveCamera(43);
 let active = true;
 const controls = createPanoramaLook(camera, canvas, () => active, () => {});

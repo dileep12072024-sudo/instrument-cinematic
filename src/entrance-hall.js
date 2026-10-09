@@ -211,11 +211,14 @@ export function buildEntranceHall(parent, exterior) {
     notice.position.set(side * 3.715, 2.25, z); group.add(notice);
   }
   const fan = new T.Group(); fan.name = 'Entrance ceiling fan'; fan.position.set(0, 3.35, 3.9); group.add(fan);
-  const hub = new T.Mesh(new T.CylinderGeometry(.15, .13, .13, 16), trim); fan.add(hub);
+  const motorProfile = [[0, -.075], [.09, -.075], [.15, -.045], [.17, 0], [.15, .065], [.075, .09], [0, .09]].map(([r, y]) => new T.Vector2(r, y));
+  const hub = new T.Mesh(new T.LatheGeometry(motorProfile, 32), trim); fan.add(hub);
   rod([0, 3.40, 3.9], [0, 3.76, 3.9], .022, trim);
+  const ceilingCup = new T.Mesh(new T.CylinderGeometry(.12, .045, .13, 24), trim); ceilingCup.position.set(0, 3.69, 3.9); group.add(ceilingCup);
   for (let i = 0; i < 3; i++) {
-    const blade = new T.Mesh(new T.BoxGeometry(.60, .022, .13), trim); const angle = i * Math.PI * 2 / 3;
-    blade.position.set(Math.cos(angle) * .37, 0, Math.sin(angle) * .37); blade.rotation.y = -angle; fan.add(blade);
+    const shape = new T.Shape(); shape.moveTo(.11, -.025); shape.lineTo(.27, -.052); shape.quadraticCurveTo(.52, -.10, .69, -.055); shape.quadraticCurveTo(.75, .005, .68, .075); shape.lineTo(.27, .06); shape.lineTo(.11, .025); shape.closePath();
+    const geometry = new T.ExtrudeGeometry(shape, { depth: .006, bevelEnabled: false, curveSegments: 10 }); geometry.rotateX(-Math.PI / 2);
+    const blade = new T.Mesh(geometry, trim); blade.name = 'Thin curved ceiling-fan blade'; blade.rotation.y = i * Math.PI * 2 / 3; blade.position.y = -.015; fan.add(blade);
   }
   const colors = ['#7a987d', '#b877a0', '#cdb773', '#71a1bb', '#dddccf'];
   const decorations = colors.map(color => new T.MeshStandardMaterial({ color, roughness: .8, side: T.DoubleSide }));

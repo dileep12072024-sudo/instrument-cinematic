@@ -8,7 +8,7 @@ assert.equal(isSheltered(-5.1, 10, 2), true);
 assert.equal(isSheltered(-15, 10, 1), false);
 assert.equal(isSheltered(25, 14, 1), false);
 assert.equal(isSheltered(-28, 7.8, 1), false);
-assert.equal(isSheltered(12, 12.5, 1), true);
+assert.equal(isSheltered(12, 12.2, 1), true);
 await mkdir('artifacts/stairs-terraces', { recursive: true });
 const browser = await chromium.launch({ executablePath: '/home/dragon/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome', args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: .8 });
@@ -68,20 +68,26 @@ try {
     const rearWindowBottom = new T.Box3().setFromObject(windowHit.object).min.y;
     const rearCanopyTop = height(0, -8.9, 6);
     const gate = scene.getObjectByName('Terrace double grille gate');
+    const shutters = [];
+    stairways.traverse(o => { if (o.name === 'Rear window with casement shutters and grille') shutters.push(o); });
     const joinFaces = [[-22.03, 7.61], [22.95, 12.11]].map(([x, y]) => new T.Raycaster(new T.Vector3(x, y + .5, 1.83), new T.Vector3(0, -1, 0), 0, .6).intersectObject(architecture.group, true).filter(hit => Math.abs(hit.point.y - y) < .005).length);
     return { failures, cavities, lockFace: lock.geometry.boundingBox.min.z,
       joinFaces,
       rearWindowCanopyGap: rearWindowBottom - rearCanopyTop,
-      heights: { gateSide: height(-2.67, -2, 10.5), stoppedSide: height(2.67, -2, 10.5), groundApproach: height(2.67, .9, 1), leftStrip: height(-15, 1), leftWing: height(-28, 1), leftStepEnd: height(-22, 1.9), rightStrip: height(12, 1), rightWing: height(25, 1), roofDoor: height(0, .35, 13), roofExit: height(0, 1.5, 13) },
+      shutters: shutters.length,
+      connectedFlights: stairways.userData.flights.slice(1).every(f => f.start === -.7),
+      heights: { gateSide: height(-2.67, -2, 10.5), stoppedSide: height(2.67, -2, 10.5), groundApproach: height(2.67, .9, 1), leftStrip: height(-15, 1), leftWing: height(-28, 1), leftStepEnd: height(-22, 1.9), rightStrip: height(12, 1), rightWing: height(25, 1), roofDoor: height(0, 1.65, 13), roofApron: height(0, 3, 13), roofExit: height(5.1, 2.425, 13), cornerStep: height(4.35, 2.425, 13) },
       thirdWindow: windowHit?.object.material.transparent,
-      inwardGate: gate.children.every(leaf => new T.Box3().setFromObject(leaf).max.x > gate.position.x + .9),
+      inwardGate: gate.children.every(leaf => new T.Box3().setFromObject(leaf).min.x >= gate.position.x - .04 && new T.Box3().setFromObject(leaf).max.x > gate.position.x + .15),
     };
   });
   await writeFile('artifacts/stairs-terraces/diagnostics.json', JSON.stringify(diagnostics, null, 2));
   console.log('Geometry diagnostics:', JSON.stringify(diagnostics));
   assert.ok(diagnostics.heights.gateSide > diagnostics.heights.stoppedSide + 3, 'Only gate-side flight continues above second floor');
   assert.ok(Math.abs(diagnostics.heights.groundApproach - .164) < .02, 'Ground twin flights must not project into the hall');
-  for (const [name, expected] of Object.entries({ leftStrip: 8.11, leftWing: 7.61, leftStepEnd: 7.61, rightStrip: 12.68, rightWing: 12.11, roofDoor: 12.11, roofExit: 12.68 })) assert.ok(Math.abs(diagnostics.heights[name] - expected) < .02, name);
+  for (const [name, expected] of Object.entries({ leftStrip: 8.11, leftWing: 7.61, leftStepEnd: 7.61, rightStrip: 12.36, rightWing: 12.11, roofDoor: 12.11, roofApron: 12.11, roofExit: 12.36, cornerStep: 12.11 + .25 * 2 / 3 })) assert.ok(Math.abs(diagnostics.heights[name] - expected) < .02, name);
+  assert.equal(diagnostics.shutters, 9, 'Each rear window has framed shutters');
+  assert.equal(diagnostics.connectedFlights, true, 'Upper flights start at the preceding return landing');
   assert.equal(diagnostics.thirdWindow, true, 'Central first-floor rear window must be glazed, not solid wall');
   assert.ok(diagnostics.rearWindowCanopyGap > .1, 'All three first-floor rear windows must clear the canopy fascia');
   assert.equal(diagnostics.inwardGate, true, 'Terrace gate leaves must open inside');
@@ -102,7 +108,28 @@ try {
   await page.locator('#zoom-out').dispatchEvent('click');
   assert.ok(await page.evaluate(() => __portrait.camera.fov) > beforeZoom);
   await page.locator('#panorama').dispatchEvent('click');
-  assert.equal(await page.evaluate(() => __portrait.entranceWalk.active), true);
+  assert.equal(await page.evaluate(() => __portrait.entranceWalk.active), false, 'Panorama must release the guided camera');
+  assert.equal(await page.locator('#walk-panel').isVisible(), false);
+  assert.equal(await page.locator('#panorama').getAttribute('aria-pressed'), 'true');
+  const dragBefore = await page.evaluate(() => {
+    const { camera, renderer, scene } = __portrait; renderer.render(scene, camera);
+    return { position: camera.position.toArray(), quaternion: camera.quaternion.toArray(), pixels: renderer.domElement.toDataURL() };
+  });
+  await page.mouse.move(530, 320); await page.mouse.down(); await page.mouse.move(750, 385, { steps: 12 }); await page.mouse.up();
+  const dragAfter = await page.evaluate(() => {
+    __advance(); const { camera, renderer, scene } = __portrait; renderer.render(scene, camera);
+    return { position: camera.position.toArray(), quaternion: camera.quaternion.toArray(), pixels: renderer.domElement.toDataURL() };
+  });
+  assert.notDeepEqual(dragAfter.quaternion, dragBefore.quaternion, 'Desktop panorama mouse drag must turn the camera');
+  assert.deepEqual(dragAfter.position, dragBefore.position, 'Desktop look must stay at the eye');
+  assert.notEqual(dragAfter.pixels, dragBefore.pixels, 'Desktop panorama drag must visibly change the canvas');
+  await page.screenshot({ path: 'artifacts/stairs-terraces/panorama-after-drag.png' });
+  assert.equal(await page.evaluate(() => document.elementFromPoint(700, 55) === __portrait.renderer.domElement), true, 'Empty header space must pass drags to the canvas');
+  const freePosition = await page.evaluate(() => __portrait.camera.position.toArray());
+  await page.locator('canvas[aria-label^="Interactive building"]').dispatchEvent('wheel', { deltaY: -100 });
+  const movedPosition = await page.evaluate(() => { __advance(); return __portrait.camera.position.toArray(); });
+  assert.notDeepEqual(movedPosition, freePosition, 'Free panorama movement must survive the next animation frame');
+  await page.locator('#enter-hall').dispatchEvent('click');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.selectOption('#walk-route', 'stairs');
   await page.locator('#walk-progress').evaluate(e => { e.value = 210; e.dispatchEvent(new Event('input')); });
@@ -125,7 +152,9 @@ try {
     ['rear-window-canopy-clearance', [0, 6.5, -16], [0, 4.2, -6.9]],
     ['terrace-gate-steps', [-8, 9.76, 2.17], [-3.9, 9.5, 2.17]],
     ['left-elevation', [-28, 9.4, 5.5], [-14, 8.9, 0]],
-    ['roof-exit-steps', [0, 13.76, -.4], [0, 12.4, 1.4]],
+    ['roof-exit-steps', [0, 13.76, 2.425], [8, 12.9, 2.425]],
+    ['roof-door-apron', [7, 16.5, 8], [0, 12.8, 1.8]],
+    ['ceiling-fan', [0, 2.4, 5.2], [0, 3.35, 3.9]],
     ['roof-enclosure', [15, 21, 17], [0, 13.2, -1]],
   ]) {
     const colors = await page.evaluate(({ eye, target }) => {

@@ -502,7 +502,7 @@ function leaveHall(returnToEntrance = true) {
 }
 $('#enter-hall').onclick = () => {
   if (!ready) return;
-  stopJourney(); setOrbit(false); setPanorama(true); transition = null; interactive = true;
+  stopJourney(); setOrbit(false); setPanorama(false); transition = null; interactive = true;
   $('#experience').classList.remove('footprint-view');
   doorsOpen = true; $('#door span').textContent = 'Close the doors'; $('#door').setAttribute('aria-pressed', 'true');
   architecture.doors.forEach(d => { d.pivot.rotation.y = d.openAngle; });
@@ -532,11 +532,20 @@ function syncSound() {
 document.addEventListener('visibilitychange', syncSound);
 $('#orbit').onclick = () => { if (entranceWalk?.active) return; setPanorama(false); stopJourney(); transition = null; interactive = true; setOrbit(!isOrbiting); };
 $('#panorama').onclick = () => {
-  if (entranceWalk?.active) { setPanorama(!panorama); needsRender = true; return; }
+  if (entranceWalk?.active) {
+    entranceWalk.exit();
+    $('#experience').classList.remove('interior-view');
+    $('#scene-mode').textContent = 'LIVE EXPLORATION';
+    setPanorama(true);
+    renderer.domElement.focus({ preventScroll: true });
+    needsRender = true;
+    return;
+  }
   stopJourney(); transition = null; interactive = true; setOrbit(false);
   setPanorama(!panorama);
   if (panorama) {
     $('#experience').classList.remove('footprint-view');
+    renderer.domElement.focus({ preventScroll: true });
     needsRender = true;
   }
 };

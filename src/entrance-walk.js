@@ -61,11 +61,11 @@ stairFlights.forEach((f, i) => {
     [0, f.half, stairs.landingZ, -Math.PI, 'Central return flight'],
     [0, f.half, stairs.rear, -Math.PI, 'Central return flight'],
     [0, f.top, stairs.returnEnd, -Math.PI, i === 2 ? 'Blue roof-access door' : `${i + 1}: Front landing`],
-    [0, f.top, i === 2 ? .35 : 2.166667, i === 0 ? -2.1 : -Math.PI, i === 0 ? 'Library and classroom wing' : i === 1 ? 'Second-floor terrace landing' : 'Roof doorway'],
+    [0, f.top, i === 2 ? 1.65 : -.5, i === 0 ? -2.1 : -Math.PI, i === 0 ? 'Library and classroom wing' : i === 1 ? 'Second-floor terrace landing' : 'Roof doorway'],
   );
-  if (i < 2) stairPoints.push([stairFlights[i + 1].sides.includes(1) ? 2.67 : -2.67, f.top, 2.166667, 0, 'Next stair flight']);
+  if (i < 2) stairPoints.push([stairFlights[i + 1].sides.includes(1) ? 2.67 : -2.67, f.top, -.5, 0, 'Next stair flight']);
 });
-stairPoints.push([0, levels.rightStrip, 1.35, -Math.PI, 'Upper terrace']);
+stairPoints.push([0, stairs.top, 2.425, Math.PI / 2, 'Roof apron'], [3.8, stairs.top, 2.425, Math.PI / 2, 'Upper terrace steps'], [5.1, levels.rightStrip, 2.425, Math.PI / 2, 'Upper terrace']);
 export const stairRoute = walkingRoute(stairPoints);
 const leftTerraceRoute = walkingRoute([
   [0, stairs.second, 2.166667, -Math.PI / 2, 'Second-floor landing'],
@@ -79,10 +79,10 @@ const leftTerraceRoute = walkingRoute([
   [-28, levels.leftWing, -11.8, Math.PI, 'Looking back across the classroom roof'],
 ]);
 const rightTerraceRoute = walkingRoute([
-  [0, stairs.top, .35, -Math.PI, 'Roof-access doorway'],
-  [0, levels.rightStrip, 1.35, -Math.PI, 'Upper terrace steps'],
-  [0, levels.rightStrip, 2.166667, Math.PI / 2, 'Upper terrace'],
-  [5.3, levels.rightStrip, 2.166667, Math.PI / 2, 'Upper right terrace'],
+  [0, stairs.top, 1.65, -Math.PI, 'Roof-access doorway'],
+  [0, stairs.top, 2.425, Math.PI / 2, 'Roof apron'],
+  [3.8, stairs.top, 2.425, Math.PI / 2, 'Enclosure corner steps'],
+  [5.1, levels.rightStrip, 2.425, Math.PI / 2, 'Upper right terrace'],
   [12, levels.rightStrip, 1.3, Math.PI / 2, 'White water tanks'],
   [22, levels.rightStrip, 1.9, Math.PI / 2, 'Wing terrace steps'],
   [23.1, levels.rightWing, 1.9, Math.PI / 2, 'Lower roof junction'],

@@ -13,6 +13,7 @@ export function createPanoramaLook(camera, canvas, active, changed) {
   }
   canvas.addEventListener('pointerdown', e => {
     if (!active() || pointer) return;
+    canvas.focus({ preventScroll: true });
     pointer = { id: e.pointerId, x: e.clientX, y: e.clientY, pan: e.button === 2 };
     canvas.setPointerCapture(e.pointerId);
   });
@@ -41,8 +42,15 @@ export function createPanoramaLook(camera, canvas, active, changed) {
   }, { passive: false });
   canvas.addEventListener('keydown', e => {
     if (!active()) return;
-    if (['w', 's', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-      e.preventDefault(); move(e.key === 'w' || e.key === 'ArrowUp' ? .7 : -.7);
+    const key = e.key.toLowerCase();
+    if (['w', 's', 'arrowup', 'arrowdown'].includes(key)) {
+      e.preventDefault(); move(key === 'w' || key === 'arrowup' ? .7 : -.7);
+    }
+    if (['a', 'd', 'q', 'e'].includes(key)) {
+      e.preventDefault();
+      direction.set(key === 'a' ? -1 : key === 'd' ? 1 : 0, 0, 0).applyQuaternion(camera.quaternion);
+      direction.y = key === 'q' ? -1 : key === 'e' ? 1 : 0;
+      camera.position.addScaledVector(direction, .7); changed();
     }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault(); angles.setFromQuaternion(camera.quaternion, 'YXZ');
