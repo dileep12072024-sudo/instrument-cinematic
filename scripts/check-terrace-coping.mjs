@@ -11,7 +11,7 @@ const down = (x, z, high) => new T.Raycaster(new T.Vector3(x, high + 1, z), new 
 for (const [edge, low, high] of [[-22.05, terraceLevels.leftWing, terraceLevels.leftStrip], [23, terraceLevels.rightWing, terraceLevels.rightStrip]]) {
   const side = Math.sign(edge), rise = high - low;
   const inner = edge - side, crest = high + rise;
-  for (const distance of [.1, .56, 1.1]) {
+  for (const distance of edge < 0 ? [.1, .3, .56] : [.1, .56, 1.1]) {
     const surface = down(inner + side * distance, -1.2, crest);
     assert.equal(surface.object.material.name, 'Projecting weathered terrace coping');
     assert.ok(Math.abs(surface.point.y - (crest - (crest - low) * distance / 1.12)) < .001, 'Capped ramp descends toward the open terrace');
@@ -26,6 +26,14 @@ for (const [edge, low, high] of [[-22.05, terraceLevels.leftWing, terraceLevels.
   assert.notEqual(down(edge + side * .1, 3.02, high)?.object.material.name, 'Projecting weathered terrace coping', 'No skinny coping stub protrudes beside the last stair');
 }
 assert.ok(Math.abs((terraceLevels.rightStrip - terraceLevels.rightWing) * 2 - (terraceLevels.leftStrip - terraceLevels.leftWing)) < 1e-9);
+for (const y of [7.7, 7.9]) {
+  const front = new T.Raycaster(new T.Vector3(-23, y, -1.2), new T.Vector3(1, 0, 0)).intersectObject(scene, true)[0];
+  assert.equal(front.object.material.name, 'Weathered terrace plaster');
+  assert.ok(Math.abs(front.point.x + 21.65) < .001, 'Left open-terrace face is vertical and recessed behind the end pillars');
+}
+for (const x of [-22, -21.9, -21.7]) {
+  assert.ok(Math.abs(down(x, -1.2, 10).point.y - terraceLevels.leftWing) < .001, 'Removed slope leaves a continuous flat terrace, not a gap');
+}
 const leftEnd = down(-21.225, .95, 10), leftProfile = down(-21.225, 0, 10);
 assert.equal(leftEnd.object.material.name, 'Projecting weathered terrace coping', 'Left cap ends within the first tread');
 assert.ok(Math.abs(leftEnd.point.y - leftProfile.point.y) < .001, 'Extending the cap does not change its height or slope');

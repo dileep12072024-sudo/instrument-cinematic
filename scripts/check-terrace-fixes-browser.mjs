@@ -45,6 +45,7 @@ try {
   assert.equal(await page.evaluate(() => !!__portrait.scene.getObjectByName('Daytime campus birds')), false);
   await view('utility-rear', [-13, 13, -14], [-5, 10, -1]);
   await view('left-cap', [-27, 9.2, 4.5], [-18, 8.1, 0]);
+  await view('left-cap-front', [-28, 8.65, -.8], [-20, 8.35, -.8]);
   await view('left-cap-step-junction', [-23, 10, 3.2], [-21.25, 8.25, .8]);
   await view('right-cap', [27, 13.7, 4.5], [18, 12.4, 0]);
   await view('left-ramp-outward', [-18, 10.4, 2], [-25, 7.9, -1.2]);
@@ -56,6 +57,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(500);
   await view('mobile-utility', [-11, 14, -12], [-5, 10, -1]);
+  await view('mobile-left-cap-front', [-28, 8.65, -.8], [-20, 8.35, -.8]);
   await view('mobile-parapet', [23.5, 13.8, -1], [15, 12.7, 3.25]);
   assert.deepEqual(errors, []);
 } finally { await browser.close(); }

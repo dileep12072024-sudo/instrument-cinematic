@@ -50,19 +50,21 @@ export function buildTerraces(parent, m) {
       g.computeVertexNormals();
     }
   }
-  function cappedEdge(x, low, high, z, depth, stepOverlap = 0) {
+  function cappedEdge(x, low, high, z, depth, stepOverlap = 0, cutDistance = 1.12) {
     const outside = Math.sign(x), crest = high + (high - low);
-    const inner = x - outside, toe = x + outside * .12, thickness = .08;
+    const inner = x - outside, toe = inner + outside * cutDistance, thickness = .08;
+    const endHeight = crest + (low - crest) * cutDistance / 1.12;
     const shape = new T.Shape();
     shape.moveTo(inner, low - thickness);
     shape.lineTo(toe, low - thickness);
+    if (cutDistance < 1.12) shape.lineTo(toe, endHeight - thickness);
     shape.lineTo(inner, crest - thickness); shape.closePath();
     const face = new T.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
     face.translate(0, 0, z - depth / 2); add(face, wall);
     // Straight high face toward the building; the capped slope falls toward the open roof.
     const coping = new T.Shape();
-    coping.moveTo(inner, crest - thickness); coping.lineTo(toe, low - thickness);
-    coping.lineTo(toe, low); coping.lineTo(inner, crest); coping.closePath();
+    coping.moveTo(inner, crest - thickness); coping.lineTo(toe, endHeight - thickness);
+    coping.lineTo(toe, endHeight); coping.lineTo(inner, crest); coping.closePath();
     const top = new T.ExtrudeGeometry(coping, { depth, bevelEnabled: false });
     top.translate(0, 0, z - depth / 2); add(top, cap);
     if (stepOverlap) {
@@ -130,7 +132,9 @@ export function buildTerraces(parent, m) {
   floor(-28, levels.leftWing, 0, 12, 30);
   for (let i = 0; i < 2; i++) step(-21.225 - i * .35, levels.leftStrip - (i + 1) * .5 / 3, 2.0375, .35, 2.425, levels.leftWing);
   floor(-21.875, levels.leftWing, 2.0375, .25, 2.425);
-  cappedEdge(-22.05, levels.leftWing, levels.leftStrip, -1.2125, 4.075, .18);
+  // Truncate behind the pillars: a straight plaster face supports the remaining cap.
+  floor(-21.825, levels.leftWing, -1.2125, .35, 4.075);
+  cappedEdge(-22.05, levels.leftWing, levels.leftStrip, -1.2125, 4.075, .18, .60);
   // Square concrete posts frame the ramp ends and the adjacent stair opening (110452).
   for (const z of [-3.25, .825, 3.25]) box(-22.05, levels.leftWing + .925, z, .60, 1.85, .60);
   for (const x of [-7, -10, -13, -16, -19]) box(x, levels.leftStrip + .9, 3.25, .52, 1.8, .64);
