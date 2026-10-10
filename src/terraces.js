@@ -50,7 +50,7 @@ export function buildTerraces(parent, m) {
       g.computeVertexNormals();
     }
   }
-  function cappedEdge(x, low, high, z, depth) {
+  function cappedEdge(x, low, high, z, depth, stepOverlap = 0) {
     const outside = Math.sign(x), crest = high + (high - low);
     const inner = x - outside, toe = x + outside * .12, thickness = .08;
     const shape = new T.Shape();
@@ -65,6 +65,15 @@ export function buildTerraces(parent, m) {
     coping.lineTo(toe, low); coping.lineTo(inner, crest); coping.closePath();
     const top = new T.ExtrudeGeometry(coping, { depth, bevelEnabled: false });
     top.translate(0, 0, z - depth / 2); add(top, cap);
+    if (stepOverlap) {
+      // Only the cap over the first tread projects into the stair opening.
+      const end = inner + outside * .35, endHeight = crest + (low - crest) * .35 / 1.12;
+      const lip = new T.Shape();
+      lip.moveTo(inner, crest - thickness); lip.lineTo(end, endHeight - thickness);
+      lip.lineTo(end, endHeight); lip.lineTo(inner, crest); lip.closePath();
+      const extension = new T.ExtrudeGeometry(lip, { depth: stepOverlap, bevelEnabled: false });
+      extension.translate(0, 0, z + depth / 2); add(extension, cap);
+    }
   }
   function grille(x, y, z, width, height, rotation = 0, open = true) {
     const gate = new T.Group(); gate.name = 'Terrace double grille gate'; gate.position.set(x, y, z); gate.rotation.y = rotation; group.add(gate);
@@ -121,7 +130,7 @@ export function buildTerraces(parent, m) {
   floor(-28, levels.leftWing, 0, 12, 30);
   for (let i = 0; i < 2; i++) step(-21.225 - i * .35, levels.leftStrip - (i + 1) * .5 / 3, 2.0375, .35, 2.425, levels.leftWing);
   floor(-21.875, levels.leftWing, 2.0375, .25, 2.425);
-  cappedEdge(-22.05, levels.leftWing, levels.leftStrip, -1.2125, 4.075);
+  cappedEdge(-22.05, levels.leftWing, levels.leftStrip, -1.2125, 4.075, .18);
   // Square concrete posts frame the ramp ends and the adjacent stair opening (110452).
   for (const z of [-3.25, .825, 3.25]) box(-22.05, levels.leftWing + .925, z, .60, 1.85, .60);
   for (const x of [-7, -10, -13, -16, -19]) box(x, levels.leftStrip + .9, 3.25, .52, 1.8, .64);

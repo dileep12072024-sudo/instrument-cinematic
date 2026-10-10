@@ -45,6 +45,7 @@ try {
   assert.equal(await page.evaluate(() => !!__portrait.scene.getObjectByName('Daytime campus birds')), false);
   await view('utility-rear', [-13, 13, -14], [-5, 10, -1]);
   await view('left-cap', [-27, 9.2, 4.5], [-18, 8.1, 0]);
+  await view('left-cap-step-junction', [-23, 10, 3.2], [-21.25, 8.25, .8]);
   await view('right-cap', [27, 13.7, 4.5], [18, 12.4, 0]);
   await view('left-ramp-outward', [-18, 10.4, 2], [-25, 7.9, -1.2]);
   await view('right-ramp-outward', [18, 14.1, 2], [25, 12.3, -1.2]);

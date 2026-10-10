@@ -26,6 +26,12 @@ for (const [edge, low, high] of [[-22.05, terraceLevels.leftWing, terraceLevels.
   assert.notEqual(down(edge + side * .1, 3.02, high)?.object.material.name, 'Projecting weathered terrace coping', 'No skinny coping stub protrudes beside the last stair');
 }
 assert.ok(Math.abs((terraceLevels.rightStrip - terraceLevels.rightWing) * 2 - (terraceLevels.leftStrip - terraceLevels.leftWing)) < 1e-9);
+const leftEnd = down(-21.225, .95, 10), leftProfile = down(-21.225, 0, 10);
+assert.equal(leftEnd.object.material.name, 'Projecting weathered terrace coping', 'Left cap ends within the first tread');
+assert.ok(Math.abs(leftEnd.point.y - leftProfile.point.y) < .001, 'Extending the cap does not change its height or slope');
+assert.notEqual(down(-21.225, 1.03, 10).object.material.name, 'Projecting weathered terrace coping', 'Left cap stops after the short overlap');
+assert.notEqual(down(-21.6, .95, 10).object.material.name, 'Projecting weathered terrace coping', 'The lower tread is not covered by the extension');
+assert.notEqual(down(22.175, .95, 14).object.material.name, 'Projecting weathered terrace coping', 'Right cap termination is unchanged');
 for (const z of [-3.25, .825, 3.25]) {
   assert.ok(Math.abs(down(-22.05, z, 10).point.y - (terraceLevels.leftWing + 1.85)) < .001, 'Ramp and stair ends have concrete pillars');
 }
