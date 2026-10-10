@@ -36,8 +36,15 @@ for (const y of [7.7, 7.9]) {
     assert.ok(Math.abs(post.point.x - front.point.x) < .001, 'Both end pillars and the cap share the same exterior face line');
   }
 }
-for (const x of [-22.4, -22.6, -23]) {
+for (const x of [-22.45, -22.6, -23]) {
   assert.ok(Math.abs(down(x, -1.2, 10).point.y - terraceLevels.leftWing) < .001, 'Open terrace stays flat beyond the pillar-aligned front');
+}
+for (const [face, side, low, crest] of [[-22.35, -1, terraceLevels.leftWing, 8.61], [22.35, 1, terraceLevels.rightWing, 12.61]]) {
+  const capHit = down(face + side * .03, -1.2, crest);
+  assert.equal(capHit.object.material.name, 'Projecting weathered terrace coping', 'Both terrace caps overhang their supporting wall slightly');
+  const wallHit = new T.Raycaster(new T.Vector3(face + side * .2, low + .03, -1.2), new T.Vector3(-side, 0, 0), 0, .3).intersectObject(scene, true)[0];
+  assert.ok(wallHit && Math.abs(wallHit.point.x - face) < .001, 'The lip does not move the supporting wall');
+  assert.notEqual(down(face + side * .08, -1.2, crest).object.material.name, 'Projecting weathered terrace coping', 'The overhang remains small');
 }
 for (const z of [-2.94, 0, .515]) {
   assert.equal(down(-22.34, z, 10).object.material.name, 'Projecting weathered terrace coping', 'Cap reaches the exterior face beside both end posts');

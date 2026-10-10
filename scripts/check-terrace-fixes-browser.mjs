@@ -52,6 +52,9 @@ try {
   await view('left-ramp-outward', [-18, 10.4, 2], [-25, 7.9, -1.2]);
   await view('right-ramp-outward', [18, 14.1, 2], [25, 12.3, -1.2]);
   await view('headhouse', [12, 20, 14], [0, 13.4, -.2]);
+  await view('right-wall-floor', [8, 16, -5], [4.6, 12.36, -.5]);
+  await view('stair-wall-joint', [.5, 10, 2.5], [1.65, 8.9, -.7]);
+  await view('blue-door-pull', [0, 13.76, -.3], [.5, 13.4, 1.5]);
   await view('terrace-gates', [0, 10.09, 2.16], [-6, 9.8, 2.16]);
   await view('classroom-doors', [-1.5, 5.9, 2.16], [-7, 5.8, 2.16]);
   await view('tables', [23.5, 2.4, -1.4], [22.8, 1.6, -5.7]);
@@ -61,5 +64,6 @@ try {
   await view('mobile-left-cap-front', [-28, 8.65, -.8], [-20, 8.35, -.8]);
   await view('mobile-right-cap-front', [28, 13.1, -.8], [21, 12.5, -.8]);
   await view('mobile-parapet', [23.5, 13.8, -1], [15, 12.7, 3.25]);
+  await view('mobile-blue-door-pull', [0, 13.76, -.3], [.5, 13.4, 1.5]);
   assert.deepEqual(errors, []);
 } finally { await browser.close(); }

@@ -62,9 +62,11 @@ export function buildTerraces(parent, m) {
     const face = new T.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
     face.translate(0, 0, z - depth / 2); add(face, wall);
     // Straight high face toward the building; the capped slope falls toward the open roof.
+    const capToe = toe + outside * .06;
+    const capEndHeight = endHeight + (endHeight - crest) * .06 / span;
     const coping = new T.Shape();
-    coping.moveTo(inner, crest - thickness); coping.lineTo(toe, endHeight - thickness);
-    coping.lineTo(toe, endHeight); coping.lineTo(inner, crest); coping.closePath();
+    coping.moveTo(inner, crest - thickness); coping.lineTo(capToe, capEndHeight - thickness);
+    coping.lineTo(capToe, capEndHeight); coping.lineTo(inner, crest); coping.closePath();
     const top = new T.ExtrudeGeometry(coping, { depth, bevelEnabled: false });
     top.translate(0, 0, z - depth / 2); add(top, cap);
     if (stepOverlap) {
@@ -117,7 +119,6 @@ export function buildTerraces(parent, m) {
   for (const y of [stairs.first, stairs.second]) floor(0, y, 2.05, 7.6, 5.5, tile);
   floor(0, stairs.top, 3.075, 7.6, 7.55, tile);
   // The exit opens onto the low apron. Turn along the wall before climbing east.
-  floor(4.375, stairs.top, -.825, 1.15, 4.85);
   for (let i = 0; i < 3; i++) step(3.99 + i * .38, stairs.top + (i + 1) * (levels.rightStrip - stairs.top) / 3, 2.425, .38, 1.65, stairs.top);
   // Library partition on the FRONT middle block, with the door near the west entrance.
   for (const [left, right] of [[-3.78, -3.12], [-1.98, 3.78]]) box((left + right) / 2, 5.95, 3.55, right - left, 3.81, .16, m.wall);
@@ -196,10 +197,12 @@ export function buildTerraces(parent, m) {
   box(0, 15.06, 1.40, 1.24, 1, .18, m.wall);
   for (const x of [-4.05, 4.05]) for (const z of [-6.85, 1.32]) box(x, 14.05, z, .10, 3, .32, m.blue);
   const topCover = terraceCovers[0]; canopy(topCover.x, topCover.top - .04, topCover.z, topCover.width, topCover.depth, .018);
-  const blueDoor = new T.Group(); blueDoor.name = 'Open blue roof-access door'; blueDoor.position.set(.61, stairs.top, 1.51); blueDoor.rotation.y = Math.PI * .96; group.add(blueDoor);
+  const blueDoor = new T.Group(); blueDoor.name = 'Open blue roof-access door'; blueDoor.position.set(.61, stairs.top, 1.51); blueDoor.rotation.y = -Math.PI * .48; group.add(blueDoor);
   const panel = new T.Mesh(new T.BoxGeometry(1.18, 2.45, .06), m.blue); panel.position.set(-.59, 1.225, 0); blueDoor.add(panel);
   const handle = new T.Mesh(new T.BoxGeometry(.03, .2, .06), m.metal); handle.position.set(-1.04, 1.13, -.06); blueDoor.add(handle);
-  floor(13.47, levels.rightStrip, 0, 17.06, 6.5);
+  // Beyond the corner steps, the raised terrace meets the enclosure wall directly.
+  floor(13.02, levels.rightStrip, -.825, 17.96, 4.85);
+  floor(13.47, levels.rightStrip, 2.425, 17.06, 1.65);
   floor(26.5, levels.rightWing, 0, 9, 33);
   for (let i = 0; i < 2; i++) step(22.175 + i * .35, levels.rightStrip - (i + 1) * (levels.rightStrip - levels.rightWing) / 3, 2.0375, .35, 2.425, levels.rightWing);
   cappedEdge(23, levels.rightWing, levels.rightStrip, -1.2125, 4.075, 0, .35);
@@ -211,7 +214,7 @@ export function buildTerraces(parent, m) {
   emptyBase.rotateX(-Math.PI / 2); emptyBase.translate(18.5, levels.rightStrip, -1.35); add(emptyBase, wall);
   tank(27.5, 12.11, -9.8, .8, 1.65, black);
   const fallen = new T.Mesh(new T.CylinderGeometry(.83, .83, 1.5, 32), black); fallen.name = 'Disused tank on its side'; fallen.rotation.z = Math.PI / 2; fallen.position.set(29.2, 12.95, 11.3); group.add(fallen);
-  for (const z of [-2.9, -2.75, -2.6]) tube([[4.4, 12.24, z], [5, levels.rightStrip + .13, z], [21.5, levels.rightStrip + .13, z], [21.85, 12.70, z], [22.1, 12.64, z], [23.25, 12.24, z], [23.25, 12.24, -15.9], [30, 12.24, -15.9]], .028, white);
+  for (const z of [-2.9, -2.75, -2.6]) tube([[4.08, levels.rightStrip + .13, z], [5, levels.rightStrip + .13, z], [21.5, levels.rightStrip + .13, z], [21.85, 12.70, z], [22.1, 12.64, z], [23.25, 12.24, z], [23.25, 12.24, -15.9], [30, 12.24, -15.9]], .028, white);
   tube([[23.6, 12.18, -10], [27, 12.18, -3], [25, 12.18, 4], [29, 12.18, 8], [27, 12.18, 12]], .034, m.blue);
   const water = new T.MeshPhysicalMaterial({ color: '#53635c', transparent: true, opacity: .32, roughness: .14, metalness: .22, depthWrite: false });
   for (const [x, z, rx, rz] of [[27, -6, 2.7, 4], [26, 8, 2.4, 3.8], [-29, 6, 2.8, 3.1]]) {

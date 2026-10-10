@@ -27,7 +27,7 @@ export function buildStairways(parent, m) {
   function parapet(x, start, end, bottom, top, solid = false) {
     const shape = new T.Shape(); shape.moveTo(start, bottom - .14); shape.lineTo(start, bottom + .93);
     shape.lineTo(end, top + .93); shape.lineTo(end, solid ? bottom - .14 : top - .14); shape.closePath();
-    const g = new T.ExtrudeGeometry(shape, { depth: .16, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(x + .08, 0, 0); add(g, m.wall);
+    const g = new T.ExtrudeGeometry(shape, { depth: .24, bevelEnabled: false }); g.rotateY(-Math.PI / 2); g.translate(x + .12, 0, 0); add(g, m.wall);
   }
   stairFlights.forEach((f, level) => {
     const material = level === 2 ? m.roof : m.tread;
@@ -41,7 +41,7 @@ export function buildStairways(parent, m) {
     for (const side of [-1, 1]) parapet(side * 1.53, stairs.rear, stairs.returnEnd, f.half, f.top);
   });
   // The twin flights stop here; only the gate-side flight continues upward.
-  box(2.67, stairs.second + .48, -.72, 2.06, .96, .16, m.wall);
+  box(2.60, stairs.second + .48, -.72, 2.38, .96, .16, m.wall);
   // Recess gates have a real under-landing cavity extending to both outer walls.
   const gates = new T.Group(); gates.name = 'Closed under-stair corner gates'; group.add(gates);
   const gatePaint = new T.MeshStandardMaterial({ name: 'Blue painted recess ironwork', color: '#426d91', metalness: .38, roughness: .58 });

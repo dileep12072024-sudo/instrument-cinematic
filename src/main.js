@@ -261,7 +261,10 @@ function updateLighting(h) {
   if (scene.background?.isColor) scene.background.copy(scene.fog.color);
   entranceLight.intensity = evening * 40;
   warm.opacity = evening * .6; warm.emissiveIntensity = evening * 1.4;
-  if (architecture) for (const material of [architecture.materials.glass, architecture.materials.rearGlass, architecture.materials.entranceReflectiveGlass]) material.envMapIntensity = THREE.MathUtils.lerp(1.4, .22, evening);
+  if (architecture) {
+    for (const material of [architecture.materials.glass, architecture.materials.rearGlass]) material.envMapIntensity = THREE.MathUtils.lerp(1.4, .22, evening);
+    architecture.materials.entranceReflectiveGlass.envMapIntensity = THREE.MathUtils.lerp(2, .65, evening);
+  }
   if (renderer) {
     renderer.toneMappingExposure = THREE.MathUtils.lerp(.94, .8, evening);
     if (performance.now() - lastShadowUpdate > 200 || !ready) { renderer.shadowMap.needsUpdate = true; lastShadowUpdate = performance.now(); }

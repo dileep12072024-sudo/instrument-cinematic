@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import { buildArchitecture } from '../src/architecture.js';
-import { terraceCovers, terraceLevels } from '../src/stair-layout.js';
+import { stairs, stairFlights, terraceCovers, terraceLevels } from '../src/stair-layout.js';
 
 // Only texture painting is stubbed; rays inspect the complete production geometry.
 const context = new Proxy({}, { get: (_, key) => key.startsWith('create') ? () => ({ addColorStop() {} }) : () => {} });
@@ -35,6 +35,23 @@ for (const [x, z, expected] of [[-22.1, 2.8, terraceLevels.leftWing], [-21.6, 3.
   assert.ok(Math.abs(hit.point.y - expected) < .001, 'Old facade pier/lintel must not protrude beside the terrace steps');
 }
 assert.ok(hits([13, terraceLevels.rightStrip + .04, 0], [0, 0, 1], 3.4).length, 'Right parapet must meet the strip without a daylight gap');
+for (const x of [4.15, 4.5, 4.9]) for (const z of [-2, 0, 1]) {
+  const hit = terraceHits([x, 12.7, z], [0, -1, 0], 1)[0];
+  assert.ok(hit && Math.abs(hit.point.y - terraceLevels.rightStrip) < .001, 'Right terrace meets enclosure without a lowered strip');
+}
+for (const [x, expected] of [[3.9, 12.11 + .25 / 3], [4.35, 12.11 + .5 / 3], [4.8, 12.36]]) {
+  assert.ok(Math.abs(terraceHits([x, 12.8, 2.425], [0, -1, 0], 1)[0].point.y - expected) < .001, 'Corner steps keep their original rise');
+}
+const stairGroup = scene.getObjectByName('Connected stairways: ground to roof');
+const stairHits = (eye, direction, far) => new T.Raycaster(new T.Vector3(...eye), new T.Vector3(...direction), 0, far).intersectObject(stairGroup, true);
+for (const x of [1.6, 1.63, 1.645, 3.76]) {
+  assert.ok(stairHits([x, stairs.second + .4, 0], [0, 0, -1], 1).length, 'Stopped-flight wall joins its adjoining walls without a slit');
+}
+for (const f of stairFlights) for (const side of f.sides) {
+  const z = -2, start = f.start ?? stairs.front;
+  const y = f.base + (f.half - f.base) * (z - start) / (stairs.rear - start);
+  assert.ok(stairHits([side * 1.645, y + 1.2, z], [0, -1, 0], .5).length, 'Every side-flight parapet closes against the treads');
+}
 for (const side of [-1, 1]) {
   const hit = hits([side * 5, 13.2, 0], [-side, 0, 0], 2)[0];
   assert.ok(Math.abs(hit.point.x - side * 4.04) < .025, 'No legacy parapet projects from the headhouse side');
@@ -50,6 +67,8 @@ for (const leaf of scene.getObjectsByProperty('name', 'Open classroom entrance l
 }
 const blue = scene.getObjectByName('Open blue roof-access door');
 assert.ok(blue.position.x > .5 && new T.Box3().setFromObject(blue).min.x > .5, 'Blue door is right-hinged viewed from the terrace');
+const blueBounds = new T.Box3().setFromObject(blue);
+assert.ok(blueBounds.min.z < blue.position.z - 1 && blueBounds.max.z < blue.position.z + .04, 'Blue door pulls toward the stair landing, not out onto the terrace');
 const tables = scene.getObjectsByProperty('name', 'Strong Room passage table');
 assert.equal(tables.length, 3);
 for (const table of tables) {
