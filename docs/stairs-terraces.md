@@ -41,7 +41,8 @@ The opening sequences were additionally inspected at one-second intervals for `1
 ## October 9 Evening Corrections
 
 - The terrace grille and classroom-wing doors are pushed from the stair hall toward the left wing. The roof-access blue door is hinged on the right when viewed from the terrace.
-- Both terrace junctions have solid raised plinths, a slightly battered plaster face and a projecting cap with a shallow outward fall. The right rise remains .25, half the left .50. Stairs extend to the parapet without a narrow coping stub alongside them.
+- Both terrace junctions have a straight raised face toward the building and a capped slope descending toward the open roof, following the October 10 clarification. The right raised face remains .25, half the left .50. The right profile begins at the original x=22 roof junction. Stairs extend to the parapet without a narrow coping stub alongside them.
+- The left terrace has square concrete posts above the parapet and at the ramp/stair extremities. Placement follows the 110452 video frames at 106s, 141s and 194s and the supplied 105519 photograph; dimensions remain proportional estimates.
 - Parapet bases follow the actual roof finishes; the right corridor no longer has an open slit underneath its parapet. Legacy parapets inside the headhouse walls are omitted, and the headhouse walls reach the apron.
 - Structural roof slabs sit below their finish layers rather than leaving nearly coplanar exposed surfaces. Corrugated roofing has a less reflective finish.
 - Passage tables stop before the corridor-junction pier, with clearance from the window wall and between tables.

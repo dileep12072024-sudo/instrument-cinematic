@@ -46,6 +46,8 @@ try {
   await view('utility-rear', [-13, 13, -14], [-5, 10, -1]);
   await view('left-cap', [-27, 9.2, 4.5], [-18, 8.1, 0]);
   await view('right-cap', [27, 13.7, 4.5], [18, 12.4, 0]);
+  await view('left-ramp-outward', [-18, 10.4, 2], [-25, 7.9, -1.2]);
+  await view('right-ramp-outward', [18, 14.1, 2], [25, 12.3, -1.2]);
   await view('headhouse', [12, 20, 14], [0, 13.4, -.2]);
   await view('terrace-gates', [0, 10.09, 2.16], [-6, 9.8, 2.16]);
   await view('classroom-doors', [-1.5, 5.9, 2.16], [-7, 5.8, 2.16]);
