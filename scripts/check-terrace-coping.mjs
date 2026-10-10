@@ -11,10 +11,11 @@ const down = (x, z, high) => new T.Raycaster(new T.Vector3(x, high + 1, z), new 
 for (const [edge, low, high] of [[-22.05, terraceLevels.leftWing, terraceLevels.leftStrip], [23, terraceLevels.rightWing, terraceLevels.rightStrip]]) {
   const side = Math.sign(edge), rise = high - low;
   const inner = edge - side, crest = high + rise;
+  const slope = (crest - low) / 1.12 * (edge < 0 ? .35 / 1.30 : 1);
   for (const distance of [.05, .15, .3]) {
     const surface = down(inner + side * distance, -1.2, crest);
     assert.equal(surface.object.material.name, 'Projecting weathered terrace coping');
-    assert.ok(Math.abs(surface.point.y - (crest - (crest - low) * distance / 1.12)) < .001, 'Capped ramp descends toward the open terrace');
+    assert.ok(Math.abs(surface.point.y - (crest - slope * distance)) < .001, 'Capped ramp descends toward the open terrace');
   }
   for (const y of [high + .03, crest - .03]) {
     const ray = new T.Raycaster(new T.Vector3(inner - side * .2, y, -1.2), new T.Vector3(side, 0, 0), 0, .3);
@@ -29,10 +30,17 @@ assert.ok(Math.abs((terraceLevels.rightStrip - terraceLevels.rightWing) * 2 - (t
 for (const y of [7.7, 7.9]) {
   const front = new T.Raycaster(new T.Vector3(-23, y, -1.2), new T.Vector3(1, 0, 0)).intersectObject(scene, true)[0];
   assert.equal(front.object.material.name, 'Weathered terrace plaster');
-  assert.ok(Math.abs(front.point.x + 21.40) < .001, 'Left open-terrace face is vertical and cut farther inward toward the building');
+  assert.ok(Math.abs(front.point.x + 22.35) < .001, 'Left cap front aligns with the exterior AC-facing pillar faces');
+  for (const z of [-3.25, .825]) {
+    const post = new T.Raycaster(new T.Vector3(-23, y, z), new T.Vector3(1, 0, 0)).intersectObject(scene, true)[0];
+    assert.ok(Math.abs(post.point.x - front.point.x) < .001, 'Both end pillars and the cap share the same exterior face line');
+  }
 }
-for (const x of [-22, -21.7, -21.5]) {
-  assert.ok(Math.abs(down(x, -1.2, 10).point.y - terraceLevels.leftWing) < .001, 'Removed slope leaves a continuous flat terrace, not a gap');
+for (const x of [-22.4, -22.6, -23]) {
+  assert.ok(Math.abs(down(x, -1.2, 10).point.y - terraceLevels.leftWing) < .001, 'Open terrace stays flat beyond the pillar-aligned front');
+}
+for (const z of [-2.94, 0, .515]) {
+  assert.equal(down(-22.34, z, 10).object.material.name, 'Projecting weathered terrace coping', 'Cap reaches the exterior face beside both end posts');
 }
 for (const y of [12.16, 12.24]) {
   const front = new T.Raycaster(new T.Vector3(24, y, -1.2), new T.Vector3(-1, 0, 0)).intersectObject(scene, true)[0];

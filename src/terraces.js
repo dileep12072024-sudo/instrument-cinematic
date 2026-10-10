@@ -50,9 +50,9 @@ export function buildTerraces(parent, m) {
       g.computeVertexNormals();
     }
   }
-  function cappedEdge(x, low, high, z, depth, stepOverlap = 0, cutDistance = 1.12) {
+  function cappedEdge(x, low, high, z, depth, stepOverlap = 0, cutDistance = 1.12, span = cutDistance) {
     const outside = Math.sign(x), crest = high + (high - low);
-    const inner = x - outside, toe = inner + outside * cutDistance, thickness = .08;
+    const inner = x - outside, toe = inner + outside * span, thickness = .08;
     const endHeight = crest + (low - crest) * cutDistance / 1.12;
     const shape = new T.Shape();
     shape.moveTo(inner, low - thickness);
@@ -69,10 +69,10 @@ export function buildTerraces(parent, m) {
     top.translate(0, 0, z - depth / 2); add(top, cap);
     if (stepOverlap) {
       // Only the cap over the first tread projects into the stair opening.
-      const end = inner + outside * .35, endHeight = crest + (low - crest) * .35 / 1.12;
+      const end = inner + outside * .35, lipHeight = crest + (endHeight - crest) * .35 / span;
       const lip = new T.Shape();
-      lip.moveTo(inner, crest - thickness); lip.lineTo(end, endHeight - thickness);
-      lip.lineTo(end, endHeight); lip.lineTo(inner, crest); lip.closePath();
+      lip.moveTo(inner, crest - thickness); lip.lineTo(end, lipHeight - thickness);
+      lip.lineTo(end, lipHeight); lip.lineTo(inner, crest); lip.closePath();
       const extension = new T.ExtrudeGeometry(lip, { depth: stepOverlap, bevelEnabled: false });
       extension.translate(0, 0, z + depth / 2); add(extension, cap);
     }
@@ -132,11 +132,15 @@ export function buildTerraces(parent, m) {
   floor(-28, levels.leftWing, 0, 12, 30);
   for (let i = 0; i < 2; i++) step(-21.225 - i * .35, levels.leftStrip - (i + 1) * .5 / 3, 2.0375, .35, 2.425, levels.leftWing);
   floor(-21.875, levels.leftWing, 2.0375, .25, 2.425);
-  // Truncate behind the pillars: a straight plaster face supports the remaining cap.
-  floor(-21.7, levels.leftWing, -1.2125, .60, 4.075);
-  cappedEdge(-22.05, levels.leftWing, levels.leftStrip, -1.2125, 4.075, .18, .35);
+  // Align the cap front with the AC-facing pillar faces, without overlapping the posts.
+  const leftPostX = -22.05, leftPostWidth = .60;
+  const outerSpan = 1 + leftPostWidth / 2, innerSpan = 1 - leftPostWidth / 2;
+  cappedEdge(leftPostX, levels.leftWing, levels.leftStrip, -1.2125, 4.075 - leftPostWidth, 0, .35, outerSpan);
+  for (const [z, overlap] of [[-3.10, 0], [.675, .18]]) {
+    cappedEdge(leftPostX, levels.leftWing, levels.leftStrip, z, leftPostWidth / 2, overlap, .35 * innerSpan / outerSpan, innerSpan);
+  }
   // Square concrete posts frame the ramp ends and the adjacent stair opening (110452).
-  for (const z of [-3.25, .825, 3.25]) box(-22.05, levels.leftWing + .925, z, .60, 1.85, .60);
+  for (const z of [-3.25, .825, 3.25]) box(leftPostX, levels.leftWing + .925, z, leftPostWidth, 1.85, leftPostWidth);
   for (const x of [-7, -10, -13, -16, -19]) box(x, levels.leftStrip + .9, 3.25, .52, 1.8, .64);
   grille(-3.79, stairs.second + .025, 2.166667, 2.02, 2.55, -Math.PI / 2);
   const cover = terraceCovers[1]; canopy(cover.x, cover.top - .04, cover.z, cover.width, cover.depth);
