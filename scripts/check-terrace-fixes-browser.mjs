@@ -42,6 +42,8 @@ try {
   await page.waitForFunction(() => window.__portrait?.ready);
   await page.locator('#loader').waitFor({ state: 'hidden' });
   await page.addStyleTag({ content: '#experience > :not(#viewport){visibility:hidden!important}' });
+  assert.equal(await page.evaluate(() => !!__portrait.scene.getObjectByName('Daytime campus birds')), false);
+  await view('utility-rear', [-13, 13, -14], [-5, 10, -1]);
   await view('left-cap', [-27, 9.2, 4.5], [-18, 8.1, 0]);
   await view('right-cap', [27, 13.7, 4.5], [18, 12.4, 0]);
   await view('headhouse', [12, 20, 14], [0, 13.4, -.2]);
@@ -50,6 +52,7 @@ try {
   await view('tables', [23.5, 2.4, -1.4], [22.8, 1.6, -5.7]);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(500);
+  await view('mobile-utility', [-11, 14, -12], [-5, 10, -1]);
   await view('mobile-parapet', [23.5, 13.8, -1], [15, 12.7, 3.25]);
   assert.deepEqual(errors, []);
 } finally { await browser.close(); }

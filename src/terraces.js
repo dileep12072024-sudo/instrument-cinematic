@@ -125,22 +125,20 @@ export function buildTerraces(parent, m) {
   cappedEdge(-22.05, levels.leftWing, levels.leftStrip, -1.2125, 4.075);
   grille(-3.79, stairs.second + .025, 2.166667, 2.02, 2.55, -Math.PI / 2);
   const cover = terraceCovers[1]; canopy(cover.x, cover.top - .04, cover.z, cover.width, cover.depth);
-  for (const z of [-6.7, -.53, 3.33]) box(-6.34, 9.74, z, .06, 3.26, .06, steel);
-  // Small terrace-side utility enclosure and its aluminium door.
-  box(-5.35, 9.91, -.9, 2.5, 2.93, .16);
-  box(-5.35, 9.91, -6.7, 2.5, 2.93, .16);
-  box(-6.52, 9.91, -3.8, .16, 2.93, 5.8);
-  for (const z of [-5.7, -4.3, -2.9, -1.5]) {
+  for (const z of [-2.9, -.53, 3.0]) box(-6.34, 9.74, z, .06, 3.26, .06, steel);
+  // Keep the enclosure on the roof, with clearance from the rear parapet and stairwell.
+  box(-5.51, 9.91, -2.65, 2.18, 2.93, .16);
+  for (const x of [-6.52, -4.5]) box(x, 9.91, -.925, .16, 2.93, 3.45);
+  for (const z of [-2.2, -1.45, -.7, .05]) {
     box(-6.61, 10.94, z, .025, .18, .46, m.dark);
     for (let j = -2; j <= 2; j++) box(-6.63, 10.94, z + j * .08, .025, .18, .025, wall);
   }
-  box(-5.35, (levels.leftStrip + stairs.second) / 2, -.04, 2.5, stairs.second - levels.leftStrip, 1.86);
-  box(-6.52, 9.91, -.04, .16, 2.93, 1.7);
-  for (const x of [-6.1, -4.58]) box(x, 9.91, .80, .50, 2.93, .16);
-  box(-5.34, 11.10, .80, 1.02, .55, .16);
-  box(-5.34, 9.55, .83, .90, 2.15, .07, sheet);
-  for (const dx of [-.48, .48]) box(-5.34 + dx, 9.55, .89, .045, 2.22, .05, white);
-  box(-4.99, 9.50, .92, .035, .20, .04, steel);
+  box(-5.51, (levels.leftStrip + stairs.second) / 2, -.925, 2.18, stairs.second - levels.leftStrip, 3.61);
+  for (const x of [-6.31, -4.71]) box(x, 9.91, .80, .58, 2.93, .16);
+  box(-5.51, 11.10, .80, 1.02, .55, .16);
+  box(-5.51, 9.55, .83, .90, 2.15, .07, sheet);
+  for (const dx of [-.48, .48]) box(-5.51 + dx, 9.55, .89, .045, 2.22, .05, white);
+  box(-5.16, 9.50, .92, .035, .20, .04, steel);
   for (let i = 0; i < 33; i++) {
     const g = new T.BoxGeometry(.22, .095, .11); g.rotateY((random() - .5) * .18); g.translate(-7.5 + (i % 5) * .23, levels.leftStrip + .05 + Math.floor(i / 5) * .10, 2.8 + (i % 2) * .13); add(g, m.brick);
   }

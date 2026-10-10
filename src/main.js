@@ -9,7 +9,6 @@ import { createAmbience } from './ambience.js';
 import { createRain, rainfall, windVector, isSheltered } from './weather-effects.js';
 import { createEntranceWalk } from './entrance-walk.js';
 import { createPanoramaLook } from './panorama-look.js';
-import { createBirds, birdDaylight } from './birds.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
 import './style.css';
 
@@ -99,7 +98,6 @@ try {
   $('#viewport').style.background = 'url(/media/entrance.webp) center/cover';
 }
 const scene = new THREE.Scene();
-const birds = createBirds(scene);
 scene.background = new THREE.Color('#b6c5c9'); scene.fog = new THREE.Fog('#b6c5c9', 80, 300);
 const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 500);
 let controls, architecture, landscape, entranceWalk, panoramaLook;
@@ -249,7 +247,7 @@ async function loadWeather() {
 
 function updateLighting(h) {
   sunlight = solarState(liveClock ? new Date() : campusDate(h), LOCATION);
-  sound.setDaylight(birdDaylight(sunlight.altitude));
+  sound.setDaylight(THREE.MathUtils.smoothstep(sunlight.altitude, 0, 6));
   const evening = sunlight.night;
   const golden = 1 - THREE.MathUtils.smoothstep(sunlight.altitude, 0, 25);
   const wet = weatherState.rainFactor;
@@ -477,7 +475,6 @@ function animate(now) {
   landscape.windDirection.value.copy(windVector(1, weatherState.windDirection)).normalize();
   if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
   rain.update(dt, weatherState, reduced);
-  birds.update(dt, sunlight.altitude, reduced);
   sound.setWeather(weatherState, isSheltered(camera.position.x, camera.position.y, camera.position.z), windSpeed);
   sky.update(now / 1000, sunlight.night, weatherState, reduced);
   if (needsRender || !reduced) {

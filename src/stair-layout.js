@@ -11,5 +11,5 @@ export const stairFlights = [
 export const terraceLevels = { leftStrip: 8.11, leftWing: 7.61, rightStrip: 12.36, rightWing: 12.11 };
 export const terraceCovers = [
   { x: 0, z: -2.8, width: 8.4, depth: 8.6, top: 15.64 },
-  { x: -5.1, z: -1.7, width: 2.6, depth: 10.3, top: 11.44 },
+  { x: -5.1, z: 0, width: 2.6, depth: 6.1, top: 11.44 },
 ];

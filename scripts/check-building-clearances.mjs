@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import { buildArchitecture } from '../src/architecture.js';
-import { terraceLevels } from '../src/stair-layout.js';
+import { terraceCovers, terraceLevels } from '../src/stair-layout.js';
 
 // Only texture painting is stubbed; rays inspect the complete production geometry.
 const context = new Proxy({}, { get: (_, key) => key.startsWith('create') ? () => ({ addColorStop() {} }) : () => {} });
@@ -12,6 +12,15 @@ globalThis.document = {
 const scene = new T.Scene();
 const { group } = buildArchitecture(scene); scene.updateMatrixWorld(true);
 const hits = (eye, direction, far = 10) => new T.Raycaster(new T.Vector3(...eye), new T.Vector3(...direction), 0, far).intersectObject(group, true);
+const terrace = scene.getObjectByName('Reference terraces and roof stair enclosure');
+const terraceHits = (eye, direction, far) => new T.Raycaster(new T.Vector3(...eye), new T.Vector3(...direction), 0, far).intersectObject(terrace, true);
+assert.equal(terraceHits([-5.5, 10, -3.25], [0, 0, -1], 4).length, 0, 'Utility enclosure must not project beyond the rear roof edge');
+assert.equal(terraceHits([-4.28, 11.3, -1], [0, -1, 0], 2.7).length, 0, 'Utility enclosure keeps a gap from the stairwell wall');
+const rear = terraceHits([-5.5, 10, -3.25], [0, 0, 1], 1)[0];
+assert.ok(rear && rear.point.z > -2.8, 'Utility rear wall is inset from the parapet');
+assert.ok(terraceHits([-5.5, 8.6, -2.6], [0, -1, 0], .5).length, 'Rear enclosure is supported on its terrace plinth');
+const cover = terraceCovers[1];
+assert.ok(cover.z - cover.depth / 2 > -3.25 && cover.z + cover.depth / 2 < 3.25, 'Utility canopy stays within the roof depth');
 for (const [x, z, expected] of [[-22.1, 2.97, terraceLevels.leftWing], [-21.6, 3.02, terraceLevels.leftWing + .5 / 3], [-22, 1, terraceLevels.leftWing], [-21.7, 1, terraceLevels.leftWing + .5 / 3]]) {
   const hit = hits([x, 8.3, z], [0, -1, 0], 1).find(h => h.object.material.name !== 'Terrace tanks and PVC pipework');
   assert.ok(Math.abs(hit.point.y - expected) < .001, 'Old facade pier/lintel must not protrude beside the terrace steps');

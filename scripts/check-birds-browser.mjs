@@ -34,17 +34,11 @@ try {
     await page.locator('#hour').evaluate((e, value) => { e.value = value; e.dispatchEvent(new Event('input')); }, hour);
     return page.evaluate(() => {
       __advance(); const { scene, sound } = __portrait;
-      return { visible: scene.getObjectByName('Daytime campus birds').visible, level: sound.birdLevel };
+      return { flockPresent: !!scene.getObjectByName('Daytime campus birds'), level: sound.birdLevel };
     });
   };
-  assert.deepEqual(await check(23), { visible: false, level: 0 });
-  const day = await check(11); assert.ok(day.visible && day.level > 0);
-  const moving = await page.evaluate(() => {
-    const flock = __portrait.scene.getObjectByName('Daytime campus birds');
-    const before = flock.children[0].position.clone(); __advance();
-    return before.distanceTo(flock.children[0].position);
-  });
-  assert.ok(moving > .1);
+  assert.deepEqual(await check(23), { flockPresent: false, level: 0 });
+  const day = await check(11); assert.ok(!day.flockPresent && day.level > 0);
   for (const [name, width, height] of [['desktop', 1280, 800], ['mobile', 390, 844]]) {
     await page.setViewportSize({ width, height });
     const pixels = await page.evaluate(() => {
@@ -63,17 +57,5 @@ try {
   await (await savedPhoto).saveAs('artifacts/birds/export.png');
   const stats = await sharp('artifacts/birds/export.png').stats();
   assert.ok(stats.channels[0].stdev > 10, 'Photo export must still contain the rendered scene');
-  await page.evaluate(async () => {
-    const T = await import('/node_modules/three/build/three.module.js');
-    const { scene, renderer, camera } = __portrait;
-    const flock = scene.getObjectByName('Daytime campus birds');
-    const detail = new T.Scene(); detail.background = new T.Color('#b9d4df');
-    detail.add(new T.HemisphereLight(0xffffff, 0x56604d, 2));
-    const sun = new T.DirectionalLight(0xffffff, 3); sun.position.set(2, 5, 3); detail.add(sun);
-    flock.children.slice(0, 3).forEach((b, i) => { const copy = b.clone(); copy.position.set((i - 1) * 1.5, 0, 0); copy.rotation.set(0, -.4, 0); detail.add(copy); });
-    camera.position.set(0, 2.5, 3.5); camera.lookAt(0, 0, 0); camera.fov = 52; camera.updateProjectionMatrix();
-    renderer.render(detail, camera);
-  });
-  await page.locator('#viewport canvas').screenshot({ path: 'artifacts/birds/species.png' });
-  console.log('PASS live solar audio/visibility, animated birds, nonblank desktop/mobile canvas');
+  console.log('PASS no flying birds, silent nighttime chirps, nonblank desktop/mobile canvas and export');
 } finally { await browser.close(); }
