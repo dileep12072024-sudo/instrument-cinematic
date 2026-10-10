@@ -33,10 +33,22 @@ The opening sequences were additionally inspected at one-second intervals for `1
 
 - Panorama now exits the guided route at the current camera position; the walkthrough no longer overwrites free movement. The canvas receives keyboard focus. WASD and Q/E provide translation as well as wheel and right-drag controls.
 - Upper side flights start at the preceding central return's endpoint, with the front landing connecting the turn. The ground twin flights are unchanged.
-- Recess gates use blue painted ironwork, continuous masonry reveals, fitted frames and hinges. The terrace leaves fold inward against the inner wall instead of projecting across the stair approach.
+- Recess gates use blue painted ironwork, continuous masonry reveals, fitted frames and hinges. The later clarification below supersedes the initial terrace-gate swing interpretation.
 - All nine rear windows have glazed casement shutters, handles and fixed blue grilles. The first row retains clearance above the canopy.
 - The terrace-side enclosure and its canopy extend farther across the classroom-facing elevation. The upper headhouse is deeper, with an outward-open blue door onto a level apron. The east opening's lintel is below the apron, removing the exposed wall across the route.
 - Ceiling fans have thin curved blades, rounded motor housings and ceiling cups rather than rectangular blades.
+
+## October 9 Evening Corrections
+
+- The terrace grille and classroom-wing doors are pushed from the stair hall toward the left wing. The roof-access blue door is hinged on the right when viewed from the terrace.
+- Both terrace junctions have solid raised plinths, a slightly battered plaster face and a projecting cap with a shallow outward fall. The right rise remains .25, half the left .50. Stairs extend to the parapet without a narrow coping stub alongside them.
+- Parapet bases follow the actual roof finishes; the right corridor no longer has an open slit underneath its parapet. Legacy parapets inside the headhouse walls are omitted, and the headhouse walls reach the apron.
+- Structural roof slabs sit below their finish layers rather than leaving nearly coplanar exposed surfaces. Corrugated roofing has a less reflective finish.
+- Passage tables stop before the corridor-junction pier, with clearance from the window wall and between tables.
+- Free panorama and guided look use gentle frame-rate-independent easing. Regression tests cover pointer interruption, fixed-eye/no-roll behavior, monotonic settling and matching results at 30/60/120 Hz. Software-rendered browser tests verify dragging, mode switching and mobile layout, but do not establish frame rates on the user's hardware.
+- Daytime parrots, cuckoos and crows follow independent flight paths above the roof. Visibility and ambient calls follow solar daylight; birds are hidden with reduced motion, and calls fade out at night.
+
+Run `npm run test:interaction`, `npm run test:geometry`, and `node scripts/check-birds.mjs` for the focused regressions. Browser checks are `scripts/check-panorama-browser.mjs`, `scripts/check-birds-browser.mjs` and `scripts/check-terrace-fixes-browser.mjs` against the preview on port 5190.
 
 ## Modeling Boundaries
 

@@ -22,10 +22,11 @@ export function buildTerraces(parent, m) {
   }
   const texture = new T.CanvasTexture(c); texture.colorSpace = T.SRGBColorSpace; texture.wrapS = texture.wrapT = T.RepeatWrapping; texture.anisotropy = 16;
   const roof = new T.MeshStandardMaterial({ name: 'Mottled terrace concrete', color: '#c7c5b6', map: texture, bumpMap: texture, bumpScale: .012, roughness: .92 });
+  const cap = roof.clone(); cap.name = 'Projecting weathered terrace coping'; cap.color.set('#777a70');
   const wall = m.wall.clone(); wall.name = 'Weathered terrace plaster'; wall.color.set('#f0efdf'); wall.bumpScale = .008;
   const steel = new T.MeshStandardMaterial({ color: '#373d38', metalness: .55, roughness: .62 });
-  const sheet = new T.MeshStandardMaterial({ color: '#c9d4d0', metalness: .3, roughness: .61, side: T.DoubleSide });
-  const white = new T.MeshStandardMaterial({ color: '#e3e4dc', roughness: .64 });
+  const sheet = new T.MeshStandardMaterial({ color: '#c9d4d0', metalness: .12, roughness: .82, side: T.DoubleSide });
+  const white = new T.MeshStandardMaterial({ name: 'Terrace tanks and PVC pipework', color: '#e3e4dc', roughness: .64 });
   const black = new T.MeshStandardMaterial({ color: '#252b2b', roughness: .74 });
   const tile = new T.MeshStandardMaterial({ color: '#e1e1d8', roughness: .3, metalness: .03 });
   function floor(x, y, z, w, d, material = roof) {
@@ -50,13 +51,26 @@ export function buildTerraces(parent, m) {
     }
   }
   function cappedEdge(x, low, high, z, depth) {
-    box(x, (low + high) / 2 - .045, z, .24, high - low - .09, depth, wall);
-    box(x, high - .045, z, .42, .09, depth, roof);
+    const outside = Math.sign(x), rise = high - low;
+    const inner = x - outside;
+    const shape = new T.Shape();
+    shape.moveTo(x + outside * rise * .16, low);
+    shape.lineTo(inner, low);
+    shape.lineTo(inner, high - .12);
+    shape.lineTo(x, high - .12); shape.closePath();
+    const face = new T.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+    face.translate(0, 0, z - depth / 2); add(face, wall);
+    // Solid capped plinth: a shallow outward fall, not a freestanding beam or ramp.
+    const coping = new T.Shape();
+    coping.moveTo(inner, high - .12); coping.lineTo(x + outside * .12, high - .12);
+    coping.lineTo(x + outside * .12, high - .025); coping.lineTo(inner, high); coping.closePath();
+    const top = new T.ExtrudeGeometry(coping, { depth, bevelEnabled: false });
+    top.translate(0, 0, z - depth / 2); add(top, cap);
   }
   function grille(x, y, z, width, height, rotation = 0, open = true) {
     const gate = new T.Group(); gate.name = 'Terrace double grille gate'; gate.position.set(x, y, z); gate.rotation.y = rotation; group.add(gate);
     for (const side of [-1, 1]) {
-      const leaf = new T.Group(); leaf.name = 'Inward-folded grille leaf'; leaf.position.x = side * width / 2; leaf.rotation.y = open ? -side * Math.PI * .92 : 0; gate.add(leaf);
+      const leaf = new T.Group(); leaf.name = 'Terrace-facing open grille leaf'; leaf.position.x = side * width / 2; leaf.rotation.y = open ? side * Math.PI * .47 : 0; gate.add(leaf);
       const part = (x, y, w, h) => { const mesh = new T.Mesh(new T.BoxGeometry(w, h, .028), steel); mesh.position.set(x, y, 0); leaf.add(mesh); };
       const centre = -side * width / 4;
       for (const dx of [0, -side * width / 2]) part(dx, height / 2, .036, height);
@@ -106,12 +120,9 @@ export function buildTerraces(parent, m) {
   floor(-3.93, stairs.second, 2.166667, .28, 1.8, tile);
   for (let i = 0; i < 3; i++) step(-4.225 - i * .33, stairs.second - i * (stairs.second - levels.leftStrip) / 3, 2.166667, .33, 1.8, levels.leftStrip);
   floor(-28, levels.leftWing, 0, 12, 30);
-  for (let i = 0; i < 2; i++) step(-21.225 - i * .35, levels.leftStrip - (i + 1) * .5 / 3, 1.9, .35, 2.15, levels.leftWing);
-  floor(-21.875, levels.leftWing, 1.9, .25, 2.15);
-  floor(-21.55, levels.leftStrip, -1.2125, 1, 4.075);
-  floor(-21.55, levels.leftStrip, 3.1125, 1, .275);
+  for (let i = 0; i < 2; i++) step(-21.225 - i * .35, levels.leftStrip - (i + 1) * .5 / 3, 2.0375, .35, 2.425, levels.leftWing);
+  floor(-21.875, levels.leftWing, 2.0375, .25, 2.425);
   cappedEdge(-22.05, levels.leftWing, levels.leftStrip, -1.2125, 4.075);
-  cappedEdge(-22.05, levels.leftWing, levels.leftStrip, 3.1125, .275);
   grille(-3.79, stairs.second + .025, 2.166667, 2.02, 2.55, -Math.PI / 2);
   const cover = terraceCovers[1]; canopy(cover.x, cover.top - .04, cover.z, cover.width, cover.depth);
   for (const z of [-6.7, -.53, 3.33]) box(-6.34, 9.74, z, .06, 3.26, .06, steel);
@@ -163,18 +174,19 @@ export function buildTerraces(parent, m) {
   for (let x = 4.6; x < 22; x += .74) tube([[x, 9.49, 3.22], [x, 9.72, 3.22]], .019, m.metal);
 
   // Single upper stair and three-window landing sit under the metal-sheet headhouse.
-  for (const side of [-1, 1]) box(side * 3.96, 14.07, -2.8, .16, 2.94, 8.2, m.wall);
+  for (const side of [-1, 1]) box(side * 3.96, (stairs.top + 15.54) / 2, -2.8, .16, 15.54 - stairs.top, 8.2, m.wall);
   for (const x of [-2.31, 2.31]) box(x, 13.835, 1.40, 3.38, 3.45, .18, m.wall);
   box(0, 15.06, 1.40, 1.24, 1, .18, m.wall);
   for (const x of [-4.05, 4.05]) for (const z of [-6.85, 1.32]) box(x, 14.05, z, .10, 3, .32, m.blue);
   const topCover = terraceCovers[0]; canopy(topCover.x, topCover.top - .04, topCover.z, topCover.width, topCover.depth, .018);
-  const blueDoor = new T.Group(); blueDoor.name = 'Open blue roof-access door'; blueDoor.position.set(-.61, stairs.top, 1.51); blueDoor.rotation.y = -Math.PI * .96; group.add(blueDoor);
-  const panel = new T.Mesh(new T.BoxGeometry(1.18, 2.45, .06), m.blue); panel.position.set(.59, 1.225, 0); blueDoor.add(panel);
-  const handle = new T.Mesh(new T.BoxGeometry(.03, .2, .06), m.metal); handle.position.set(1.04, 1.13, -.06); blueDoor.add(handle);
-  floor(13.47, levels.rightStrip, 0, 17.06, 6.5); floor(26.5, levels.rightWing, 0, 9, 33);
-  for (let i = 0; i < 2; i++) step(22.175 + i * .35, levels.rightStrip - (i + 1) * (levels.rightStrip - levels.rightWing) / 3, 1.9, .35, 2.15, levels.rightWing);
+  const blueDoor = new T.Group(); blueDoor.name = 'Open blue roof-access door'; blueDoor.position.set(.61, stairs.top, 1.51); blueDoor.rotation.y = Math.PI * .96; group.add(blueDoor);
+  const panel = new T.Mesh(new T.BoxGeometry(1.18, 2.45, .06), m.blue); panel.position.set(-.59, 1.225, 0); blueDoor.add(panel);
+  const handle = new T.Mesh(new T.BoxGeometry(.03, .2, .06), m.metal); handle.position.set(-1.04, 1.13, -.06); blueDoor.add(handle);
+  floor(12.97, levels.rightStrip, 0, 16.06, 6.5);
+  floor(21.5, levels.rightStrip, 2.0375, 1, 2.425);
+  floor(26.5, levels.rightWing, 0, 9, 33);
+  for (let i = 0; i < 2; i++) step(22.175 + i * .35, levels.rightStrip - (i + 1) * (levels.rightStrip - levels.rightWing) / 3, 2.0375, .35, 2.425, levels.rightWing);
   cappedEdge(22, levels.rightWing, levels.rightStrip, -1.2125, 4.075);
-  cappedEdge(22, levels.rightWing, levels.rightStrip, 3.1125, .275);
   tank(11, levels.rightStrip, -1.35, .82, 2.15, white);
   tank(15, levels.rightStrip, -1.35, .82, 2.15, white);
   const ring = new T.Shape(); ring.absarc(0, 0, 1.1, 0, Math.PI * 2, false);

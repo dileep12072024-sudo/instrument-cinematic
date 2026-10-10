@@ -78,7 +78,7 @@ try {
       connectedFlights: stairways.userData.flights.slice(1).every(f => f.start === -.7),
       heights: { gateSide: height(-2.67, -2, 10.5), stoppedSide: height(2.67, -2, 10.5), groundApproach: height(2.67, .9, 1), leftStrip: height(-15, 1), leftWing: height(-28, 1), leftStepEnd: height(-22, 1.9), rightStrip: height(12, 1), rightWing: height(25, 1), roofDoor: height(0, 1.65, 13), roofApron: height(0, 3, 13), roofExit: height(5.1, 2.425, 13), cornerStep: height(4.35, 2.425, 13) },
       thirdWindow: windowHit?.object.material.transparent,
-      inwardGate: gate.children.every(leaf => new T.Box3().setFromObject(leaf).min.x >= gate.position.x - .04 && new T.Box3().setFromObject(leaf).max.x > gate.position.x + .15),
+      terraceFacingGate: gate.children.every(leaf => new T.Box3().setFromObject(leaf).max.x <= gate.position.x + .04 && new T.Box3().setFromObject(leaf).min.x < gate.position.x - .15),
     };
   });
   await writeFile('artifacts/stairs-terraces/diagnostics.json', JSON.stringify(diagnostics, null, 2));
@@ -90,7 +90,7 @@ try {
   assert.equal(diagnostics.connectedFlights, true, 'Upper flights start at the preceding return landing');
   assert.equal(diagnostics.thirdWindow, true, 'Central first-floor rear window must be glazed, not solid wall');
   assert.ok(diagnostics.rearWindowCanopyGap > .1, 'All three first-floor rear windows must clear the canopy fascia');
-  assert.equal(diagnostics.inwardGate, true, 'Terrace gate leaves must open inside');
+  assert.equal(diagnostics.terraceFacingGate, true, 'Terrace gates push from the stair hall toward the left terrace');
   assert.deepEqual(diagnostics.joinFaces, [1, 1], 'Roof joins must not have coplanar duplicate treads');
   for (const [route, progress, name] of [['hall', 700, 'lower-gates'], ['stairs', 195, 'first-return'], ['stairs', 297, 'library-landing'], ['stairs', 820, 'top-windows'], ['stairs', 900, 'roof-stair'], ['terraceLeft', 100, 'left-gate'], ['terraceLeft', 450, 'left-roof'], ['terraceRight', 450, 'upper-tanks'], ['terraceRight', 850, 'upper-roof'], ['upperCorridor', 250, 'upper-corridor'], ['seminar', 220, 'strong-room-entry'], ['seminar', 490, 'strong-room-passage']]) {
     await page.selectOption('#walk-route', route);

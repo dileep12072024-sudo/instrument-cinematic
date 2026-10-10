@@ -5,6 +5,7 @@ import { buildReferenceGarden } from './garden.js';
 import { buildEntranceHall } from './entrance-hall.js';
 import { buildClassroomWing } from './classroom-wing.js';
 import { buildTerraces } from './terraces.js';
+import { stairs, terraceLevels } from './stair-layout.js';
 import { applyWind } from './weather-effects.js';
 
 let seed = 1937;
@@ -178,7 +179,19 @@ export function buildArchitecture(scene) {
   }
   function face(cx, cz, rotation, width, height, bays, type, closedGround = false, openGround = false, onlyFloor = null) {
     const transform = new T.Matrix4().compose(new T.Vector3(cx, 0, cz), quaternion.setFromAxisAngle(new T.Vector3(0, 1, 0), rotation), new T.Vector3(1, 1, 1));
-    const b = (x, y, z, w, h, d, material) => box(x, y, z, w, h, d, material, transform);
+    let facade = true;
+    const b = (x, y, z, w, h, d, material) => {
+      const emit = (left, right, top = Infinity) => {
+        const bottom = y - h / 2, clippedTop = Math.min(y + h / 2, top);
+        if (clippedTop > bottom && right > left) box((left + right) / 2, (bottom + clippedTop) / 2, z, right - left, clippedTop - bottom, d, material, transform);
+      };
+      // The lowered classroom roof must not expose the old storey's piers or lintels.
+      if (facade && height === 9.4 && Math.abs(cx) >= 22) emit(x - w / 2, x + w / 2, terraceLevels.leftWing - .12);
+      else if (facade && type === 'low-corridor' && rotation === 0 && x - w / 2 < -21.05 - cx) {
+        const split = Math.min(x + w / 2, -21.05 - cx);
+        emit(x - w / 2, split, terraceLevels.leftWing - .12); emit(split, x + w / 2);
+      } else emit(x - w / 2, x + w / 2);
+    };
     const floors = Math.round((height - 1.4) / 4), floorH = (height - 1.4) / floors, bay = width / bays;
     const westOuter = type === 'west-end' || type === 'west-outer';
     const westWindow = type === 'west' || westOuter;
@@ -321,10 +334,15 @@ export function buildArchitecture(scene) {
       if (f === 0 && (westWindow || type === 'east-wing')) b(0, 3.15, .38, width + .25, .14, 1.05, m.trim);
     }
     if (onlyFloor !== null) return;
-    const roofY = height - 1.4 + (height === 9.4 && Math.abs(cx) >= 22 ? -.5 : height === 13.4 && cx > 4 && cx < 22 ? .57 : 0);
+    facade = false;
+    const roofY = type.startsWith('tower') ? stairs.top : height === 9.4
+      ? (Math.abs(cx) >= 22 ? terraceLevels.leftWing : terraceLevels.leftStrip)
+      : height === 13.4 ? (cx > 4 && cx < 22 ? terraceLevels.rightStrip : terraceLevels.rightWing) : height - 1.4;
     // Real roof connections must cut through the old perimeter parapets.
-    if (type === 'tower-side' && cx > 0) {
-      for (const [a, c] of [[-7, 1.083333], [3.25, 7]]) box(cx, roofY + .7, (a + c) / 2, .32, 1.4, c - a, m.wall);
+    if (type === 'tower-side') {
+      // The headhouse supplies its own side walls; do not bury a parapet inside them.
+      const start = cx > 0 ? 3.25 : 1.49;
+      box(cx, roofY + .7, (start + 7) / 2, .32, 1.4, 7 - start, m.wall);
       return;
     }
     if (type === 'room' && (cx === -22 || cx === 22) && cz < 0) {
@@ -401,9 +419,12 @@ export function buildArchitecture(scene) {
       if (type === 'tower') box(x, y - .07, 4.15, w, .2, 5.7, m.roof);
       else box(x, y - .07, z, w, .2, d, m.roof);
     }
-    if (type === 'tower') box(x, 11.99, 4.15, w + .35, .2, 5.7, m.roof);
-    else if (type === 'low-corridor') box(-12.4375, roofBase, z, 17.225, .2, d + .35, m.roof);
-    else box(x, roofBase, z, w + .35, .2, d + .35, m.roof);
+    if (type === 'tower') box(x, stairs.top - .22, 4.15, w + .35, .2, 5.7, m.roof);
+    else if (type === 'low-corridor') box(-12.4375, terraceLevels.leftStrip - .22, z, 17.225, .2, d + .35, m.roof);
+    else {
+      const surface = type === 'west' ? terraceLevels.leftWing : type === 'room' ? terraceLevels.rightWing : terraceLevels.rightStrip;
+      box(x, surface - .22, z, w + .35, .2, d + .35, m.roof);
+    }
   }
   for (const p of footprint) block(p.x, p.z, p.width, p.depth, p.height, p.bays, p.type);
   // Outdoor condensers sit on the narrow ledge of the right-hand outer elevation.

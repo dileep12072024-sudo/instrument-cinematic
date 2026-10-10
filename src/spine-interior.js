@@ -266,11 +266,12 @@ export function buildSpineInterior(parent, m) {
     for (let i = 1; i < 7; i++) tube([[hx, base + .05, gateZ - i * .14], [hx, base + 1.19, gateZ - i * .14]], .007, gateMetal);
     for (const r of [.15, .30, .45]) tube(Array.from({ length: 20 }, (_, i) => { const a = i * Math.PI / 19; return [hx, base + 1.19 + Math.sin(a) * r, leafZ + Math.cos(a) * r]; }), .010, gateMetal);
   }
-  // Keep the deepest table clear of the projecting Strong Room pier at pierZ.
-  for (const [z, width, depth] of [[-3.3, .72, 1.6], [-6.1, .60, 2.0], [-8.2, .62, 1.4]]) {
-    const x = left + width / 2 + .10;
+  // Leave clearances at the corridor junction, wall piers and between tables.
+  for (const [z, width, depth] of [[-4.35, .72, 1.4], [-6.45, .60, 1.6], [-8.55, .62, 1.4]]) {
+    const x = left + width / 2 + .22;
     const top = new T.ExtrudeGeometry(rectangle(width, depth), { depth: .028, bevelEnabled: true, bevelSize: .003, bevelThickness: .003, bevelSegments: 1, steps: 1 });
-    top.rotateX(-Math.PI / 2); top.translate(x, base + .79, z); add(top, m.doorPanel);
+    top.rotateX(-Math.PI / 2); top.translate(x, base + .79, z);
+    const tabletop = new T.Mesh(top, m.doorPanel); tabletop.name = 'Strong Room passage table'; tabletop.castShadow = tabletop.receiveShadow = true; group.add(tabletop);
     for (const dx of [-width * .40, width * .40]) for (const dz of [-depth * .42, depth * .42]) {
       const leg = new T.CylinderGeometry(.025, .019, .78, 4); leg.rotateY(Math.PI / 4); leg.translate(x + dx, base + .39, z + dz); add(leg, m.entranceWood);
     }

@@ -11,6 +11,14 @@ export function buildClassroomWing(parent, m) {
   const batches = new Map();
   function add(g, material) { if (!batches.has(material)) batches.set(material, []); batches.get(material).push(g.index ? g.toNonIndexed() : g); }
   function box(x, y, z, w, h, d, mat) {
+    // The far passage sits beneath the lower terrace, including its wall ends.
+    if (mat === plaster && y + h / 2 > 7.46 + .00001 && z - d / 2 < -17.05 - .00001) {
+      const back = z - d / 2, front = z + d / 2, split = Math.min(front, -17.05);
+      const bottom = y - h / 2;
+      if (bottom < 7.46) box(x, (bottom + 7.46) / 2, (back + split) / 2, w, 7.46 - bottom, split - back, mat);
+      if (front > split) box(x, y, (split + front) / 2, w, h, front - split, mat);
+      return;
+    }
     const g = new T.BoxGeometry(w, h, d); g.translate(x, y, z);
     if (mat === plaster) {
       const { position: p, normal: n, uv } = g.attributes;
@@ -189,7 +197,7 @@ export function buildClassroomWing(parent, m) {
   box(0, y + 2.8, .47, 2.16, .47, .035, dark);
   label('CLASSROOM WING', 0, y + 2.8, .50, 1.88, .36);
   for (const side of [-1, 1]) {
-    const leaf = new T.Group(); leaf.name = 'Open classroom entrance leaf'; leaf.position.set(side * 1.03, y, .46); leaf.rotation.y = side * Math.PI * .47; group.add(leaf);
+    const leaf = new T.Group(); leaf.name = 'Open classroom entrance leaf'; leaf.position.set(side * 1.03, y, .46); leaf.rotation.y = -side * Math.PI * .47; group.add(leaf);
     for (const [px, py, w, h] of [[-side * .47, .04, .94, .04], [-side * .47, 2.55, .94, .04], [0, 1.28, .04, 2.56], [-side * .94, 1.28, .04, 2.56], [-side * .47, 1.15, .94, .04]]) {
       const mesh = new T.Mesh(new T.BoxGeometry(w, h, .04), dark); mesh.position.set(px, py, 0); leaf.add(mesh);
     }
