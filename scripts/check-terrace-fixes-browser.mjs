@@ -22,6 +22,7 @@ await page.addInitScript(() => {
   });
 });
 async function view(name, eye, target) {
+  if (process.argv[2] && !name.includes(process.argv[2])) return;
   const colors = await page.evaluate(({ eye, target }) => {
     const { renderer, camera, scene } = __portrait;
     renderer.setPixelRatio(.75);
@@ -52,6 +53,8 @@ try {
   await view('left-ramp-outward', [-18, 10.4, 2], [-25, 7.9, -1.2]);
   await view('right-ramp-outward', [18, 14.1, 2], [25, 12.3, -1.2]);
   await view('headhouse', [12, 20, 14], [0, 13.4, -.2]);
+  await view('corner-steps-approach', [1.8, 13.76, 2.425], [4.5, 12.3, 2.425]);
+  await view('corner-steps-overhead', [1.5, 16, 5.8], [4.2, 12.25, 2.425]);
   await view('right-wall-floor', [8, 16, -5], [4.6, 12.36, -.5]);
   await view('stair-wall-joint', [.5, 10, 2.5], [1.65, 8.9, -.7]);
   await view('blue-door-pull', [0, 13.76, -.3], [.5, 13.4, 1.5]);
@@ -65,5 +68,6 @@ try {
   await view('mobile-right-cap-front', [28, 13.1, -.8], [21, 12.5, -.8]);
   await view('mobile-parapet', [23.5, 13.8, -1], [15, 12.7, 3.25]);
   await view('mobile-blue-door-pull', [0, 13.76, -.3], [.5, 13.4, 1.5]);
+  await view('mobile-corner-steps', [1.8, 13.76, 2.425], [4.5, 12.3, 2.425]);
   assert.deepEqual(errors, []);
 } finally { await browser.close(); }

@@ -39,8 +39,21 @@ for (const x of [4.15, 4.5, 4.9]) for (const z of [-2, 0, 1]) {
   const hit = terraceHits([x, 12.7, z], [0, -1, 0], 1)[0];
   assert.ok(hit && Math.abs(hit.point.y - terraceLevels.rightStrip) < .001, 'Right terrace meets enclosure without a lowered strip');
 }
-for (const [x, expected] of [[3.9, 12.11 + .25 / 3], [4.35, 12.11 + .5 / 3], [4.8, 12.36]]) {
-  assert.ok(Math.abs(terraceHits([x, 12.8, 2.425], [0, -1, 0], 1)[0].point.y - expected) < .001, 'Corner steps keep their original rise');
+for (const [x, expected] of [[3.79, stairs.top], [3.81, stairs.top + .15], [4.03, stairs.top + .15], [4.17, stairs.top + .15], [4.19, stairs.top + .3], [4.55, stairs.top + .3], [4.57, terraceLevels.rightStrip], [4.95, terraceLevels.rightStrip]]) {
+  for (const z of [1.5, 1.55, 2.425, 3.05]) {
+    const near = hits([x, 12.8, z], [0, -1, 0], .8);
+    assert.ok(near[0] && Math.abs(near[0].point.y - expected) < .001, `Unobstructed, full-width tread at ${x}, ${z}`);
+    assert.equal(new Set(near.filter(h => Math.abs(h.point.y - expected) < .01).map(h => h.point.y.toFixed(4))).size, 1, 'No flickering duplicate finish on the steps');
+  }
+}
+for (const [x, y] of [[3.8, stairs.top + .07], [4.18, stairs.top + .22], [4.56, stairs.top + .37]]) {
+  for (const z of [1.5, 2.425, 3.05]) {
+    const face = hits([x - .02, y, z], [1, 0, 0], .04)[0];
+    assert.ok(face && Math.abs(face.point.x - x) < .001, 'Every riser is closed across the passage');
+  }
+}
+for (const y of [12.05, 12.2, 12.4]) {
+  assert.ok(hits([13, y, 4], [0, 0, -1], 1).length, 'Raised right roof remains sealed to the facade');
 }
 const stairGroup = scene.getObjectByName('Connected stairways: ground to roof');
 const stairHits = (eye, direction, far) => new T.Raycaster(new T.Vector3(...eye), new T.Vector3(...direction), 0, far).intersectObject(stairGroup, true);

@@ -426,7 +426,13 @@ export function buildArchitecture(scene) {
     else if (type === 'low-corridor') box(-12.4375, terraceLevels.leftStrip - .22, z, 17.225, .2, d + .35, m.roof);
     else {
       const surface = type === 'west' ? terraceLevels.leftWing : type === 'room' ? terraceLevels.rightWing : terraceLevels.rightStrip;
-      box(x, surface - .22, z, w + .35, .2, d + .35, m.roof);
+      const bottom = Math.min(surface - .32, roofBase - .2), top = surface - .12;
+      if (type === 'corridor') {
+        // Leave the entire corner stair footprint clear; the solid treads close the notch.
+        const end = x + (w + .35) / 2, rear = z - (d + .35) / 2;
+        box((4.94 + end) / 2, (bottom + top) / 2, z, end - 4.94, top - bottom, d + .35, m.roof);
+        box((3.825 + 4.94) / 2, (bottom + top) / 2, (rear + 1.49) / 2, 4.94 - 3.825, top - bottom, 1.49 - rear, m.roof);
+      } else box(x, (bottom + top) / 2, z, w + .35, top - bottom, d + .35, m.roof);
     }
   }
   for (const p of footprint) block(p.x, p.z, p.width, p.depth, p.height, p.bays, p.type);

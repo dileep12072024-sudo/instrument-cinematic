@@ -39,7 +39,7 @@ for (const y of [7.7, 7.9]) {
 for (const x of [-22.45, -22.6, -23]) {
   assert.ok(Math.abs(down(x, -1.2, 10).point.y - terraceLevels.leftWing) < .001, 'Open terrace stays flat beyond the pillar-aligned front');
 }
-for (const [face, side, low, crest] of [[-22.35, -1, terraceLevels.leftWing, 8.61], [22.35, 1, terraceLevels.rightWing, 12.61]]) {
+for (const [face, side, low, crest] of [[-22.35, -1, terraceLevels.leftWing, 8.61], [22.35, 1, terraceLevels.rightWing, terraceLevels.rightStrip + .25]]) {
   const capHit = down(face + side * .03, -1.2, crest);
   assert.equal(capHit.object.material.name, 'Projecting weathered terrace coping', 'Both terrace caps overhang their supporting wall slightly');
   const wallHit = new T.Raycaster(new T.Vector3(face + side * .2, low + .03, -1.2), new T.Vector3(-side, 0, 0), 0, .3).intersectObject(scene, true)[0];
@@ -49,7 +49,7 @@ for (const [face, side, low, crest] of [[-22.35, -1, terraceLevels.leftWing, 8.6
 for (const z of [-2.94, 0, .515]) {
   assert.equal(down(-22.34, z, 10).object.material.name, 'Projecting weathered terrace coping', 'Cap reaches the exterior face beside both end posts');
 }
-for (const y of [12.16, 12.24]) {
+for (const y of [terraceLevels.rightWing + .05, terraceLevels.rightWing + .13]) {
   const front = new T.Raycaster(new T.Vector3(24, y, -1.2), new T.Vector3(-1, 0, 0)).intersectObject(scene, true)[0];
   assert.equal(front.object.material.name, 'Weathered terrace plaster');
   assert.ok(Math.abs(front.point.x - 22.35) < .001, 'Right cap has the same inward cut at its original half-height');

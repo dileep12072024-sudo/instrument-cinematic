@@ -7,7 +7,7 @@ export const shelters = [
   ...footprint.map(p => ({
     x: p.type === 'low-corridor' ? -12.4375 : p.x, z: p.z,
     width: p.type === 'low-corridor' ? 17.225 : p.width + .35, depth: p.depth + .35,
-    top: p.type === 'west' ? terraceLevels.leftWing : p.type === 'low-corridor' ? terraceLevels.leftStrip : p.type === 'corridor' || p.type === 'tower' ? terraceLevels.rightStrip : p.height - 1.3,
+    top: p.type === 'west' ? terraceLevels.leftWing : p.type === 'low-corridor' ? terraceLevels.leftStrip : p.type === 'room' ? terraceLevels.rightWing : p.type === 'corridor' || p.type === 'tower' ? terraceLevels.rightStrip : p.height - 1.3,
   })),
   { x: 0, z: 8.8, width: 10, depth: 4, top: 3.67 },
   { x: 0, z: -7.9, width: 10, depth: 2, top: 3.67 },

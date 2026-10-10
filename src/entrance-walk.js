@@ -87,9 +87,9 @@ const rightTerraceRoute = walkingRoute([
   [12, levels.rightStrip, 1.3, Math.PI / 2, 'White water tanks'],
   [22, levels.rightStrip, 1.9, Math.PI / 2, 'Wing terrace steps'],
   [23.1, levels.rightWing, 1.9, Math.PI / 2, 'Lower roof junction'],
-  [25, 12.11, 1.3, 0, 'Main roof'],
-  [25, 12.11, -11.8, Math.PI, 'Black water tank'],
-  [25, 12.11, 12.8, -Math.PI / 2, 'Far roof parapet'],
+  [25, levels.rightWing, 1.3, 0, 'Main roof'],
+  [25, levels.rightWing, -11.8, Math.PI, 'Black water tank'],
+  [25, levels.rightWing, 12.8, -Math.PI / 2, 'Far roof parapet'],
 ]);
 const upperCorridorRoute = walkingRoute([
   [0, stairs.second, 2.166667, Math.PI / 2, 'Second-floor landing'],

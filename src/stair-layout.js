@@ -8,7 +8,7 @@ export const stairFlights = [
   { base: stairs.first, half: 6.364, top: stairs.second, sides: [-1, 1], start: stairs.returnEnd, sideSteps: 14, returnSteps: 12 },
   { base: stairs.second, half: 10.644, top: stairs.top, sides: [-1], start: stairs.returnEnd, sideSteps: 14, returnSteps: 10 },
 ];
-export const terraceLevels = { leftStrip: 8.11, leftWing: 7.61, rightStrip: 12.36, rightWing: 12.11 };
+export const terraceLevels = { leftStrip: 8.11, leftWing: 7.61, rightStrip: 12.56, rightWing: 12.31 };
 export const terraceCovers = [
   { x: 0, z: -2.8, width: 8.4, depth: 8.6, top: 15.64 },
   { x: -5.1, z: 0, width: 2.6, depth: 6.1, top: 11.44 },

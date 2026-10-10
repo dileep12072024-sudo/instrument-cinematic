@@ -70,7 +70,7 @@ try {
     const gate = scene.getObjectByName('Terrace double grille gate');
     const shutters = [];
     stairways.traverse(o => { if (o.name === 'Rear window with casement shutters and grille') shutters.push(o); });
-    const joinFaces = [[-22.03, 7.61], [22.95, 12.11]].map(([x, y]) => new T.Raycaster(new T.Vector3(x, y + .5, 1.83), new T.Vector3(0, -1, 0), 0, .6).intersectObject(architecture.group, true).filter(hit => Math.abs(hit.point.y - y) < .005).length);
+    const joinFaces = [[-22.03, 7.61], [22.95, 12.31]].map(([x, y]) => new T.Raycaster(new T.Vector3(x, y + .5, 1.83), new T.Vector3(0, -1, 0), 0, .6).intersectObject(architecture.group, true).filter(hit => Math.abs(hit.point.y - y) < .005).length);
     return { failures, cavities, lockFace: lock.geometry.boundingBox.min.z,
       joinFaces,
       rearWindowCanopyGap: rearWindowBottom - rearCanopyTop,
@@ -85,7 +85,7 @@ try {
   console.log('Geometry diagnostics:', JSON.stringify(diagnostics));
   assert.ok(diagnostics.heights.gateSide > diagnostics.heights.stoppedSide + 3, 'Only gate-side flight continues above second floor');
   assert.ok(Math.abs(diagnostics.heights.groundApproach - .164) < .02, 'Ground twin flights must not project into the hall');
-  for (const [name, expected] of Object.entries({ leftStrip: 8.11, leftWing: 7.61, leftStepEnd: 7.61, rightStrip: 12.36, rightWing: 12.11, roofDoor: 12.11, roofApron: 12.11, roofExit: 12.36, cornerStep: 12.11 + .25 * 2 / 3 })) assert.ok(Math.abs(diagnostics.heights[name] - expected) < .02, name);
+  for (const [name, expected] of Object.entries({ leftStrip: 8.11, leftWing: 7.61, leftStepEnd: 7.61, rightStrip: 12.56, rightWing: 12.31, roofDoor: 12.11, roofApron: 12.11, roofExit: 12.56, cornerStep: 12.41 })) assert.ok(Math.abs(diagnostics.heights[name] - expected) < .02, name);
   assert.equal(diagnostics.shutters, 9, 'Each rear window has framed shutters');
   assert.equal(diagnostics.connectedFlights, true, 'Upper flights start at the preceding return landing');
   assert.equal(diagnostics.thirdWindow, true, 'Central first-floor rear window must be glazed, not solid wall');
