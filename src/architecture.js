@@ -109,6 +109,9 @@ export function buildArchitecture(scene) {
   m.rearGlass = m.glass.clone(); m.rearGlass.name = 'Rear glass';
   m.entranceGlazing = m.glass.clone(); m.entranceGlazing.name = 'Transparent entrance sidelights';
   m.entranceGlazing.color.set('#d9e5d9'); m.entranceGlazing.transparent = true; m.entranceGlazing.opacity = .22; m.entranceGlazing.depthWrite = false;
+  m.entranceReflectiveGlass = m.glass.clone(); m.entranceReflectiveGlass.name = 'Green reflective entrance exterior';
+  m.entranceReflectiveGlass.color.set('#638f79'); m.entranceReflectiveGlass.metalness = .72; m.entranceReflectiveGlass.roughness = .065;
+  m.entranceTintedGlass = new T.MeshPhysicalMaterial({ name: 'Cool tinted entrance interior', color: '#789c8c', transparent: true, opacity: .18, depthWrite: false, side: T.BackSide, roughness: .25, metalness: 0, envMapIntensity: .08 });
   const grain = woodGrain();
   m.entranceWood = mat('#927c64', { name: 'Entrance timber', map: grain, bumpMap: grain, bumpScale: .003, roughness: .65 });
   m.doorPanel = m.entranceWood.clone(); m.doorPanel.color.set('#b69372');
@@ -462,7 +465,12 @@ export function buildArchitecture(scene) {
     const glassWidth = sideWidth - .17;
     box(x, .64, 7, sideWidth, 1.08, .08, m.entranceWood);
     box(x, 3.23, 7, sideWidth, .15, .08, m.entranceWood);
-    box(x, 2.2, 7.06, glassWidth, 1.98, .018, m.entranceGlazing);
+    // Opposite culled faces: reflective outside, see-through tint inside, no stacked glass box.
+    const pane = new T.PlaneGeometry(glassWidth, 1.98);
+    for (const material of [m.entranceReflectiveGlass, m.entranceTintedGlass]) {
+      const surface = new T.Mesh(pane, material); surface.name = material.name;
+      surface.position.set(x, 2.2, 7.06); surface.layers.enable(1); group.add(surface);
+    }
     box(x, 2.2, 7.10, .065, 2.02, .08, m.entranceWood);
     for (const s of [-1, 1]) box(x + s * glassWidth / 2, 2.2, 7.10, .065, 2.02, .08, m.entranceWood);
     for (const side of [-1, 1]) {

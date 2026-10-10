@@ -10,8 +10,17 @@ globalThis.document = {
   createElementNS: () => ({ addEventListener() {}, removeEventListener() {} }),
 };
 const scene = new T.Scene();
-const { group } = buildArchitecture(scene); scene.updateMatrixWorld(true);
+const { group, materials } = buildArchitecture(scene); scene.updateMatrixWorld(true);
 const hits = (eye, direction, far = 10) => new T.Raycaster(new T.Vector3(...eye), new T.Vector3(...direction), 0, far).intersectObject(group, true);
+for (const x of [-2.3, 2.3]) {
+  const glassHits = (z, direction) => hits([x, 2.3, z], [0, 0, direction], 3).filter(hit => [materials.entranceReflectiveGlass, materials.entranceTintedGlass].includes(hit.object.material));
+  assert.deepEqual(glassHits(9, -1).map(hit => hit.object.material), [materials.entranceReflectiveGlass], 'Outside sees only the reflective face');
+  assert.deepEqual(glassHits(5, 1).map(hit => hit.object.material), [materials.entranceTintedGlass], 'Inside sees only the transparent tinted face');
+}
+assert.equal(materials.entranceReflectiveGlass.transparent, false);
+assert.ok(materials.entranceReflectiveGlass.metalness > .5);
+assert.ok(materials.entranceTintedGlass.transparent && materials.entranceTintedGlass.opacity < .3 && !materials.entranceTintedGlass.depthWrite);
+assert.equal(materials.entranceGlazing.side, T.FrontSide, 'Side notice windows retain their existing glazing');
 const terrace = scene.getObjectByName('Reference terraces and roof stair enclosure');
 const terraceHits = (eye, direction, far) => new T.Raycaster(new T.Vector3(...eye), new T.Vector3(...direction), 0, far).intersectObject(terrace, true);
 assert.equal(terraceHits([-5.5, 10, -3.25], [0, 0, -1], 4).length, 0, 'Utility enclosure must not project beyond the rear roof edge');
