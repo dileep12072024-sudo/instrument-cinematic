@@ -133,8 +133,8 @@ export function buildTerraces(parent, m) {
   for (let i = 0; i < 2; i++) step(-21.225 - i * .35, levels.leftStrip - (i + 1) * .5 / 3, 2.0375, .35, 2.425, levels.leftWing);
   floor(-21.875, levels.leftWing, 2.0375, .25, 2.425);
   // Truncate behind the pillars: a straight plaster face supports the remaining cap.
-  floor(-21.825, levels.leftWing, -1.2125, .35, 4.075);
-  cappedEdge(-22.05, levels.leftWing, levels.leftStrip, -1.2125, 4.075, .18, .60);
+  floor(-21.7, levels.leftWing, -1.2125, .60, 4.075);
+  cappedEdge(-22.05, levels.leftWing, levels.leftStrip, -1.2125, 4.075, .18, .35);
   // Square concrete posts frame the ramp ends and the adjacent stair opening (110452).
   for (const z of [-3.25, .825, 3.25]) box(-22.05, levels.leftWing + .925, z, .60, 1.85, .60);
   for (const x of [-7, -10, -13, -16, -19]) box(x, levels.leftStrip + .9, 3.25, .52, 1.8, .64);
@@ -198,7 +198,7 @@ export function buildTerraces(parent, m) {
   floor(13.47, levels.rightStrip, 0, 17.06, 6.5);
   floor(26.5, levels.rightWing, 0, 9, 33);
   for (let i = 0; i < 2; i++) step(22.175 + i * .35, levels.rightStrip - (i + 1) * (levels.rightStrip - levels.rightWing) / 3, 2.0375, .35, 2.425, levels.rightWing);
-  cappedEdge(23, levels.rightWing, levels.rightStrip, -1.2125, 4.075);
+  cappedEdge(23, levels.rightWing, levels.rightStrip, -1.2125, 4.075, 0, .35);
   tank(11, levels.rightStrip, -1.35, .82, 2.15, white);
   tank(15, levels.rightStrip, -1.35, .82, 2.15, white);
   const ring = new T.Shape(); ring.absarc(0, 0, 1.1, 0, Math.PI * 2, false);

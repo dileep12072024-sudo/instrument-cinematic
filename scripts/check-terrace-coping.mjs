@@ -11,7 +11,7 @@ const down = (x, z, high) => new T.Raycaster(new T.Vector3(x, high + 1, z), new 
 for (const [edge, low, high] of [[-22.05, terraceLevels.leftWing, terraceLevels.leftStrip], [23, terraceLevels.rightWing, terraceLevels.rightStrip]]) {
   const side = Math.sign(edge), rise = high - low;
   const inner = edge - side, crest = high + rise;
-  for (const distance of edge < 0 ? [.1, .3, .56] : [.1, .56, 1.1]) {
+  for (const distance of [.05, .15, .3]) {
     const surface = down(inner + side * distance, -1.2, crest);
     assert.equal(surface.object.material.name, 'Projecting weathered terrace coping');
     assert.ok(Math.abs(surface.point.y - (crest - (crest - low) * distance / 1.12)) < .001, 'Capped ramp descends toward the open terrace');
@@ -21,7 +21,7 @@ for (const [edge, low, high] of [[-22.05, terraceLevels.leftWing, terraceLevels.
     const face = ray.intersectObject(scene, true)[0];
     assert.ok(face && Math.abs(face.point.x - inner) < .001, 'Raised building-facing edge is visible above the approach and stays vertical');
   }
-  const sideFace = new T.Raycaster(new T.Vector3(edge - side * .5, low + .05, 1.1), new T.Vector3(0, 0, -1));
+  const sideFace = new T.Raycaster(new T.Vector3(inner + side * .2, low + .05, 1.1), new T.Vector3(0, 0, -1));
   assert.ok(sideFace.intersectObject(scene, true)[0]?.distance < .3, 'The cap is supported along the stair side, not floating');
   assert.notEqual(down(edge + side * .1, 3.02, high)?.object.material.name, 'Projecting weathered terrace coping', 'No skinny coping stub protrudes beside the last stair');
 }
@@ -29,10 +29,18 @@ assert.ok(Math.abs((terraceLevels.rightStrip - terraceLevels.rightWing) * 2 - (t
 for (const y of [7.7, 7.9]) {
   const front = new T.Raycaster(new T.Vector3(-23, y, -1.2), new T.Vector3(1, 0, 0)).intersectObject(scene, true)[0];
   assert.equal(front.object.material.name, 'Weathered terrace plaster');
-  assert.ok(Math.abs(front.point.x + 21.65) < .001, 'Left open-terrace face is vertical and recessed behind the end pillars');
+  assert.ok(Math.abs(front.point.x + 21.40) < .001, 'Left open-terrace face is vertical and cut farther inward toward the building');
 }
-for (const x of [-22, -21.9, -21.7]) {
+for (const x of [-22, -21.7, -21.5]) {
   assert.ok(Math.abs(down(x, -1.2, 10).point.y - terraceLevels.leftWing) < .001, 'Removed slope leaves a continuous flat terrace, not a gap');
+}
+for (const y of [12.16, 12.24]) {
+  const front = new T.Raycaster(new T.Vector3(24, y, -1.2), new T.Vector3(-1, 0, 0)).intersectObject(scene, true)[0];
+  assert.equal(front.object.material.name, 'Weathered terrace plaster');
+  assert.ok(Math.abs(front.point.x - 22.35) < .001, 'Right cap has the same inward cut at its original half-height');
+}
+for (const x of [22.45, 22.7, 23.1]) {
+  assert.ok(Math.abs(down(x, -1.2, 14).point.y - terraceLevels.rightWing) < .001, 'Right terrace stays flat beyond the shortened cap');
 }
 const leftEnd = down(-21.225, .95, 10), leftProfile = down(-21.225, 0, 10);
 assert.equal(leftEnd.object.material.name, 'Projecting weathered terrace coping', 'Left cap ends within the first tread');
