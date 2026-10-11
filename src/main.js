@@ -398,20 +398,24 @@ async function boot() {
   } catch { console.warn('Sky map unavailable. Using daylight fallback.'); }
   updateLighting(hour);
   $('#loading-status').textContent = 'Reflecting the courtyards';
-  const probe = new THREE.WebGLCubeRenderTarget(128, { type: THREE.HalfFloatType });
-  const probeCamera = new THREE.CubeCamera(.2, 180, probe);
-  const reflectionFilter = new THREE.PMREMGenerator(renderer);
   const glass = [architecture.materials.glass, architecture.materials.rearGlass, architecture.materials.entranceReflectiveGlass];
   glass.forEach(material => { material.visible = false; });
   try {
     for (const [i, position] of [[0, 6, 20], [0, 6, -9], [0, 2.2, 7.25]].entries()) {
-      probeCamera.position.fromArray(position); probeCamera.update(renderer, scene);
-      glass[i].envMap = reflectionFilter.fromCubemap(probe.texture).texture;
-      glass[i].needsUpdate = true;
+      // The entrance needs a crisp reflection; capture it once, without a per-frame render pass.
+      const probe = new THREE.WebGLCubeRenderTarget(i === 2 ? 512 : 128, { type: THREE.HalfFloatType });
+      const probeCamera = new THREE.CubeCamera(.2, 180, probe);
+      const reflectionFilter = new THREE.PMREMGenerator(renderer);
+      try {
+        probeCamera.position.fromArray(position); probeCamera.update(renderer, scene);
+        glass[i].envMap = reflectionFilter.fromCubemap(probe.texture).texture;
+        glass[i].needsUpdate = true;
+      } finally {
+        probe.dispose(); reflectionFilter.dispose();
+      }
     }
   } finally {
     glass.forEach(material => { material.visible = true; });
-    probe.dispose(); reflectionFilter.dispose();
   }
   const defaultAudio = sound.setEnabled(true);
   updateSoundButton();

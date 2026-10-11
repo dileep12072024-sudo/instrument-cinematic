@@ -110,7 +110,13 @@ export function buildArchitecture(scene) {
   m.entranceGlazing = m.glass.clone(); m.entranceGlazing.name = 'Transparent entrance sidelights';
   m.entranceGlazing.color.set('#d9e5d9'); m.entranceGlazing.transparent = true; m.entranceGlazing.opacity = .22; m.entranceGlazing.depthWrite = false;
   m.entranceReflectiveGlass = m.glass.clone(); m.entranceReflectiveGlass.name = 'Green reflective entrance exterior';
-  m.entranceReflectiveGlass.color.set('#afd5b5'); m.entranceReflectiveGlass.metalness = .85; m.entranceReflectiveGlass.roughness = .045;
+  m.entranceReflectiveGlass.color.set('#afd5b5'); m.entranceReflectiveGlass.metalness = .85; m.entranceReflectiveGlass.roughness = 0;
+  m.entranceReflectiveGlass.clearcoatRoughness = 0;
+  // Three's 256px reflection blur floor softens our 512px polished entrance capture.
+  m.entranceReflectiveGlass.onBeforeCompile = shader => {
+    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_fragment>', T.ShaderChunk.lights_physical_fragment.replaceAll('0.0525', '0.025'));
+  };
+  m.entranceReflectiveGlass.customProgramCacheKey = () => 'polished-entrance-512';
   m.entranceTintedGlass = new T.MeshPhysicalMaterial({ name: 'Cool tinted entrance interior', color: '#789c8c', transparent: true, opacity: .18, depthWrite: false, side: T.BackSide, roughness: .25, metalness: 0, envMapIntensity: .08 });
   const grain = woodGrain();
   m.entranceWood = mat('#927c64', { name: 'Entrance timber', map: grain, bumpMap: grain, bumpScale: .003, roughness: .65 });

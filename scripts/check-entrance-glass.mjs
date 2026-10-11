@@ -25,7 +25,16 @@ try {
   await page.waitForFunction(() => window.__portrait?.ready);
   await page.locator('#loader').waitFor({ state: 'hidden' });
   await page.addStyleTag({ content: '#experience > :not(#viewport){visibility:hidden!important}' });
-  assert.ok(await page.evaluate(() => !!__portrait.architecture.materials.entranceReflectiveGlass.envMap));
+  const finish = await page.evaluate(() => {
+    const glass = __portrait.architecture.materials.entranceReflectiveGlass;
+    const shader = { fragmentShader: '#include <lights_physical_fragment>' };
+    glass.onBeforeCompile(shader);
+    return { roughness: glass.roughness, clearcoatRoughness: glass.clearcoatRoughness, reflectionWidth: glass.envMap?.image.width, polished: shader.fragmentShader.includes('max( roughnessFactor, 0.025 )') && !shader.fragmentShader.includes('0.0525') };
+  });
+  assert.equal(finish.roughness, 0, 'Exterior glass has no frosted surface blur');
+  assert.equal(finish.clearcoatRoughness, 0, 'Clearcoat preserves sharp reflections');
+  assert.ok(finish.reflectionWidth >= 1536, 'Entrance reflection retains a 512px cube face');
+  assert.ok(finish.polished, 'Physical shader does not impose the lower-resolution blur floor');
   async function view(name, inside) {
     const result = await page.evaluate(inside => {
       const { renderer, camera, scene, architecture } = __portrait;
