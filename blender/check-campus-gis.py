@@ -73,7 +73,7 @@ try:
         closed.append(o.name)
     report['draft']={'drive_join_max_error_m':max(join_errors),'closed_slabs':closed,'objects':len(draft.objects),'grading_status':'Provisional, not surveyed'}
     report['status']='PASS'
-    (BASE/'gis'/'checks.json').write_text(json.dumps(report,indent=2))
+    (BASE/'gis'/'checks.json').write_text(json.dumps(report,indent=2), newline='\n')
     print(json.dumps(report,indent=2))
 finally:
     bpy.context.window.scene=active

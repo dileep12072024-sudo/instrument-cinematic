@@ -94,7 +94,7 @@ department_mat = material('Department GIS footprint', (.20, .47, .55))
 count = RADIUS * 2 // STEP + 1
 rows = [[height(x, y) for x in range(-RADIUS, RADIUS+1, STEP)] for y in range(RADIUS, -RADIUS-1, -STEP)]
 asc = GIS / 'campus-utm44n.asc'
-asc.write_text(f'ncols {count}\nnrows {count}\nxllcenter {ox-RADIUS}\nyllcenter {oy-RADIUS}\ncellsize {STEP}\nNODATA_value -9999\n' + '\n'.join(' '.join(f'{h:.4f}' for h in row) for row in rows))
+asc.write_text(f'ncols {count}\nnrows {count}\nxllcenter {ox-RADIUS}\nyllcenter {oy-RADIUS}\ncellsize {STEP}\nNODATA_value -9999\n' + '\n'.join(' '.join(f'{h:.4f}' for h in row) for row in rows), newline='\n')
 prefs = bpy.context.preferences.addons['BlenderGIS-master'].preferences
 old_crs = prefs.predefCrsJson
 entries = json.loads(old_crs)
@@ -152,7 +152,8 @@ for ref in sorted(refs):
 for way in ways:
     subset.append(way)
 cropped = GIS / 'campus-context.osm'
-ET.ElementTree(subset).write(cropped, encoding='utf-8', xml_declaration=True)
+with cropped.open('wb') as output:
+    ET.ElementTree(subset).write(output, encoding='utf-8', xml_declaration=True)
 osm = importlib.import_module('BlenderGIS-master.operators.io_import_osm')
 osm.OSMTAGS = osm.getTags()
 types = {i.identifier for i in bpy.ops.importgis.osm_file.get_rna_type().properties['featureType'].enum_items if i.identifier == 'way'}
@@ -212,6 +213,6 @@ for way in ways:
 
 scene['gis_import_complete'] = True
 manifest = {'origin_lon_lat': ORIGIN, 'crs':CRS,'projected_origin_m':[ox,oy],'vertical_datum_at_origin_m':datum,'terrain_extent_m':600,'interpolated_grid_m':STEP,'road_objects':len(roads),'osm_reference_objects':len(references),'height_range_m':[min(map(min,rows)),max(map(max,rows))],'department_way':'509878600','status':'GIS base plus preliminary road ribbons; not surveyed and not connected to runtime'}
-(GIS / 'manifest.json').write_text(json.dumps(manifest,indent=2))
+(GIS / 'manifest.json').write_text(json.dumps(manifest,indent=2), newline='\n')
 bpy.ops.wm.save_as_mainfile(filepath=str(BASE/'campus-terrain-working.blend'))
 print(json.dumps(manifest,indent=2))
