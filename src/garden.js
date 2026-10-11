@@ -174,7 +174,7 @@ export function buildReferenceGarden(group, groundHeight, wind, windStrength, wi
   }
   const trunks = new T.Mesh(mergeGeometries(branches), barkMat); trunks.name = 'Reference forked trunks and shrub stems'; trunks.castShadow = trunks.receiveShadow = true; group.add(trunks); branches.forEach(g => g.dispose());
   const leafMat = new T.MeshStandardMaterial({ color: '#aebf87', side: T.DoubleSide, roughness: .58 });
-  applyWind(leafMat, wind, windStrength, windDirection);
+  applyWind(leafMat, wind, windStrength, windDirection, 1);
   applyWind(barkMat, wind, windStrength, windDirection);
   trunks.customDepthMaterial = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking });
   applyWind(trunks.customDepthMaterial, wind, windStrength, windDirection);
@@ -185,7 +185,7 @@ export function buildReferenceGarden(group, groundHeight, wind, windStrength, wi
   });
   foliage.receiveShadow = true; group.add(foliage);
   const flowerMat = new T.MeshStandardMaterial({ color: '#e9609a', side: T.DoubleSide, roughness: .7 });
-  applyWind(flowerMat, wind, windStrength, windDirection);
+  applyWind(flowerMat, wind, windStrength, windDirection, .35);
   const flowers = new T.InstancedMesh(new T.CircleGeometry(.06, 5), flowerMat, blossoms.length); flowers.name = 'Pink flower clusters';
   blossoms.forEach((p, i) => { dummy.position.copy(p); dummy.rotation.set(random() * 3, random() * 6, random() * 6); dummy.scale.setScalar(1); dummy.updateMatrix(); flowers.setMatrixAt(i, dummy.matrix); }); group.add(flowers);
   const groundLeaves = new T.InstancedMesh(leafGeometry(), leafMat, 9000); groundLeaves.name = 'Patchy verge groundcover';

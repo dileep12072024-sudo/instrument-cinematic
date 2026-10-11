@@ -27,7 +27,7 @@ for (const mesh of [landscape.foliage, landscape.garden.foliage]) {
     mesh.getMatrixAt(i, matrix);
     bounds.copy(mesh.geometry.boundingBox).applyMatrix4(matrix);
     const sway = 1.5 * (Math.max(0, bounds.max.y - .3) / 12) ** 2;
-    bounds.expandByVector(new T.Vector3(sway, 0, sway));
+    bounds.expandByVector(new T.Vector3(sway + .0525, .021, sway + .0525));
     assert.ok(obstacles.every(obstacle => !obstacle.intersectsBox(bounds)), `Leaf ${i} stays clear even at maximum wind displacement`);
   }
   console.log('PASS foliage clearance', { kept: mesh.count, trimmed: mesh.userData.trimmedLeaves });

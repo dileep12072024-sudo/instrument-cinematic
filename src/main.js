@@ -6,7 +6,7 @@ import { buildArchitecture, buildLandscape } from './architecture.js';
 import { footprint } from './footprint.js';
 import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
-import { createRain, rainfall, windVector, isSheltered } from './weather-effects.js';
+import { createRain, rainfall, updateWind, isSheltered } from './weather-effects.js';
 import { createEntranceWalk } from './entrance-walk.js';
 import { createPanoramaLook } from './panorama-look.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
@@ -475,11 +475,7 @@ function animate(now) {
   }
   // Orbit speed follows wall time, including slower devices; damping is for pointer input.
   if (!entranceWalk?.active && !panorama) controls.update(Math.min(frameDuration / 1000, 1));
-  if (!reduced) landscape.wind.value += dt;
-  const gust = (.5 + .5 * Math.sin(landscape.wind.value * .47)) ** 4;
-  const windSpeed = weatherState.windSpeed + ((weatherState.windGusts || weatherState.windSpeed) - weatherState.windSpeed) * gust;
-  landscape.windStrength.value = THREE.MathUtils.damp(landscape.windStrength.value, reduced ? 0 : Math.min(1.5, (windSpeed / 35) ** 1.5), 2, dt);
-  landscape.windDirection.value.copy(windVector(1, weatherState.windDirection)).normalize();
+  const windSpeed = updateWind(landscape, weatherState, dt, reduced);
   if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
   rain.update(dt, weatherState, reduced);
   sound.setWeather(weatherState, isSheltered(camera.position.x, camera.position.y, camera.position.z), windSpeed);

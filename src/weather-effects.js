@@ -74,7 +74,21 @@ export function createRain(scene, camera) {
   };
 }
 
-export function applyWind(material, wind, strength, direction) {
+export function updateWind(landscape, weather, dt, reduced = false) {
+  if (!reduced) landscape.wind.value += dt;
+  const time = landscape.wind.value;
+  const gust = (.5 + .3 * Math.sin(time * .47) + .2 * Math.sin(time * .19 + 1.7)) ** 4;
+  const speed = Math.max(0, Number(weather.windSpeed) || 0);
+  const windSpeed = speed + (Math.max(speed, Number(weather.windGusts) || speed) - speed) * gust;
+  landscape.windStrength.value = reduced ? 0 : T.MathUtils.damp(landscape.windStrength.value, Math.min(1.5, (windSpeed / 35) ** 1.5), 2, dt);
+  const bearing = windVector(1, weather.windDirection).normalize();
+  // Interpolate the vector without normalizing: even a 180-degree change cannot snap.
+  landscape.windDirection.value.lerp(bearing, 1 - Math.exp(-.8 * dt));
+  return windSpeed;
+}
+
+export function applyWind(material, wind, strength, direction, flutter = 0) {
+  material.customProgramCacheKey = () => `campus-wind-2:${flutter}`;
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, { uWind: wind, uWindStrength: strength, uWindDirection: direction });
     shader.vertexShader = 'uniform float uWind; uniform float uWindStrength; uniform vec2 uWindDirection;\n' + shader.vertexShader;
@@ -86,8 +100,24 @@ export function applyWind(material, wind, strength, direction) {
       #endif
       vec4 windWorld = modelMatrix * mvPosition;
       float heightWeight = pow(max(0.0, windWorld.y - .3) / 12.0, 2.0);
-      float wave = .65 + .25 * sin(uWind * 1.25 + windWorld.x * .12 + windWorld.z * .09) + .1 * sin(uWind * 2.7 + windWorld.y);
+      float phase = windWorld.x * .12 + windWorld.z * .09;
+      float wave = .60 + .28 * sin(uWind * .72 + phase) + .12 * sin(uWind * 1.63 + phase * 2.3 + windWorld.y * .14);
       windWorld.xz += uWindDirection * uWindStrength * heightWeight * wave;
+      ${flutter ? `
+      // Fine movement is tip-weighted, spatially varied and bounded to 5.25 cm.
+      // The shared branch displacement above still anchors the petiole.
+      vec4 leafOrigin = vec4(0.0, 0.0, 0.0, 1.0);
+      #ifdef USE_INSTANCING
+        leafOrigin = instanceMatrix * leafOrigin;
+      #endif
+      leafOrigin = modelMatrix * leafOrigin;
+      float leafPhase = dot(leafOrigin.xyz, vec3(2.17, 3.13, 1.71));
+      float tip = clamp(length(position), 0.0, 1.0);
+      float flutterWave = .65 * sin(uWind * 5.1 + leafPhase) + .35 * sin(uWind * 8.3 + leafPhase * 1.7);
+      float flutterAmount = ${flutter.toFixed(3)} * .035 * uWindStrength * tip * flutterWave;
+      windWorld.xz += uWindDirection * flutterAmount;
+      windWorld.y += flutterAmount * .4;
+      ` : ''}
       mvPosition = viewMatrix * windWorld;
       gl_Position = projectionMatrix * mvPosition;
     `);
