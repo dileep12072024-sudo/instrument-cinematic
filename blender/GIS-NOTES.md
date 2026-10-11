@@ -1,8 +1,11 @@
 # Campus Terrain Working File
 
-Open `campus-terrain-working.blend` in Blender. This is a separate environment
-study; the approved website building, camera controls and deployed preview are
-unchanged. `IT_evnironment.blend` and the pre-existing asset library are untouched.
+Open **`campus-terrain-working.blend`** in Blender. This is the single master file
+for all environment work, with collections and scenes inside it, not alternate
+working-file copies. The approved website building, camera controls and deployed
+preview are unchanged. Existing `IT_evnironment.blend` and `Terrain.blend` files
+are untouched. Textures are packed into the master file.
+The packed file is stored with Git LFS; fresh clones need `git lfs pull`.
 
 ## Scenes
 
@@ -10,9 +13,30 @@ unchanged. `IT_evnironment.blend` and the pre-existing asset library are untouch
   39 road ribbons and 82 OSM footprint/line references. Road widths without OSM
   width tags are estimates. Roads are draped onto the triangulated ground.
 - **Entrance road and ground - photo draft**: entrance driveway with flared
-  junction, adjoining mapped road alignment, white edges, kerbs, gate-pier
-  placeholders, concrete apron, lower side paving and planted ground. The blue
+  junction, adjoining mapped road alignment, white edges, kerbs, open metal
+  gates, concrete apron, lower side paving and planted ground. The blue
   shape is a footprint registration reference, not the finished building.
+
+## Environment Pass 01
+
+- Four environment collections hold vegetation, ground cover, gate details and
+  review cameras/daylight. These extend the existing photo draft in place.
+- Fourteen textured trees share two source meshes. They are visual proxies,
+  not surveyed locations or confirmed campus species. Detailed source geometry
+  is for Blender authoring, **not yet suitable for direct browser export**.
+- Ten thousand small Bermuda grass clumps are combined into one textured mesh,
+  avoiding the roads, side paving, apron and tree roots.
+- Asphalt and leaf-litter ground use 1K color, normal and roughness textures.
+  Foliage uses standard Principled shaders with texture alpha, not solid cards.
+- Open gates sit beside the drive. Piers are moved to the narrow throat before
+  the flare, roughly 25.61 m from the proposed entrance, so they do not overlap
+  the road surface. Gate placement, dimensions and materials remain estimates.
+- Three cameras: `Environment overview`, `Entrance approach - eye level`, and
+  `Lower courtyard - eye level`. Daylight is for review, not runtime lighting.
+- GIS and environment checks pass. Root and gate clearances are checked; this
+  is not an exhaustive collision test of every leaf. Road join error remains 0.
+- Before website integration: confirm registration/levels, bake portable ground
+  materials, create tree LODs, and test frame time with existing pano controls.
 
 ## Coordinates and Accuracy
 
@@ -54,6 +78,14 @@ Retrieved 2026-10-11:
   <https://github.com/tilezen/joerd/blob/master/docs/attribution.md>.
 - User photographs: `Entire building.jpg`, `Central/Road from the main door.jpg`,
   and `Left/RUIDbda25da3be3443d5bafdc3c6c7e9dfd6.jpg`.
+- Powered by Poly Haven, [CC0 asset license](https://polyhaven.com/license):
+  [Jacaranda tree](https://polyhaven.com/a/jacaranda_tree),
+  [Island tree 02](https://polyhaven.com/a/island_tree_02),
+  [Bermuda grass](https://polyhaven.com/a/grass_bermuda_01),
+  [Asphalt 02](https://polyhaven.com/a/asphalt_02), and
+  [Brown mud leaves 01](https://polyhaven.com/a/brown_mud_leaves_01).
+  Local original downloads remain under ignored `sources/`; working geometry
+  and textures are embedded in the single master `.blend`.
 - Esri World Imagery was inspected as a temporary orientation reference only.
   No satellite imagery is packaged, committed, or exported in the working file.
 
@@ -67,7 +99,13 @@ Retrieved 2026-10-11:
 3. Execute `build-entrance-layout.py` to create the separate local grading draft.
 4. Execute `check-campus-gis.py` to check source coverage, geometry, road joins,
    finite coordinates, and closed slab modifiers. Results go to `gis/checks.json`.
+5. With the three vegetation source libraries in `sources/`, run
+   `node scripts/fetch-ground-materials.mjs` for the two verified ground sets.
+6. Execute `build-environment.py` once in the same master file, then
+   `check-environment.py`. The build refuses to overwrite an existing pass.
+   Pack resources and save the master file, not another `.blend` variant.
 
-Both scripts are intended for a fresh working file. Save copies before rebuilding
-after manual edits. BlenderGIS preferences are restored after the temporary CRS
+Build scripts are for initial construction; subsequent hand edits belong in the
+master file. Use Git history for previous versions instead of making alternate
+working files. BlenderGIS preferences are restored after the temporary CRS
 registration; no permanent add-on settings are changed.
