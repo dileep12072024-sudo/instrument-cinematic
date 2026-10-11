@@ -38,6 +38,11 @@ if scene.get('facade_planting_pass'):
                 origin=Vector((p.x,p.y,100))
                 assert footprint.ray_cast(origin,Vector((0,0,-1)))[0] is None, o.name+' overlaps building'
                 assert all(r.ray_cast(origin,Vector((0,0,-1)))[0] is None for r in roads), o.name+' reaches road'
+rear = bpy.data.collections.get('Environment - rear terrace canopy')
+if scene.get('rear_canopy_pass'):
+    assert rear is not None and len(rear.objects)==7
+    assert all(o.data in [t.data for t in trees] for o in rear.objects)
+    trees += list(rear.objects)
 gaps = []
 for o in trees:
     origin = Vector((o.location.x,o.location.y,100))
@@ -64,6 +69,6 @@ grass = scene.objects['Patchy Bermuda grass - road and trunk exclusion']
 assert grass['clumps'] == 10000
 assert len(grass.data.uv_layers.active.data) == len(grass.data.loops)
 assert scene['estimated_drive_drop_m'] == .9, 'Do not silently change provisional grading'
-report = {'status':'PASS','trees':len(trees),'shared_tree_meshes':2,'flowering_shrubs':3 if planting else 0,'green_shrubs':3 if planting else 0,'grass_clumps':grass['clumps'],'missing_textures':missing,'root_ground_gap_m':[min(gaps),max(gaps)],'draft_objects':len(scene.objects),'note':'Tree checks cover roots; new shrub leaves and blooms checked against roads/building footprint. Final detailed building registration remains pending.'}
+report = {'status':'PASS','trees':len(trees),'rear_canopy_trees':len(rear.objects) if rear else 0,'shared_tree_meshes':2,'flowering_shrubs':3 if planting else 0,'green_shrubs':3 if planting else 0,'grass_clumps':grass['clumps'],'missing_textures':missing,'root_ground_gap_m':[min(gaps),max(gaps)],'draft_objects':len(scene.objects),'note':'Tree checks cover roots; new shrub leaves and blooms checked against roads/building footprint. Final detailed building registration remains pending.'}
 (BASE/'gis'/'environment-checks.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
 print(json.dumps(report,indent=2))

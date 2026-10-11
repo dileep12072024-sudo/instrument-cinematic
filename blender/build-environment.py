@@ -466,3 +466,59 @@ def add_facade_planting():
     print('Added courtyard planting in the existing master:',len(planting.objects),'objects')
 
 add_facade_planting()
+
+# Rear canopy pass: run this section in the existing master, without rebuilding it.
+def add_rear_canopy():
+    import bpy
+    import math
+    from mathutils import Vector
+    from mathutils.bvhtree import BVHTree
+    scene = bpy.data.scenes['Entrance road and ground - photo draft']
+    assert not scene.get('rear_canopy_pass'), 'Rear canopy already exists; edit it in place'
+    bpy.context.window.scene = scene
+    collection = bpy.data.collections.new('Environment - rear terrace canopy')
+    scene.collection.children.link(collection)
+    anchor = Vector((-4.8,9.0))
+    right = Vector((.926,.377)).normalized()
+    forward = Vector((-right.y,right.x))
+    def world(x,y,z):
+        p = anchor+right*x+forward*y
+        return Vector((p.x,p.y,z))
+    ground = scene.objects['Editable verges and lower courtyard grading']
+    bvh = BVHTree.FromPolygons([ground.matrix_world@v.co for v in ground.data.vertices],[list(p.vertices) for p in ground.data.polygons])
+    # Ground-rooted outside the wings; only the upper crowns reach the parapets.
+    # Sizes and placements are photo estimates until the detailed building is registered.
+    placements = [
+        ('Spreading canopy beside tank terrace','jacaranda_tree',-38.85,-15,(.56,.66,.86),0),
+        ('Rear compound-leaf canopy','jacaranda_tree',-29,-34,(.48,.70,.82),0),
+        ('Rear right spreading canopy','jacaranda_tree',42,-20,(.59,.64,1.02),math.pi),
+        ('Broadleaf screen beside AC terrace','island_tree_02',-40.1,-3,(2.7,2.3,4.8),.4),
+        ('Broadleaf rear screen west','island_tree_02',-16,-29,(1.6,1.7,4.5),1.2),
+        ('Broadleaf rear screen centre','island_tree_02',0,-28,(1.8,1.7,4.2),2.4),
+        ('Narrow rear crown east','island_tree_02',26,-35,(1.05,1.05,5.5),.7),
+    ]
+    for name,source,x,y,scale,turn in placements:
+        mesh = scene.objects['Canopy - '+source].data
+        obj = bpy.data.objects.new(name,mesh)
+        collection.objects.link(obj)
+        obj.scale = scale
+        obj.rotation_euler.z = math.atan2(right.y,right.x)+turn
+        hit = bvh.ray_cast(world(x,y,100),Vector((0,0,-1)))[0]
+        assert hit is not None
+        obj.location = world(x,y,hit.z-.06-min(v.co.z for v in mesh.vertices)*scale[2])
+        obj['plant_role'] = 'rear_canopy'
+        obj['base_local_xy'] = [x,y]
+        obj['source'] = 'https://polyhaven.com/a/'+source
+        obj['placement'] = 'Photo-guided ground root; terrace overhang pending detailed building registration'
+    data = bpy.data.cameras.new('Rear canopy review')
+    camera = bpy.data.objects.new('Rear canopy review',data)
+    bpy.data.collections['Environment - review cameras and daylight'].objects.link(camera)
+    camera.location = world(-52,-44,25)
+    camera.rotation_euler = (world(-5,-13,7)-camera.location).to_track_quat('-Z','Y').to_euler()
+    data.lens = 28
+    scene.camera = camera
+    scene['rear_canopy_pass'] = '03 - ground-rooted spreading and broadleaf terrace canopy'
+    bpy.context.view_layer.update()
+    print('Added rear canopy to the same master:',len(collection.objects),'shared-mesh trees')
+
+add_rear_canopy()

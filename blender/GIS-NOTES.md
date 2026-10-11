@@ -76,6 +76,22 @@ Do not merge the two vertical surfaces or export them as an approved runtime
 environment until the road junction, building registration and level differences
 have been checked. The unmodified GIS reference is retained for comparison.
 
+## Rear Canopy and Wind
+
+Pass 03 adds seven ground-rooted trees outside the rear and side wings, using
+the existing two shared tree meshes. Compound-leaf crowns extend toward the
+tank terrace; broadleaf crowns form the denser screen beside the AC terrace.
+References: `20260928_105519.jpg`, `20260928_105754(1).jpg`, and
+`20260928_110004.jpg`. Species are visual proxies, not botanical identification.
+The master still contains a footprint placeholder, so precise crown clearance
+against the detailed building and tanks must be verified during registration.
+
+Website wind uses live speed, direction and gust readings with slow canopy bend
+and independent tip-weighted leaf flutter. Calm wind settles and reduced-motion
+mode disables movement. This shader runs on the existing website vegetation;
+the high-resolution Blender trees are not yet exported to the website. They
+need lower-detail runtime meshes and final building registration first.
+
 ## Sources and Attribution
 
 Retrieved 2026-10-11:

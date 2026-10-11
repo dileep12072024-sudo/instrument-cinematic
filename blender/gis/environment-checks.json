@@ -1,6 +1,7 @@
 {
   "status": "PASS",
-  "trees": 16,
+  "trees": 23,
+  "rear_canopy_trees": 7,
   "shared_tree_meshes": 2,
   "flowering_shrubs": 3,
   "green_shrubs": 3,
@@ -10,6 +11,6 @@
     -0.06000000238418579,
     -0.059999942779541016
   ],
-  "draft_objects": 95,
+  "draft_objects": 103,
   "note": "Tree checks cover roots; new shrub leaves and blooms checked against roads/building footprint. Final detailed building registration remains pending."
 }
