@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint, groundSpine, seminarPassage } from './footprint.js';
-import { buildReferenceGarden } from './garden.js';
+import { buildReferenceGarden, trimBuildingFoliage } from './garden.js';
 import { buildEntranceHall } from './entrance-hall.js';
 import { buildClassroomWing } from './classroom-wing.js';
 import { buildTerraces } from './terraces.js';
@@ -700,5 +700,8 @@ export function buildLandscape(scene) {
   }
   stones.receiveShadow = true; group.add(stones);
   const garden = buildReferenceGarden(group, groundHeight, wind, windStrength, windDirection);
+  const tanks = scene.getObjectByName('Reference terraces and roof stair enclosure')?.userData.tanks || [];
+  trimBuildingFoliage(foliage, tanks);
+  trimBuildingFoliage(garden.foliage, tanks);
   return { group, foliage, wind, windStrength, windDirection, garden, groundMaterial: groundMat, soilMaterial: soilMat, pavingMaterial: pavingMat };
 }

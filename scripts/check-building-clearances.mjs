@@ -22,6 +22,14 @@ assert.ok(materials.entranceReflectiveGlass.metalness > .5);
 assert.ok(materials.entranceTintedGlass.transparent && materials.entranceTintedGlass.opacity < .3 && !materials.entranceTintedGlass.depthWrite);
 assert.equal(materials.entranceGlazing.side, T.FrontSide, 'Side notice windows retain their existing glazing');
 const terrace = scene.getObjectByName('Reference terraces and roof stair enclosure');
+for (const tank of terrace.userData.tanks.filter(t => t.x < -16 && t.x > -20)) {
+  for (const [x, z] of [[-19.5, -.9], [-16, -.9], [tank.x, -3.25]]) {
+    const direction = new T.Vector3(x - tank.x, 0, z - tank.z).normalize();
+    const wall = hits([tank.x, tank.y + .6, tank.z], direction.toArray(), 4)
+      .find(hit => ['Weathered terrace plaster', materials.wall.name].includes(hit.object.material.name));
+    assert.ok(wall && wall.distance > tank.radius + .12, 'Black tanks clear the concrete posts and rear parapet');
+  }
+}
 const terraceHits = (eye, direction, far) => new T.Raycaster(new T.Vector3(...eye), new T.Vector3(...direction), 0, far).intersectObject(terrace, true);
 assert.equal(terraceHits([-5.5, 10, -3.25], [0, 0, -1], 4).length, 0, 'Utility enclosure must not project beyond the rear roof edge');
 assert.equal(terraceHits([-4.28, 11.3, -1], [0, -1, 0], 2.7).length, 0, 'Utility enclosure keeps a gap from the stairwell wall');

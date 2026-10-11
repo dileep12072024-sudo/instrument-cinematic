@@ -4,6 +4,7 @@ import { stairs, terraceCovers, terraceLevels as levels } from './stair-layout.j
 
 export function buildTerraces(parent, m) {
   const group = new T.Group(); group.name = 'Reference terraces and roof stair enclosure'; parent.add(group);
+  group.userData.tanks = [];
   const batches = new Map();
   const add = (g, material) => { if (!batches.has(material)) batches.set(material, []); batches.get(material).push(g.index ? g.toNonIndexed() : g); };
   const box = (x, y, z, w, h, d, material = wall) => { const g = new T.BoxGeometry(w, h, d); g.translate(x, y, z); add(g, material); };
@@ -96,6 +97,7 @@ export function buildTerraces(parent, m) {
     }
   }
   function tank(x, y, z, radius, height, material, plinth = true) {
+    group.userData.tanks.push({ x, y, z, radius: radius + (plinth ? .28 : .02), top: y + (plinth ? .5 : .04) + height + .3 });
     if (plinth) cylinder(x, y + .25, z, radius + .28, .5, wall);
     const base = y + (plinth ? .5 : .04);
     cylinder(x, base + height / 2, z, radius, height, material);
@@ -164,8 +166,8 @@ export function buildTerraces(parent, m) {
   }
   for (const x of [-9, -12.5, -16, -19.5]) box(x, levels.leftStrip + .68, -.9, .42, 1.36, .48);
   for (const z of [-10, -5, 0, 5, 10]) box(-25, levels.leftWing + .68, z, .42, 1.36, .48);
-  tank(-17.1, levels.leftStrip, -1.85, .74, 1.85, black, false);
-  tank(-19.2, levels.leftStrip, -1.85, .74, 1.85, black, false);
+  tank(-17.1, levels.leftStrip, -2.1, .74, 1.85, black, false);
+  tank(-19.2, levels.leftStrip, -2.1, .74, 1.85, black, false);
   tank(-23.45, levels.leftWing, 3.9, .49, 1.12, white, false);
   for (const z of [-8, -4]) ac(-33.30, levels.leftWing + .14, z, Math.PI / 2);
   for (const x of [-29.7, -26.2]) { ac(x, levels.leftWing + .14, -14.35); ac(x, levels.leftWing + .14, 14.35, Math.PI); }

@@ -1,6 +1,40 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { applyWind } from './weather-effects.js';
+import { footprint } from './footprint.js';
+import { terraceCovers, terraceLevels } from './stair-layout.js';
+
+export function trimBuildingFoliage(foliage, tanks = []) {
+  const tops = { west: terraceLevels.leftWing + 1.6, 'low-corridor': terraceLevels.leftStrip + 1.6, corridor: terraceLevels.rightStrip + 1.6, room: terraceLevels.rightWing + 1.6, tower: terraceCovers[0].top };
+  const obstacles = footprint.map(p => new T.Box3(
+    new T.Vector3(p.x - p.width / 2 - .3, 0, p.z - p.depth / 2 - .3),
+    new T.Vector3(p.x + p.width / 2 + .3, tops[p.type], p.z + p.depth / 2 + .3),
+  ));
+  const utility = terraceCovers[1];
+  obstacles.push(new T.Box3(new T.Vector3(utility.x - utility.width / 2, terraceLevels.leftStrip, utility.z - utility.depth / 2), new T.Vector3(utility.x + utility.width / 2, utility.top, utility.z + utility.depth / 2)));
+  for (const t of tanks) obstacles.push(new T.Box3(
+    new T.Vector3(t.x - t.radius, t.y, t.z - t.radius),
+    new T.Vector3(t.x + t.radius, t.top, t.z + t.radius),
+  ));
+  foliage.geometry.computeBoundingBox();
+  const matrix = new T.Matrix4(), bounds = new T.Box3(), color = new T.Color();
+  const originalCount = foliage.count;
+  let count = 0;
+  for (let i = 0; i < originalCount; i++) {
+    foliage.getMatrixAt(i, matrix);
+    bounds.copy(foliage.geometry.boundingBox).applyMatrix4(matrix);
+    // Reserve the full displacement allowed by applyWind, in either wind direction.
+    const sway = 1.5 * (Math.max(0, bounds.max.y - .3) / 12) ** 2;
+    bounds.expandByVector(new T.Vector3(sway + .08, .08, sway + .08));
+    if (obstacles.some(obstacle => obstacle.intersectsBox(bounds))) continue;
+    foliage.setMatrixAt(count, matrix);
+    foliage.getColorAt(i, color); foliage.setColorAt(count++, color);
+  }
+  foliage.count = count;
+  foliage.instanceMatrix.needsUpdate = foliage.instanceColor.needsUpdate = true;
+  foliage.computeBoundingBox(); foliage.computeBoundingSphere();
+  foliage.userData.trimmedLeaves = originalCount - count;
+}
 
 // Positions interpreted from the Left / Central / Right photographic survey.
 // Coordinates remain approximate until measured site dimensions are available.

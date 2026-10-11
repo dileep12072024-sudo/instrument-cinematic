@@ -46,6 +46,7 @@ try {
   assert.equal(await page.evaluate(() => !!__portrait.scene.getObjectByName('Daytime campus birds')), false);
   await view('utility-rear', [-13, 13, -14], [-5, 10, -1]);
   await view('left-cap', [-27, 9.2, 4.5], [-18, 8.1, 0]);
+  await view('tank-post-clearance', [-21, 11, 0], [-19.3, 8.6, -1.6]);
   await view('left-cap-front', [-28, 8.65, -.8], [-20, 8.35, -.8]);
   await view('left-cap-step-junction', [-23, 10, 3.2], [-21.25, 8.25, .8]);
   await view('right-cap', [27, 13.7, 4.5], [18, 12.4, 0]);
@@ -65,6 +66,7 @@ try {
   await page.waitForTimeout(500);
   await view('mobile-utility', [-11, 14, -12], [-5, 10, -1]);
   await view('mobile-left-cap-front', [-28, 8.65, -.8], [-20, 8.35, -.8]);
+  await view('mobile-tank-post-clearance', [-21, 11, 0], [-19.3, 8.6, -1.6]);
   await view('mobile-right-cap-front', [28, 13.1, -.8], [21, 12.5, -.8]);
   await view('mobile-parapet', [23.5, 13.8, -1], [15, 12.7, 3.25]);
   await view('mobile-blue-door-pull', [0, 13.76, -.3], [.5, 13.4, 1.5]);
