@@ -1,0 +1,30 @@
+{
+  "gis": {
+    "vertices": 3721,
+    "grid_faces": 3600,
+    "roads": 39,
+    "road_vertex_clearance_m": [
+      0.11999988555908203,
+      0.12000083923339844
+    ],
+    "minimum_triangle_clearance_m": 0.0493466854095459,
+    "extent_m": 600,
+    "crs": "EPSG:32644"
+  },
+  "draft": {
+    "drive_join_max_error_m": 0.0,
+    "closed_slabs": [
+      "Editable verges and lower courtyard grading",
+      "Entrance concrete apron",
+      "Lower side courtyard paving",
+      "Principal Office Road - OSM alignment, provisional grade",
+      "Entrance driveway with flared junction",
+      "West driveway kerb",
+      "East driveway kerb",
+      "Department footprint - registration only"
+    ],
+    "objects": 14,
+    "grading_status": "Provisional, not surveyed"
+  },
+  "status": "PASS"
+}

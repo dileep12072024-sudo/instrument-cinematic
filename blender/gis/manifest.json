@@ -1,0 +1,22 @@
+{
+  "origin_lon_lat": [
+    83.323715,
+    17.728887
+  ],
+  "crs": "EPSG:32644",
+  "projected_origin_m": [
+    746423.1337710049,
+    1961713.3267939861
+  ],
+  "vertical_datum_at_origin_m": 62.5544503054963,
+  "terrain_extent_m": 600,
+  "interpolated_grid_m": 10,
+  "road_objects": 39,
+  "osm_reference_objects": 82,
+  "height_range_m": [
+    42.0,
+    79.98980274432142
+  ],
+  "department_way": "509878600",
+  "status": "GIS base plus preliminary road ribbons; not surveyed and not connected to runtime"
+}
