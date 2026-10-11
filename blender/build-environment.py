@@ -299,3 +299,170 @@ for area in bpy.context.screen.areas:
         area.spaces.active.region_3d.view_rotation = Vector((-.7,.6,.6)).to_track_quat('Z','Y')
         area.spaces.active.clip_end = 1500
 print(json.dumps({'scene':scene.name,'trees':len(trees.objects),'grass_clumps':len(centres),'objects':len(scene.objects)}))
+
+# Courtyard planting pass: callable independently without rebuilding the terrain.
+def add_facade_planting():
+    import bpy
+    import math
+    import random
+    from pathlib import Path
+    from mathutils import Vector, Matrix
+    from mathutils.bvhtree import BVHTree
+
+    scene = bpy.data.scenes['Entrance road and ground - photo draft']
+    assert not scene.get('facade_planting_pass'), 'Edit the existing planting, do not duplicate it.'
+    bpy.context.window.scene = scene
+    base = Path(__file__).resolve().parent
+    rng = random.Random(11102)
+    anchor = Vector(scene['gis_anchor_xy_m'])
+    right = Vector((.926,.377)).normalized()
+    forward = Vector((-right.y,right.x))
+    angle = math.atan2(right.y,right.x)
+    ground = scene.objects['Editable verges and lower courtyard grading']
+    terrain = BVHTree.FromPolygons([v.co for v in ground.data.vertices],[list(p.vertices) for p in ground.data.polygons])
+    def world(x,y,z):
+        p = anchor+right*x+forward*y
+        return Vector((p.x,p.y,z))
+    def height(x,y):
+        return terrain.ray_cast(world(x,y,100),Vector((0,0,-1)))[0].z
+    planting = bpy.data.collections.new('Environment - flowering shrubs and facade trees')
+    scene.collection.children.link(planting)
+    def mesh_object(name,vertices,faces,materials):
+        mesh = bpy.data.meshes.new(name)
+        mesh.from_pydata(vertices,[],faces)
+        mesh.update()
+        o = bpy.data.objects.new(name,mesh)
+        planting.objects.link(o)
+        for material in materials:
+            mesh.materials.append(material)
+        return o
+
+    source = scene.objects['Canopy - jacaranda_tree']
+    for name,x,y,h,sx,sy in [('Slender tree beside left facade',-18,.45,11.5,.15,.12),('Forked tree beside main entrance',-8,1.35,12.8,.32,.26)]:
+        o = bpy.data.objects.new(name,source.data)
+        planting.objects.link(o)
+        lo,hi = min(v[2] for v in source.bound_box),max(v[2] for v in source.bound_box)
+        o.scale = (sx,sy,h/(hi-lo))
+        o.rotation_euler.z = angle
+        o.location = world(x,y,height(x,y)-lo*o.scale.z-.06)
+        o['base_local_xy'] = [x,y]
+        o['plant_role'] = 'facade_tree'
+        o['placement'] = 'Photo-guided proportions; exact trunk survey and building registration pending'
+        o['source'] = source['source']
+
+    source_name = 'shrub_03_a_LOD0'
+    sprig = bpy.data.objects.get(source_name)
+    if sprig is None:
+        with bpy.data.libraries.load(str(base/'sources'/'shrub_03'/'shrub_03.blend'),link=False) as (src,dst):
+            dst.objects = [source_name]
+        sprig = dst.objects[0]
+    foliage = sprig.data.materials[0]
+    nodes,links = foliage.node_tree.nodes,foliage.node_tree.links
+    output = next(n for n in nodes if n.type=='OUTPUT_MATERIAL')
+    shader = nodes.new('ShaderNodeBsdfPrincipled')
+    shader.label = 'Portable shrub foliage'
+    shader.inputs['Roughness'].default_value = .85
+    for label,socket in [('Base Color','Base Color'),('Alpha','Alpha')]:
+        tex = next(n for n in nodes if n.type=='TEX_IMAGE' and n.label==label)
+        links.new(tex.outputs['Color'],shader.inputs[socket])
+    normal = nodes.new('ShaderNodeNormalMap')
+    tex = next(n for n in nodes if n.type=='TEX_IMAGE' and n.label=='Normal')
+    links.new(tex.outputs['Color'],normal.inputs['Color'])
+    links.new(normal.outputs['Normal'],shader.inputs['Normal'])
+    links.new(shader.outputs['BSDF'],output.inputs['Surface'])
+    def color_material(name,color):
+        m = bpy.data.materials.new(name)
+        m.use_nodes = True
+        m.diffuse_color = (*color,1)
+        b = next(n for n in m.node_tree.nodes if n.type=='BSDF_PRINCIPLED')
+        b.inputs['Base Color'].default_value = (*color,1)
+        b.inputs['Roughness'].default_value = .78
+        b.inputs['Subsurface Weight'].default_value = .06
+        return m
+    petals = [color_material('Papery pink bracts',(.52,.025,.17)),color_material('Rose bract variation',(.72,.055,.27)),color_material('Small ivory flower centres',(.8,.72,.5))]
+    stem_material = color_material('Woody shrub stems',(.12,.065,.028))
+    shrub_min = min(v.co.z for v in sprig.data.vertices)
+    shrub_height = max(v.co.z for v in sprig.data.vertices)-shrub_min
+    centre = Vector(((min(v.co.x for v in sprig.data.vertices)+max(v.co.x for v in sprig.data.vertices))/2,(min(v.co.y for v in sprig.data.vertices)+max(v.co.y for v in sprig.data.vertices))/2,shrub_min))
+
+    for index,(x,y,h,flowering) in enumerate([(-5.7,12.5,1.8,True),(-7.2,14,2.1,True),(-8.4,13,1.55,True),(-6.5,9.3,1.65,False),(-7.5,9.6,1.25,False),(-18.1,.65,.65,False)]):
+        root = world(x,y,height(x,y)-.015)
+        verts,faces,uvs,stems,stem_faces,candidates = [],[],[],[],[],[]
+        for branch in range(38):
+            theta = rng.uniform(0,math.tau)
+            radius = h*rng.uniform(.1,.40)
+            tip = Vector((math.cos(theta)*radius,math.sin(theta)*radius,h*rng.uniform(.32,.66)))
+            foot = Vector((rng.uniform(-.12,.12)*h,rng.uniform(-.12,.12)*h,0))
+            bend = tip*.45+Vector((rng.uniform(-.08,.08)*h,rng.uniform(-.08,.08)*h,.03))
+            points = [foot,bend,tip]
+            start = len(stems)
+            # Tapered stems support each leaf spray; no detached floating clusters.
+            for k,p in enumerate(points):
+                r = (.006,.003,.001)[k]*h
+                for j in range(6):
+                    stems.append(root+p+Vector((math.cos(j*math.tau/6)*r,math.sin(j*math.tau/6)*r,0)))
+            for k in range(2):
+                for j in range(6):
+                    a = start+k*6+j; b = start+k*6+(j+1)%6
+                    stem_faces.append((a,b,b+6,a+6))
+            for along in [.25,.60,1]:
+                length = h*rng.uniform(.33,.52)
+                rotation = Vector((tip.x*.6,tip.y*.6,1)).to_track_quat('Z','Y').to_matrix().to_4x4() @ Matrix.Rotation(theta+along*2,4,'Z')
+                location = foot.lerp(bend,along*2) if along<.5 else bend.lerp(tip,along*2-1)
+                transform = Matrix.Translation(root+location) @ rotation @ Matrix.Scale(length/shrub_height,4) @ Matrix.Translation(-centre)
+                offset = len(verts)
+                for v in sprig.data.vertices:
+                    p = transform@v.co
+                    verts.append(p)
+                    if along==1 and v.co.z>shrub_min+shrub_height*.60:
+                        candidates.append(p)
+                for face in sprig.data.polygons:
+                    faces.append(tuple(offset+i for i in face.vertices))
+                    uvs.extend(tuple(sprig.data.uv_layers.active.data[i].uv) for i in face.loop_indices)
+        shrub = mesh_object(('Pink flowering shrub' if flowering else 'Bright green understory')+' %02d'%index,verts,faces,[foliage])
+        uv = shrub.data.uv_layers.new(name='UVMap')
+        for item,value in zip(uv.data,uvs):
+            item.uv = value
+        shrub['plant_role'] = 'flowering_shrub' if flowering else 'green_shrub'
+        shrub['base_local_xy'] = [x,y]
+        shrub['source'] = 'https://polyhaven.com/a/shrub_03; custom stems and pink bracts, visual proxy only'
+        mesh_object('Supporting shrub stems %02d'%index,stems,stem_faces,[stem_material])
+        if flowering:
+            v,f,slots = [],[],[]
+            for p in rng.sample(candidates,min(120,len(candidates))):
+                # Folded, pointed bracts in threes, clustered on actual leaf-spray tips.
+                orientation = Vector((p.x-root.x,p.y-root.y,.5)).to_track_quat('Z','Y').to_matrix()
+                for petal in range(3):
+                    turn = orientation @ Matrix.Rotation(petal*math.tau/3+rng.uniform(-.2,.2),3,'Z')
+                    length = rng.uniform(.035,.065)
+                    profile = [(0,0,0),(-.42,.45,.12),(-.28,.85,.05),(0,1,.12),(.30,.83,.04),(.42,.42,.10),(0,.52,.25)]
+                    start = len(v)
+                    v.extend(p+turn@(Vector(q)*length) for q in profile)
+                    for a,b in [(0,1),(1,2),(2,3),(3,4),(4,5),(5,0)]:
+                        f.append((start+a,start+b,start+6)); slots.append(rng.randrange(2))
+                start = len(v)
+                v.extend(p+orientation@Vector(q) for q in [(-.003,0,.007),(.003,0,.007),(0,.005,.012)])
+                f.append((start,start+1,start+2)); slots.append(2)
+            flowers = mesh_object('Pink bloom clusters %02d'%index,v,f,petals)
+            flowers['plant_role'] = 'blooms'
+            for face,slot in zip(flowers.data.polygons,slots):
+                face.material_index = slot
+
+    # The low, weathered bed edging around the entrance-side tree in reference #3.
+    curb = color_material('Dark weathered tree-bed edging',(.095,.10,.075))
+    for a,b in [((-10,.15),(-10,2.8)),((-10,2.8),(-5.8,2.8)),((-5.8,2.8),(-5.8,.15))]:
+        p,q = world(*a,height(*a)+.13),world(*b,height(*b)+.13)
+        direction = (q-p).normalized(); side = Vector((-direction.y,direction.x,0))*.075
+        v = [c+s+Vector((0,0,z)) for c in [p,q] for z in [-.13,.13] for s in [-side,side]]
+        mesh_object('Low entrance tree-bed edging',v,[(0,1,3,2),(4,6,7,5),(0,4,5,1),(2,3,7,6),(0,2,6,4),(1,5,7,3)],[curb])
+    data = bpy.data.cameras.new('Facade planting review')
+    camera = bpy.data.objects.new('Facade planting review',data)
+    bpy.data.collections['Environment - review cameras and daylight'].objects.link(camera)
+    camera.location = world(-13,12,4.6)
+    camera.rotation_euler = (world(-13,1,6)-camera.location).to_track_quat('-Z','Y').to_euler()
+    data.lens = 20
+    scene['facade_planting_pass'] = '02 - pink flowering shrubs, bright understory and two facade trees'
+    bpy.context.view_layer.update()
+    print('Added courtyard planting in the existing master:',len(planting.objects),'objects')
+
+add_facade_planting()

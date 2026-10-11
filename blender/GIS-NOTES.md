@@ -38,6 +38,21 @@ The packed file is stored with Git LFS; fresh clones need `git lfs pull`.
 - Before website integration: confirm registration/levels, bake portable ground
   materials, create tree LODs, and test frame time with existing pano controls.
 
+## Courtyard Planting Pass 02
+
+- Added three pink flowering shrubs and three green understory groups, including
+  low growth around the slender facade tree. Flower clusters use folded bract
+  geometry on textured leaf sprays, supported by tapered woody stems.
+- Added a narrow facade-side tree and a broader forked entrance-side tree,
+  bringing the total to 16 trees. They reuse the existing textured tree mesh.
+- Added the low weathered tree-bed edging seen beside the entrance and a
+  `Facade planting review` camera. Existing terrain levels remain unchanged.
+- This is photo-guided planting, not a botanical identification or a survey.
+  The pink shrub is a visual proxy, not a claim of an exact bougainvillea model.
+  Final canopy clearance against the detailed building awaits registration.
+- The new shrub leaves and blooms are checked against the road surfaces and
+  building footprint. All referenced textures are packed in the same master.
+
 ## Coordinates and Accuracy
 
 - WGS84 origin: longitude **83.323715**, latitude **17.728887**.
@@ -82,6 +97,7 @@ Retrieved 2026-10-11:
   [Jacaranda tree](https://polyhaven.com/a/jacaranda_tree),
   [Island tree 02](https://polyhaven.com/a/island_tree_02),
   [Bermuda grass](https://polyhaven.com/a/grass_bermuda_01),
+  [Shrub 03 foliage](https://polyhaven.com/a/shrub_03),
   [Asphalt 02](https://polyhaven.com/a/asphalt_02), and
   [Brown mud leaves 01](https://polyhaven.com/a/brown_mud_leaves_01).
   Local original downloads remain under ignored `sources/`; working geometry

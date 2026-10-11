@@ -1,13 +1,15 @@
 {
   "status": "PASS",
-  "trees": 14,
+  "trees": 16,
   "shared_tree_meshes": 2,
+  "flowering_shrubs": 3,
+  "green_shrubs": 3,
   "grass_clumps": 10000,
   "missing_textures": [],
   "root_ground_gap_m": [
     -0.06000000238418579,
     -0.059999942779541016
   ],
-  "draft_objects": 74,
-  "note": "Placement checks cover trunk roots and gate piers, not every leaf; grading remains provisional."
+  "draft_objects": 95,
+  "note": "Tree checks cover roots; new shrub leaves and blooms checked against roads/building footprint. Final detailed building registration remains pending."
 }

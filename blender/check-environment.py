@@ -19,6 +19,25 @@ footprint = bvh(scene.objects['Department footprint - registration only'])
 trees = list(bpy.data.collections['Environment - textured canopy and understory'].objects)
 assert len(trees) == 14
 assert len({o.data.as_pointer() for o in trees}) == 2, 'Tree instances must share source meshes'
+planting = bpy.data.collections.get('Environment - flowering shrubs and facade trees')
+if scene.get('facade_planting_pass'):
+    assert planting is not None
+    near_trees = [o for o in planting.objects if o.get('plant_role')=='facade_tree']
+    assert len(near_trees)==2
+    assert all(o.data==trees[0].data for o in near_trees), 'Reuse the existing tree mesh'
+    trees += near_trees
+    assert len([o for o in planting.objects if o.get('plant_role')=='flowering_shrub'])==3
+    assert len([o for o in planting.objects if o.get('plant_role')=='blooms'])==3
+    assert len([o for o in planting.objects if o.get('plant_role')=='green_shrub'])==3
+    for o in planting.objects:
+        if o.get('plant_role') in ['flowering_shrub','green_shrub','blooms']:
+            assert len(o.data.polygons)>0
+            # Conservative footprint/road check of every new leaf and bloom vertex.
+            for v in o.data.vertices:
+                p=o.matrix_world@v.co
+                origin=Vector((p.x,p.y,100))
+                assert footprint.ray_cast(origin,Vector((0,0,-1)))[0] is None, o.name+' overlaps building'
+                assert all(r.ray_cast(origin,Vector((0,0,-1)))[0] is None for r in roads), o.name+' reaches road'
 gaps = []
 for o in trees:
     origin = Vector((o.location.x,o.location.y,100))
@@ -45,6 +64,6 @@ grass = scene.objects['Patchy Bermuda grass - road and trunk exclusion']
 assert grass['clumps'] == 10000
 assert len(grass.data.uv_layers.active.data) == len(grass.data.loops)
 assert scene['estimated_drive_drop_m'] == .9, 'Do not silently change provisional grading'
-report = {'status':'PASS','trees':len(trees),'shared_tree_meshes':2,'grass_clumps':grass['clumps'],'missing_textures':missing,'root_ground_gap_m':[min(gaps),max(gaps)],'draft_objects':len(scene.objects),'note':'Placement checks cover trunk roots and gate piers, not every leaf; grading remains provisional.'}
+report = {'status':'PASS','trees':len(trees),'shared_tree_meshes':2,'flowering_shrubs':3 if planting else 0,'green_shrubs':3 if planting else 0,'grass_clumps':grass['clumps'],'missing_textures':missing,'root_ground_gap_m':[min(gaps),max(gaps)],'draft_objects':len(scene.objects),'note':'Tree checks cover roots; new shrub leaves and blooms checked against roads/building footprint. Final detailed building registration remains pending.'}
 (BASE/'gis'/'environment-checks.json').write_text(json.dumps(report,indent=2)+'\n',newline='\n')
 print(json.dumps(report,indent=2))

@@ -26,3 +26,18 @@ for (const id of ['asphalt_02', 'brown_mud_leaves_01']) {
   writeFileSync(join(dir, 'maps.json'), JSON.stringify(maps, null, 2) + '\n');
   console.log(`${id}: verified color, normal and roughness maps`);
 }
+
+// Small photographed shrub library used for the flowering verge planting.
+for (const id of ['shrub_03']) {
+  const dir = join('blender', 'sources', id);
+  mkdirSync(join(dir, 'textures'), { recursive: true });
+  const metadata = join(dir, 'files.json');
+  if (!existsSync(metadata)) execFileSync('curl', ['--fail', '--retry', '2', '-sSL', `https://api.polyhaven.com/files/${id}`, '-o', metadata]);
+  const asset = JSON.parse(readFileSync(metadata)).blend['1k'].blend;
+  for (const [path, file] of Object.entries({ [`${id}.blend`]: asset, ...asset.include })) {
+    const target = join(dir, path);
+    if (!existsSync(target)) execFileSync('curl', ['--fail', '--retry', '2', '-sSL', file.url, '-o', target]);
+    if (createHash('md5').update(readFileSync(target)).digest('hex') !== file.md5) throw new Error(`Checksum failed: ${target}`);
+  }
+  console.log(`${id}: verified model and textures`);
+}
