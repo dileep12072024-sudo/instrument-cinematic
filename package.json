@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node scripts/check-site.mjs",
     "test:wind": "node scripts/check-wind.mjs",
+    "test:environment": "node scripts/check-environment.mjs",
     "test:interaction": "node scripts/check-panorama-look.mjs && node scripts/check-entrance-look.mjs",
     "test:geometry": "node scripts/check-building-clearances.mjs && node scripts/check-terrace-coping.mjs && node scripts/check-foliage-clearance.mjs",
     "deploy": "wrangler pages deploy dist --project-name instrument-cinematic"

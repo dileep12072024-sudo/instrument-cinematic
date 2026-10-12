@@ -581,6 +581,18 @@ function foliageTexture() {
   return texture(c);
 }
 
+export function buildEntranceApron(group) {
+  const tiles = canvas(256), tileCtx = tiles.getContext('2d');
+  tileCtx.fillStyle = '#c1a39a'; tileCtx.fillRect(0, 0, 256, 256);
+  tileCtx.strokeStyle = '#816d65'; tileCtx.lineWidth = 2; tileCtx.strokeRect(2, 2, 252, 252);
+  for (let r = 24; r < 170; r += 22) { tileCtx.beginPath(); tileCtx.arc(128, 128, r, 0, Math.PI * 2); tileCtx.stroke(); }
+  const tileMap = texture(tiles); tileMap.repeat.set(16, 6);
+  const tileMat = new T.MeshStandardMaterial({ color: '#ded0c5', roughness: .95, map: tileMap, bumpMap: tileMap, bumpScale: .009 });
+  const apron = new T.Mesh(new T.BoxGeometry(9.9, .03, 3.55), tileMat);
+  apron.position.set(0, .145, 8.95); apron.name = 'Pink patterned entrance apron'; apron.receiveShadow = true; group.add(apron);
+  return apron;
+}
+
 export function buildLandscape(scene) {
   const group = new T.Group(); group.name = 'Courtyard and planting'; scene.add(group);
   const mat = (color, opts = {}) => new T.MeshStandardMaterial({ color, roughness: .95, ...opts });
@@ -625,13 +637,7 @@ export function buildLandscape(scene) {
   for (const z of [35.95, 42.04]) gradedBox(180, .014, .08, 0, .018, z, white);
   for (const x of [-3, 3]) gradedBox(.18, .22, 24, x, .035, 23.5, curbMat);
   for (const z of [35.7, 42.3]) gradedBox(180, .18, .22, 0, .025, z, curbMat);
-  const tiles = canvas(256), tileCtx = tiles.getContext('2d');
-  tileCtx.fillStyle = '#c1a39a'; tileCtx.fillRect(0, 0, 256, 256);
-  tileCtx.strokeStyle = '#816d65'; tileCtx.lineWidth = 2; tileCtx.strokeRect(2, 2, 252, 252);
-  for (let r = 24; r < 170; r += 22) { tileCtx.beginPath(); tileCtx.arc(128, 128, r, 0, Math.PI * 2); tileCtx.stroke(); }
-  const tileMap = texture(tiles); tileMap.repeat.set(16, 6);
-  const tileMat = mat('#ded0c5', { map: tileMap, bumpMap: tileMap, bumpScale: .009 });
-  box(9.9, .03, 3.55, 0, .145, 8.95, tileMat).name = 'Pink patterned entrance apron';
+  buildEntranceApron(group);
   const treePositions = [[-37, 10, 14], [-37, -6, 14], [-29, 18, 14], [-43, 16, 14], [41, 11, 13], [-45, -10, 14], [44, -15, 12], [-13, -25, 13], [9, -25, 15], [30, -29, 13], [-30, -29, 15]];
   for (let i = 0; i < 26; i++) {
     const a = random() * Math.PI * 2, r = 60 + random() * 50;

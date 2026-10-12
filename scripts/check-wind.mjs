@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { Vector2, MeshStandardMaterial, MeshDepthMaterial } from 'three';
+import { Vector2, Vector3, Box3, BufferGeometry, Float32BufferAttribute, Mesh, MeshStandardMaterial, MeshDepthMaterial } from 'three';
 import { updateWind, applyWind } from '../src/weather-effects.js';
+import { applyModelWind, clearModelVegetation } from '../src/blender-environment.js';
 
 const makeState = () => ({ wind: { value: 0 }, windStrength: { value: 0 }, windDirection: { value: new Vector2(0, 1) } });
 function settle(speed, fps = 60) {
@@ -29,7 +30,21 @@ for (const Material of [MeshStandardMaterial, MeshDepthMaterial]) {
   applyWind(trunk, state.wind, state.windStrength, state.windDirection);
   applyWind(leaf, state.wind, state.windStrength, state.windDirection, 1);
   assert.notEqual(trunk.customProgramCacheKey(), leaf.customProgramCacheKey());
+  const model = new Material();
+  applyModelWind(model, state, 12);
+  const shader = { uniforms: {}, vertexShader: '#include <project_vertex>' };
+  model.onBeforeCompile(shader);
+  assert.equal(shader.uniforms.uWindStrength, state.windStrength);
+  assert.equal(shader.uniforms.uWindDirection, state.windDirection);
+  assert.ok(shader.vertexShader.includes('_wind.x * wave'), 'Blender weights drive both color and depth shaders');
 }
+const geometry = new BufferGeometry();
+geometry.setAttribute('position', new Float32BufferAttribute([0, 1, 0, .1, 1, 0, 0, 1.1, 0, 10, 1, 0, 10.1, 1, 0, 10, 1.1, 0], 3));
+geometry.setIndex([0, 1, 2, 3, 4, 5]);
+const plant = new Mesh(geometry, new MeshStandardMaterial()); plant.updateMatrixWorld(true);
+assert.equal(clearModelVegetation(plant, [new Box3(new Vector3(-1, 0, -1), new Vector3(1, 2, 1))], 12), 1);
+assert.equal(plant.geometry.index.count, 3);
+assert.equal(geometry.index.count, 6, 'Shared export geometry is not mutated by clearance pruning');
 console.log('PASS calm, speed scaling, gust bounds, frame-rate independence, direction smoothing and reduced motion');
 
 if (process.argv.includes('--browser')) {

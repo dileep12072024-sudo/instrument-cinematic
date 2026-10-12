@@ -1,0 +1,581 @@
+{
+  "source": "blender/campus-terrain-working.blend",
+  "trees": 23,
+  "triangles": 4106128,
+  "bytes": 20747700,
+  "registration_apron_z": 10.75,
+  "objects": [
+    {
+      "name": "Editable verges and lower courtyard grading",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 27300
+    },
+    {
+      "name": "Entrance concrete apron",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 480
+    },
+    {
+      "name": "Lower side courtyard paving",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 480
+    },
+    {
+      "name": "Principal Office Road - OSM alignment, provisional grade",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 1040
+    },
+    {
+      "name": "Entrance driveway with flared junction",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 2048
+    },
+    {
+      "name": "West driveway edge paint",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 128
+    },
+    {
+      "name": "West driveway kerb",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 128
+    },
+    {
+      "name": "East driveway edge paint",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 128
+    },
+    {
+      "name": "East driveway kerb",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 128
+    },
+    {
+      "name": "Near campus road edge paint",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 228
+    },
+    {
+      "name": "Far campus road edge paint",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 260
+    },
+    {
+      "name": "Left entrance gate pier - provisional",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "Right entrance gate pier - provisional",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "Canopy - jacaranda_tree",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Canopy - jacaranda_tree.001",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Canopy - jacaranda_tree.002",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Canopy - jacaranda_tree.003",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Canopy - jacaranda_tree.004",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Canopy - jacaranda_tree.005",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Canopy - island_tree_02",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Canopy - island_tree_02.001",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Canopy - island_tree_02.002",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Canopy - island_tree_02.003",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Canopy - island_tree_02.004",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Canopy - island_tree_02.005",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Canopy - island_tree_02.006",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Canopy - island_tree_02.007",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Patchy Bermuda grass - road and trunk exclusion",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 120000
+    },
+    {
+      "name": "West open gate upright",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West open gate upright.001",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West open gate rail",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West open gate rail.001",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West open gate rail.002",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket.001",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket.002",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket.003",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket.004",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket.005",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket.006",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket.007",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket.008",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket.009",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate picket.010",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate brace",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate pier coping",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East open gate upright",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East open gate upright.001",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East open gate rail",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East open gate rail.001",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East open gate rail.002",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket.001",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket.002",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket.003",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket.004",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket.005",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket.006",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket.007",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket.008",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket.009",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate picket.010",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate brace",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate pier coping",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate hinge strap",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "West gate hinge strap.001",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate hinge strap",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "East gate hinge strap.001",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "Slender tree beside left facade",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Forked tree beside main entrance",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Pink flowering shrub 00",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 12000
+    },
+    {
+      "name": "Supporting shrub stems 00",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 912
+    },
+    {
+      "name": "Pink bloom clusters 00",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 2280
+    },
+    {
+      "name": "Pink flowering shrub 01",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 12000
+    },
+    {
+      "name": "Supporting shrub stems 01",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 912
+    },
+    {
+      "name": "Pink bloom clusters 01",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 2280
+    },
+    {
+      "name": "Pink flowering shrub 02",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 12000
+    },
+    {
+      "name": "Supporting shrub stems 02",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 912
+    },
+    {
+      "name": "Pink bloom clusters 02",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 2280
+    },
+    {
+      "name": "Bright green understory 03",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 12000
+    },
+    {
+      "name": "Supporting shrub stems 03",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 912
+    },
+    {
+      "name": "Bright green understory 04",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 12000
+    },
+    {
+      "name": "Supporting shrub stems 04",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 912
+    },
+    {
+      "name": "Bright green understory 05",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 12000
+    },
+    {
+      "name": "Supporting shrub stems 05",
+      "tree": false,
+      "vegetation": true,
+      "triangles": 912
+    },
+    {
+      "name": "Low entrance tree-bed edging",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "Low entrance tree-bed edging.001",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "Low entrance tree-bed edging.002",
+      "tree": false,
+      "vegetation": false,
+      "triangles": 12
+    },
+    {
+      "name": "Spreading canopy beside tank terrace",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Rear compound-leaf canopy",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Rear right spreading canopy",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 264448
+    },
+    {
+      "name": "Broadleaf screen beside AC terrace",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Broadleaf rear screen west",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Broadleaf rear screen centre",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    },
+    {
+      "name": "Narrow rear crown east",
+      "tree": true,
+      "vegetation": true,
+      "triangles": 80000
+    }
+  ],
+  "rawBytes": 80565132,
+  "sha256": "0cea00ecb9bc9e850c02c473aad4a19607f20f05ad9a79534277c9bd2cd6743d"
+}

@@ -2,8 +2,8 @@
 
 Open **`campus-terrain-working.blend`** in Blender. This is the single master file
 for all environment work, with collections and scenes inside it, not alternate
-working-file copies. The approved website building, camera controls and deployed
-preview are unchanged. Existing `IT_evnironment.blend` and `Terrain.blend` files
+working-file copies. The approved website building and camera controls are
+unchanged; the website landscape now uses this master. Existing `IT_evnironment.blend` and `Terrain.blend` files
 are untouched. Textures are packed into the master file.
 The packed file is stored with Git LFS; fresh clones need `git lfs pull`.
 
@@ -16,6 +16,9 @@ The packed file is stored with Git LFS; fresh clones need `git lfs pull`.
   junction, adjoining mapped road alignment, white edges, kerbs, open metal
   gates, concrete apron, lower side paving and planted ground. The blue
   shape is a footprint registration reference, not the finished building.
+- **Website environment export**: reduced, textured derivatives of the actual
+  photo-draft meshes, registered to the website building. This is an export scene
+  inside the same master, not another working file.
 
 ## Environment Pass 01
 
@@ -72,9 +75,9 @@ The packed file is stored with Git LFS; fresh clones need `git lfs pull`.
   These are editable estimates, not measurements or heights inferred precisely
   from photographs. The proposed entrance axis needs visual confirmation.
 
-Do not merge the two vertical surfaces or export them as an approved runtime
-environment until the road junction, building registration and level differences
-have been checked. The unmodified GIS reference is retained for comparison.
+Do not merge the two vertical surfaces. The runtime uses the photo-based grading;
+the unmodified GIS reference is retained for comparison. Levels remain provisional
+until measured on site.
 
 ## Rear Canopy and Wind
 
@@ -88,9 +91,39 @@ against the detailed building and tanks must be verified during registration.
 
 Website wind uses live speed, direction and gust readings with slow canopy bend
 and independent tip-weighted leaf flutter. Calm wind settles and reduced-motion
-mode disables movement. This shader runs on the existing website vegetation;
-the high-resolution Blender trees are not yet exported to the website. They
-need lower-detail runtime meshes and final building registration first.
+mode disables movement. The shader now runs on the exported Blender trees,
+shrubs, blooms and grass, replacing the old procedural website planting.
+
+## Website Integration
+
+- `Website environment export` contains all 23 trees and the authored terrain,
+  drive, road, kerbs, gates, shrubs and ground cover. Tree leaves and wood have
+  separate simplification budgets so thin leaf sprays survive reduction.
+- `_WIND` is a vertex attribute: normalized bend, leaf flexibility and phase.
+  Roots stay anchored; the runtime adds world-space bend and leaf flutter on the
+  GPU, including the matching shadow deformation. No baked animation is needed.
+- The source photo-draft meshes remain unchanged. The export maps its entrance
+  axis to website +Z, with the drive starting at Z=10.75 beside the pink apron.
+- The website trims exported plant triangles against the approved building and
+  tank volumes with clearance for maximum wind excursion. It does not replace
+  or remodel the building to fit vegetation.
+- The 2026-10-12 WhatsApp videos confirm flowering shrubs on the **right** of
+  the driveway when facing the main entrance. The three flowering groups and
+  two adjoining green shrubs were moved together in both authoring/export scenes;
+  the small understory at the left facade tree remains there.
+- Embedded textures are capped at 1024 pixels; Draco geometry compression and
+  shared tree meshes keep the GLB within the hosting asset limit. A distant
+  ground continuation lies below, not over, the authored local terrain.
+- Export the existing export scene as GLB to `public/media/campus-environment.glb`
+  with extras, custom attributes, applied modifiers and Draco enabled. Then run
+  `node scripts/prepare-environment.mjs`. On a fresh checkout, unpack the master's
+  grass/shrub source textures into their existing `blender/sources/` paths first;
+  the packer combines their original color and alpha without changing color space.
+  The Python export script constructs
+  derivatives once and refuses to duplicate an existing export scene.
+- Verify using `npm run test:environment`, `node scripts/check-wind.mjs --browser`,
+  and the interaction and geometry regression suites. Browser checks require
+  the development server on port 5190 and the configured Playwright Chromium.
 
 ## Sources and Attribution
 

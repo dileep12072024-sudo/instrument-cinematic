@@ -385,7 +385,8 @@ def add_facade_planting():
     shrub_height = max(v.co.z for v in sprig.data.vertices)-shrub_min
     centre = Vector(((min(v.co.x for v in sprig.data.vertices)+max(v.co.x for v in sprig.data.vertices))/2,(min(v.co.y for v in sprig.data.vertices)+max(v.co.y for v in sprig.data.vertices))/2,shrub_min))
 
-    for index,(x,y,h,flowering) in enumerate([(-5.7,12.5,1.8,True),(-7.2,14,2.1,True),(-8.4,13,1.55,True),(-6.5,9.3,1.65,False),(-7.5,9.6,1.25,False),(-18.1,.65,.65,False)]):
+    # Video 2026-10-12: the flower bed is right of the drive, facing the entrance.
+    for index,(x,y,h,flowering) in enumerate([(5.7,12.5,1.8,True),(7.2,14,2.1,True),(8.4,13,1.55,True),(6.5,9.3,1.65,False),(7.5,9.6,1.25,False),(-18.1,.65,.65,False)]):
         root = world(x,y,height(x,y)-.015)
         verts,faces,uvs,stems,stem_faces,candidates = [],[],[],[],[],[]
         for branch in range(38):
