@@ -2,6 +2,35 @@
 
 Updated: 2026-10-12. Read this before changing the project.
 
+## Latest Terrain Edit (Supersedes Baseline Below)
+
+After this handoff was first committed, the user requested terrain correction
+and removal of white sheet-like scraps. They asked the agent to use the videos
+rather than trying to explain "inversion" verbally. No measured elevations or
+explicit instruction to globally mirror the terrain were supplied.
+
+`blender/correct-video-forecourt.py` has now been applied in the existing master:
+
+- Replaced the broad pale draft apron with textured facade-side paving.
+- Moved the left return paving inside the left courtyard, rather than outside
+  the left wing. Preserved the existing website porch and building.
+- Widened the driveway toward the entrance, kept the mapped road junction fixed,
+  and retained the provisional downhill grade toward the gate.
+- Restored bare-earth pockets beside both wings with open access from the drive;
+  kept kerbs around the planted verges rather than blocking court access.
+- Repositioned whole flower groups beside the right-hand kerb. New local XY:
+  (4.3,8.6), (5.6,10.2), (4.4,12.1). Green groups 03/04: (6.7,8), (7,10.5).
+- Adjusted tree roots/grass to the revised ground without changing panorama code.
+
+The script is a one-time corrective migration, not a second Blender project;
+it refuses to run twice. The raw GIS scene is unchanged. Final positions remain
+video-guided estimates pending user review. The round masonry feature remains
+unmodeled. Do not claim a surveyed match or a confirmed global inversion fix.
+
+Check Git history for the terrain commit/deployment after `028c250`. All baseline
+positions, asset hashes and dirty-state notes below describe the earlier handoff,
+not this new export. Current asset metadata is in `blender/gis/runtime-checks.json`.
+
 ## Current Task: Plant Placement Is Not Approved
 
 The user's latest feedback is: "I'm feeling like they are not located in correct

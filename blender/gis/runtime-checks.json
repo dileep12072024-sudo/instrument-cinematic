@@ -1,8 +1,8 @@
 {
   "source": "blender/campus-terrain-working.blend",
   "trees": 23,
-  "triangles": 4106128,
-  "bytes": 20747700,
+  "triangles": 4103320,
+  "bytes": 20676976,
   "registration_apron_z": 10.75,
   "objects": [
     {
@@ -15,7 +15,7 @@
       "name": "Entrance concrete apron",
       "tree": false,
       "vegetation": false,
-      "triangles": 480
+      "triangles": 648
     },
     {
       "name": "Lower side courtyard paving",
@@ -45,7 +45,7 @@
       "name": "West driveway kerb",
       "tree": false,
       "vegetation": false,
-      "triangles": 128
+      "triangles": 78
     },
     {
       "name": "East driveway edge paint",
@@ -57,7 +57,7 @@
       "name": "East driveway kerb",
       "tree": false,
       "vegetation": false,
-      "triangles": 128
+      "triangles": 104
     },
     {
       "name": "Near campus road edge paint",
@@ -171,7 +171,7 @@
       "name": "Patchy Bermuda grass - road and trunk exclusion",
       "tree": false,
       "vegetation": true,
-      "triangles": 120000
+      "triangles": 117098
     },
     {
       "name": "West open gate upright",
@@ -576,6 +576,6 @@
       "triangles": 80000
     }
   ],
-  "rawBytes": 80565132,
-  "sha256": "0cea00ecb9bc9e850c02c473aad4a19607f20f05ad9a79534277c9bd2cd6743d"
+  "rawBytes": 80494408,
+  "sha256": "6e45dfc34bb51f990871f4b6e09d659f962bdecf4511881b0436eb738ee81172"
 }

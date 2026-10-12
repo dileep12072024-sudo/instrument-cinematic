@@ -125,6 +125,27 @@ shrubs, blooms and grass, replacing the old procedural website planting.
   and the interaction and geometry regression suites. Browser checks require
   the development server on port 5190 and the configured Playwright Chromium.
 
+## October 12 Video Forecourt Correction
+
+`correct-video-forecourt.py` was applied to the existing authoring/export scenes,
+not to the raw GIS reference. It refuses to apply twice. The entrance drive now
+widens toward the porch; its campus-road junction and provisional downhill grade
+are retained. The videos do not establish measured elevations or justify a
+global left/right reflection of the whole terrain.
+
+The continuous pale 40 m draft apron was replaced by textured facade-side paving
+around the existing tiled porch. The lower left paving now lies inside the left
+wing's courtyard, not beyond that wing. Both near-building courts have exposed
+earth and open road access; kerbs begin at the planted verges. Flower groups now
+follow the right kerbed edge at local XY (4.3,8.6), (5.6,10.2), (4.4,12.1), with
+stems/blooms moved together. These are video-guided estimates pending user review.
+Tree roots and grass follow the revised local surface; wind attributes remain.
+
+The rough grey paving reuses packed aggregate maps; no untextured bright draft
+sheet spans the entrance. The browser regression samples both earth courts,
+the driveway flare, inner left paving, flower strip and textured apron. The
+round masonry feature visible near the flowers is not yet modeled.
+
 ## Sources and Attribution
 
 Retrieved 2026-10-11:

@@ -38,6 +38,17 @@ try {
     scene.updateMatrixWorld(true);
     const ray = new T.Raycaster(new T.Vector3(0, 2, 10.76), new T.Vector3(0, -1, 0));
     const hit = ray.intersectObject(road, true)[0];
+    const ground = nodes.find(o => o.userData.source_object === 'Editable verges and lower courtyard grading');
+    const down = new T.Vector3(0, -1, 0);
+    const sample = (object, x, z) => new T.Raycaster(new T.Vector3(x, 3, z), down).intersectObject(object, true)[0];
+    const bareCourts = [[-12, 16], [12, 14]].map(([x,z]) => {
+      const hit = sample(ground, x, z);
+      return hit?.object.material.userData.source_material;
+    });
+    const apron = nodes.find(o => o.userData.source_object === 'Entrance concrete apron');
+    const paving = [];
+    apron.traverse(o => { if (o.isMesh) paving.push(o); });
+    const pavingBounds = new T.Box3().setFromObject(apron);
     const point = new T.Vector3();
     const flowers = nodes.filter(o => o.userData.source_object?.startsWith('Pink flowering shrub')).map(o => new T.Box3().setFromObject(o).getCenter(new T.Vector3()).toArray());
     let rootWeight = 0;
@@ -53,7 +64,11 @@ try {
     return { name: landscape.group.name, trees: landscape.trees.length, vegetation: vegetation.length, sources, missingWeights: vegetation.filter(o => !o.geometry.attributes._wind).length,
       trimmed: landscape.trimmedTriangles, visiblePlants: vegetation.filter(o => o.visible).length,
       missingLeafMaps: vegetation.filter(o => o.material.userData.foliage && /leaves|shrub|grass/.test(o.material.name) && !o.material.map).length,
-      roadStartY: hit?.point.y, rootWeight, flowers };
+      roadStartY: hit?.point.y, rootWeight, flowers, bareCourts,
+      approachFlare: !!sample(road, 4.7, 10.8) && !sample(road, 4.7, 28),
+      pavingTextured: paving.every(o => !!o.material.map), pavingTop: pavingBounds.max.y,
+      noPavingAcrossDrive: !sample(apron, 0, 9),
+      leftReturnInsideWing: sample(nodes.find(o => o.userData.source_object === 'Lower side courtyard paving'), -19, 18)?.point.y };
   });
   assert.equal(model.name, 'Blender campus environment');
   assert.equal(model.trees, 23); assert.equal(model.missingWeights, 0); assert.equal(model.missingLeafMaps, 0);
@@ -64,12 +79,19 @@ try {
   assert.equal(model.flowers.length, 3);
   console.log('Flower centres', model.flowers);
   assert.ok(model.flowers.every(p => p[0] > 3), 'Flowers are right of the driveway, facing the entrance');
+  assert.ok(model.flowers.every(p => p[0] < 6 && p[2] > 18 && p[2] < 24), 'Flowers follow the near right kerbed strip, not the distant lawn');
+  assert.deepEqual(model.bareCourts, ['Exposed red earth', 'Exposed red earth']);
+  assert.ok(model.approachFlare, 'Drive widens at the entrance, not only at the campus road');
+  assert.ok(model.pavingTextured && model.pavingTop < 0 && model.noPavingAcrossDrive, 'No bright continuous draft sheet across the porch');
+  assert.ok(Number.isFinite(model.leftReturnInsideWing), 'Left courtyard paving is inside the wing');
   console.log('PASS exported Blender environment', { ...model, sources: model.sources.length });
   await mkdir('artifacts/environment', { recursive: true });
   for (const [name, eye, target] of [
     ['approach', [0, 2, 46], [0, 5, 0]],
     ['overview', [48, 35, 65], [0, 3, 14]],
-    ['flowers', [1.5, 2.5, 27], [7, 1.2, 23.5]],
+    ['flowers', [0, 1.65, 24], [5, .8, 20.5]],
+    ['left-court', [-3, 1.65, 25], [-15, .2, 12]],
+    ['right-court', [1, 1.65, 23], [14, .2, 12]],
     ['rear-canopy', [-20, 11, 6], [-25, 13, -23]],
   ]) {
     await page.evaluate(({ eye, target }) => {
