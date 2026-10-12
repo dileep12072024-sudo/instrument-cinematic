@@ -2,6 +2,29 @@
 
 Updated: 2026-10-12. Read this before changing the project.
 
+## Video-Guided Surroundings and Quality Pass (2026-10-12, latest)
+
+Both WhatsApp videos were reviewed frame by frame (480p re-encodes, so fine detail
+is limited). Runtime changes, all in three.js; the Blender master was not touched:
+
+- `src/surroundings.js` (new): material tints matching the footage (dark asphalt,
+  weathered kerb, red laterite earth, red hibiscus-like blooms instead of magenta);
+  a 260-tree impostor belt beyond the site (cards captured from the real Blender
+  trees, never on roads/kerbs/paving, chapter sightlines kept clear); a hazy hill
+  ridge only on the gate-facing arc, where the videos show it; and a provisional low
+  brick plinth with concrete cap directly behind the east kerb at runtime Z=20.5.
+- The "round masonry feature" is a low rectangular brick plinth with a concrete cap
+  (video 12.38.14 at ~25-26 s), right behind the kerb, beside a kerb break. Its
+  position along the drive and its size (1.4 x 0.9 x 0.38 m) are estimates.
+- Distant ground now uses the verge material, not bare soil.
+- Quality: auto resolution used to ratchet down permanently, and every tab switch
+  counted as one huge frame, so it lost 20% each time. It now ignores stalls and
+  recovers (`scripts/check-resolution.mjs`, `npm run test:resolution`). All
+  textures get the GPU's maximum anisotropy.
+- Smoothness: panorama wheel/trackpad movement is proportional to scroll delta.
+- Still not determinable from the footage: a measured driveway fall, side-ground
+  depression, exact shrub positions. The provisional 0.9 m grade is unchanged.
+
 ## Latest Terrain Edit (Supersedes Baseline Below)
 
 After this handoff was first committed, the user requested terrain correction

@@ -4,6 +4,7 @@ import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { createIcons, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, Images, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check } from 'lucide';
 import { buildArchitecture, buildEntranceApron } from './architecture.js';
 import { loadBlenderEnvironment } from './blender-environment.js';
+import { buildSurroundings } from './surroundings.js';
 import { footprint } from './footprint.js';
 import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
@@ -101,7 +102,7 @@ try {
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#b6c5c9'); scene.fog = new THREE.Fog('#b6c5c9', 80, 300);
 const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 500);
-let controls, architecture, landscape, entranceWalk, panoramaLook;
+let controls, architecture, landscape, surroundings, entranceWalk, panoramaLook;
 let selected = 0, transition = null, journey = false, journeyStart = 0, isOrbiting = false, doorsOpen = false, hour = 16.5, targetHour = 16.5;
 let ready = false, drift = !reduced, quality = 'auto', needsRender = true, lastRendered = 0, lastShadowUpdate = 0;
 let interactive = false;
@@ -143,6 +144,18 @@ for (const x of [-2, 2]) {
 }
 const defaultPixelRatio = () => Math.min(devicePixelRatio, 1.35);
 const frameSamples = [];
+let resolutionCeiling = Infinity, lastResolutionChange = 0, lastResolutionRaise = -Infinity, ceilingSetAt = -Infinity;
+// Previously this only ever lowered the pixel ratio, so every tab switch (one huge frame) blurred the scene for good.
+function adaptResolution(duration, now) {
+  frameSamples.push(duration); if (frameSamples.length > 30) frameSamples.shift();
+  if (frameSamples.length < 30 || now - lastResolutionChange < 1500) return;
+  const average = frameSamples.reduce((a, b) => a + b, 0) / frameSamples.length, ratio = renderer.getPixelRatio();
+  let next = ratio;
+  if (now - ceilingSetAt > 60000) resolutionCeiling = Infinity;
+  if (average > 28 && ratio > .65) { next = Math.max(.65, ratio * .85); if (now - lastResolutionRaise < 6000) { resolutionCeiling = ratio; ceilingSetAt = now; } } // a raise that immediately overloads becomes the cap for a minute
+  else if (average < 19 && ratio < Math.min(defaultPixelRatio(), resolutionCeiling)) { next = Math.min(defaultPixelRatio(), resolutionCeiling, ratio * 1.12); lastResolutionRaise = now; }
+  if (next !== ratio) { renderer.setPixelRatio(next); frameSamples.length = 0; lastResolutionChange = now; needsRender = true; }
+}
 // Live weather point supplied for the Andhra University campus.
 const LOCATION = { latitude: 17.6801, longitude: 83.2016, timezone: 'Asia/Kolkata', label: 'ANDHRA UNIVERSITY / VISAKHAPATNAM' };
 const WEATHER_RAIN_CODES = new Set([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99]);
@@ -260,6 +273,7 @@ function updateLighting(h) {
   scene.backgroundIntensity = THREE.MathUtils.lerp(.95, .13, evening);
   scene.fog.color.set('#b6c5c9').lerp(new THREE.Color('#182336'), evening).lerp(new THREE.Color('#64757b'), wet * .22);
   if (scene.background?.isColor) scene.background.copy(scene.fog.color);
+  surroundings?.update(scene.fog.color);
   entranceLight.intensity = evening * 40;
   warm.opacity = evening * .6; warm.emissiveIntensity = evening * 1.4;
   if (architecture) {
@@ -388,6 +402,10 @@ async function boot() {
   $('#loading-status').textContent = 'Growing the Blender landscape';
   landscape = await loadBlenderEnvironment(scene);
   buildEntranceApron(landscape.group);
+  surroundings = buildSurroundings(scene, landscape, renderer, chapters.flatMap(c => [[c.eye, c.target], [new THREE.Vector3(...c.eye).sub(new THREE.Vector3(...c.target)).multiplyScalar(2.4).add(new THREE.Vector3(...c.target)).toArray(), c.target]]));
+  // Full anisotropic filtering keeps road lines, paving and soil crisp at grazing angles.
+  const anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
+  scene.traverse(o => { for (const m of [o.material].flat()) if (m) for (const v of Object.values(m)) if (v?.isTexture && !v.isRenderTargetTexture) v.anisotropy = Math.max(v.anisotropy, anisotropy); });
   setHour(localHour(), { manual: false });
   hour = targetHour;
   updateMoon();
@@ -486,14 +504,11 @@ function animate(now) {
   if (needsRender || !reduced) {
     renderer.render(scene, camera);
     if (++frames % 60 === 0) drawPlan();
-    if (quality === 'auto' && !reduced && frames > 12) {
-      frameSamples.push(frameDuration); if (frameSamples.length > 12) frameSamples.shift();
-      if (frameSamples.length === 12 && frames % 12 === 0 && frameSamples.reduce((a, b) => a + b, 0) / 12 > 28 && renderer.getPixelRatio() > .65) renderer.setPixelRatio(Math.max(.65, renderer.getPixelRatio() * .8));
-    }
+    if (quality === 'auto' && !reduced && frames > 12 && frameDuration < 250) adaptResolution(frameDuration, now);
     needsRender = false; lastRendered = now;
   }
 }
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; } };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; } };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;
@@ -573,7 +588,7 @@ $('#hour').oninput = e => setHour(+e.target.value);
 $('#live-clock').onchange = e => { liveClock = e.target.checked; if (liveClock) setHour(localHour(), { manual: false }); updateMoon(); };
 document.querySelectorAll('[data-hour]').forEach(b => b.onclick = () => setHour(+b.dataset.hour));
 $('#motion').onchange = e => { drift = e.target.checked; interactive = !drift; };
-$('#quality').onchange = e => { quality = e.target.value; frameSamples.length = 0; if (renderer) { renderer.setPixelRatio(quality === 'high' ? Math.min(devicePixelRatio, 2) : quality === 'low' ? .9 : defaultPixelRatio()); needsRender = true; } };
+$('#quality').onchange = e => { quality = e.target.value; frameSamples.length = 0; resolutionCeiling = Infinity; if (renderer) { renderer.setPixelRatio(quality === 'high' ? Math.min(devicePixelRatio, 2) : quality === 'low' ? .9 : defaultPixelRatio()); needsRender = true; } };
 $('#capture').onclick = () => { if (!renderer) return; renderer.render(scene, camera); renderer.domElement.toBlob(blob => { if (!blob) return toast('Could not save the photograph.'); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'instrument-technology.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast('Your campus photograph is ready.'); }); };
 $('#fullscreen').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('#experience').requestFullscreen(); } catch { toast('Full screen is unavailable in this browser.'); } };
 document.addEventListener('fullscreenchange', () => { $('#fullscreen').innerHTML = icon(document.fullscreenElement ? 'minimize' : 'maximize'); $('#fullscreen').setAttribute('aria-label', document.fullscreenElement ? 'Exit full screen' : 'Full screen'); refreshIcons(); });

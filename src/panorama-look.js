@@ -34,7 +34,9 @@ export function createPanoramaLook(camera, canvas, active, changed) {
   });
   canvas.addEventListener('wheel', e => {
     if (!active()) return;
-    e.preventDefault(); move(-Math.sign(e.deltaY) * .7);
+    e.preventDefault();
+    const delta = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+    move(T.MathUtils.clamp(-delta * .007, -1.4, 1.4));
   }, { passive: false });
   canvas.addEventListener('keydown', e => {
     if (!active()) return;

@@ -101,8 +101,8 @@ export async function loadBlenderEnvironment(scene) {
     state.vegetation.push(node);
   });
   if (state.trees.length !== 23 || !state.groundMaterial || !state.soilMaterial || !state.pavingMaterial) throw new Error('Incomplete Blender environment export');
-  // Distant continuation sits below the authored terrain, never over the roads.
-  const horizon = new T.Mesh(new T.PlaneGeometry(2000, 2000), state.soilMaterial.clone());
+  // Distant continuation sits below the authored terrain, never over the roads; vegetated, as in the site videos.
+  const horizon = new T.Mesh(new T.PlaneGeometry(2000, 2000), state.groundMaterial.clone());
   for (const slot of ['map', 'normalMap', 'roughnessMap']) if (horizon.material[slot]) {
     horizon.material[slot] = horizon.material[slot].clone();
     horizon.material[slot].wrapS = horizon.material[slot].wrapT = T.RepeatWrapping;
