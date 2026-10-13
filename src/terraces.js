@@ -191,7 +191,7 @@ export function buildTerraces(parent, m) {
   // Close the facade between storeys: first-floor wall top (8.0) to the parapet (8.70), and the
   // lintel (11.84) to the roof parapet (12.56). Both were open bands showing the slab and interior.
   box(13, 8.35, 3.25, 18, .70, .32, m.wall);
-  box(13, 12.2, 3.25, 18, .72, .32, m.wall);
+  box(13, 12.2, 3.35, 18, .72, .20, m.wall); // facade line (3.25) out past the roof slab edge (3.425); clear of the corner stair treads
   box(13, 11.55, 3.25, 18, .58, .22, m.wall);
   for (let x = 4.2; x <= 22; x += 2.96) box(x, 10.25, 3.25, .34, 2.02, .24, m.wall);
   tube([[4.2, 9.72, 3.22], [21.8, 9.72, 3.22]], .034, m.metal);

@@ -24,11 +24,16 @@ export function clearModelVegetation(mesh, obstacles, height) {
   const world = new Float32Array(position.count * 3), point = new T.Vector3();
   for (let i = 0; i < position.count; i++) point.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld).toArray(world, i * 3);
   const kept = [], count = index ? index.count : position.count;
-  const triangle = new T.Box3(), margin = new T.Vector3(reach, .03, reach);
+  const triangle = new T.Box3(), margin = new T.Vector3();
+  // Clearance per vertex from its own wind weights (the shader's maximum bend + flutter at full strength),
+  // so a trunk that barely moves is never cut because the crown tip of the same tree sways 1.7 m.
+  const wind = geometry.getAttribute('_wind'), bend = Math.max(.035, (height / 12) ** 2);
+  const vertexReach = v => wind ? 1.5 * (bend * Math.max(0, wind.getX(v)) + .035 * Math.max(0, wind.getY(v))) + .053 : reach;
   for (let i = 0; i < count; i += 3) {
     triangle.makeEmpty();
-    for (let k = 0; k < 3; k++) triangle.expandByPoint(point.fromArray(world, (index ? index.getX(i + k) : i + k) * 3));
-    triangle.expandByVector(margin);
+    let r = 0;
+    for (let k = 0; k < 3; k++) { const v = index ? index.getX(i + k) : i + k; triangle.expandByPoint(point.fromArray(world, v * 3)); r = Math.max(r, vertexReach(v)); }
+    triangle.expandByVector(margin.set(r, .03, r));
     if (!nearby.some(box => box.intersectsBox(triangle))) for (let k = 0; k < 3; k++) kept.push(index ? index.getX(i + k) : i + k);
   }
   if (kept.length === count) return 0;
@@ -73,12 +78,15 @@ export function prefetchEnvironment(onProgress) {
 export async function loadBlenderEnvironment(scene, adjust, download = prefetchEnvironment()) {
   const draco = new DRACOLoader().setDecoderPath('/media/draco/').setWorkerLimit(2);
   let gltf;
-  try { gltf = await new GLTFLoader().setDRACOLoader(draco).parseAsync(await download, '/media/'); }
+  const bytes = await download; performance.mark('env-downloaded');
+  try { gltf = await new GLTFLoader().setDRACOLoader(draco).parseAsync(bytes, '/media/'); }
   finally { draco.dispose(); }
   const group = gltf.scene;
   group.name = 'Blender campus environment';
   const state = { group, wind: { value: 0 }, windStrength: { value: 0 }, windDirection: { value: new T.Vector2(0, 1) }, vegetation: [], trees: [], materials: [], trimmedTriangles: 0 };
+  performance.mark('env-parsed');
   adjust?.(group);
+  performance.mark('env-trees-placed');
   group.updateMatrixWorld(true);
   const obstacles = environmentObstacles(scene);
   group.traverse(node => {
@@ -114,17 +122,24 @@ export async function loadBlenderEnvironment(scene, adjust, download = prefetchE
     node.geometry.boundingSphere.radius += modelWindReach(height) / Math.max(.01, node.getWorldScale(new T.Vector3()).length() / Math.sqrt(3));
     state.vegetation.push(node);
   });
+  performance.mark('env-trimmed');
   // Foliage level of detail: the roadside canopies carry ~3.8M of ~4.4M triangles. Far trees keep every 2nd/4th
   // leaf card; the material, wind weights and silhouette stay the same, so the switch is hard to see at that range.
-  state.lods = [];
+  state.lods = []; state.lodScale = 1; // lowered by main.js on weak GPUs before screen resolution
   const sphere = new T.Sphere();
   for (const node of state.vegetation) {
     const index = node.geometry.index;
-    if (!node.visible || !node.material.userData.foliage || !index || index.count / 3 < 20000) continue;
+    if (!node.visible || !index || index.count / 3 < 20000) continue;
+    const foliage = node.material.userData.foliage, wind = node.geometry.getAttribute('_wind');
+    // Branches: far levels drop only outer twig segments (all vertices highly flexible), never limbs or trunk.
+    if (!foliage && !(wind && /branches/.test(node.material.name))) continue;
     const levels = [node];
-    for (const keep of [2, 4]) {
+    for (const [keep, flex] of [[2, .5], [4, .35]]) {
       const kept = [];
-      for (let i = 0; i < index.count; i += 3) if (Math.floor(i / 6) % keep === 0) kept.push(index.getX(i), index.getX(i + 1), index.getX(i + 2));
+      for (let i = 0; i < index.count; i += 3) {
+        const a = index.getX(i), b = index.getX(i + 1), c = index.getX(i + 2);
+        if (foliage ? Math.floor(i / 6) % keep === 0 : Math.min(wind.getX(a), wind.getX(b), wind.getX(c)) <= flex) kept.push(a, b, c);
+      }
       const geometry = node.geometry.clone(); geometry.setIndex(kept);
       const level = new T.Mesh(geometry, node.material);
       level.position.copy(node.position); level.quaternion.copy(node.quaternion); level.scale.copy(node.scale);
@@ -137,7 +152,9 @@ export async function loadBlenderEnvironment(scene, adjust, download = prefetchE
   }
   state.updateLod = eye => {
     for (const lod of state.lods) {
-      const d = eye.distanceTo(lod.centre), level = d < 45 ? 0 : d < 90 ? 1 : 2;
+      // Hysteresis: a drifting camera near a boundary must not flip detail back and forth.
+      const d = eye.distanceTo(lod.centre), bias = lod.shown === 0 ? 4 : lod.shown === 1 ? -4 : 0;
+      const s = state.lodScale, level = d < (45 + bias) * s ? 0 : d < (90 + (lod.shown === 2 ? -6 : 6)) * s ? 1 : 2;
       if (level !== lod.shown) { lod.levels[lod.shown].visible = false; lod.levels[level].visible = true; lod.shown = level; }
     }
   };

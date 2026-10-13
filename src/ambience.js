@@ -89,8 +89,11 @@ export function createAmbience() {
   }
 
   async function prepareBirds() {
-    // Generous limit: on a slow phone link this competes with the 20 MB campus download.
-    const response = await fetch('/media/birds.mp3', { signal: AbortSignal.timeout(90000) });
+    // Time-limit only the server's first response; reading the body may be slow while the 20 MB campus
+    // download competes or the main thread is busy, and must not be cut off (that caused a second download).
+    const abort = new AbortController(), timer = setTimeout(() => abort.abort(), 30000);
+    let response;
+    try { response = await fetch('/media/birds.mp3', { signal: abort.signal }); } finally { clearTimeout(timer); }
     if (!response.ok) throw new Error('Bird ambience could not be loaded');
     const recording = await context.decodeAudioData(await response.arrayBuffer());
     const fade = Math.round(recording.sampleRate * 1.2), length = recording.length - fade;

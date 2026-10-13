@@ -136,6 +136,7 @@ const ambient = new THREE.HemisphereLight('#e4eff7', '#77654c', 1.25); scene.add
 // Lightning: a cool sky-wide flash during live thunderstorm weather (never for reduced-motion users).
 const lightning = new THREE.DirectionalLight('#dce6ff', 0); lightning.position.set(-30, 90, -60); scene.add(lightning);
 let skyBase = .95, nextStrike = 0, strike = null;
+const shadowSun = new THREE.Vector3();
 const entranceLight = new THREE.PointLight('#fff0cc', 0, 14, 2);
 entranceLight.name = 'Entrance tube light';
 entranceLight.position.set(0, 3.30, 7.32);
@@ -158,15 +159,33 @@ const defaultPixelRatio = () => Math.min(devicePixelRatio, 1.35);
 const frameSamples = [];
 let resolutionCeiling = Infinity, lastResolutionChange = 0, lastResolutionRaise = -Infinity, ceilingSetAt = -Infinity;
 // Previously this only ever lowered the pixel ratio, so every tab switch (one huge frame) blurred the scene for good.
-function adaptResolution(duration, now) {
-  frameSamples.push(duration); if (frameSamples.length > 30) frameSamples.shift();
+let cadence = 1, cadenceSince = 0; // render every Nth display frame (1 = 60 fps, 2 = 30, 3 = 20)
+const setRatio = ratio => renderer.setPixelRatio(ratio);
+// Adaptive quality for weak GPUs, least visible first: (1) an even 30 fps, (2) an even 20 fps,
+// (3) simplified distant foliage, (4) one resolution step to 0.85; restored in reverse order.
+// Even frame spacing reads as smooth; the old version blurred straight to 0.65 and oscillated (flashing).
+function adaptResolution(interval, now) {
+  frameSamples.push(interval); if (frameSamples.length > 30) frameSamples.shift();
   if (frameSamples.length < 30 || now - lastResolutionChange < 1500) return;
+  const settling = now - lastResolutionChange < 6000;
   const average = frameSamples.reduce((a, b) => a + b, 0) / frameSamples.length, ratio = renderer.getPixelRatio();
-  let next = ratio;
+  const target = cadence * 1000 / 60, lod = landscape?.lodScale ?? 1, best = defaultPixelRatio();
   if (now - ceilingSetAt > 60000) resolutionCeiling = Infinity;
-  if (average > 28 && ratio > .65) { next = Math.max(.65, ratio * .85); if (now - lastResolutionRaise < 6000) { resolutionCeiling = ratio; ceilingSetAt = now; } } // a raise that immediately overloads becomes the cap for a minute
-  else if (average < 19 && ratio < Math.min(defaultPixelRatio(), resolutionCeiling)) { next = Math.min(defaultPixelRatio(), resolutionCeiling, ratio * 1.12); lastResolutionRaise = now; }
-  if (next !== ratio) { renderer.setPixelRatio(next); frameSamples.length = 0; lastResolutionChange = now; needsRender = true; }
+  const change = () => { frameSamples.length = 0; lastResolutionChange = now; needsRender = true; };
+  if (average > target * (cadence > 1 ? 1.15 : 1.25)) {
+    if (cadence < 3) { cadence++; cadenceSince = now; return change(); }
+    if (lod > .5) { landscape.lodScale = Math.max(.5, lod * .8); return change(); }
+    if (ratio > Math.min(best, .85)) {
+      setRatio(Math.min(best, .85));
+      if (now - lastResolutionRaise < 6000) { resolutionCeiling = Math.min(best, .85); ceilingSetAt = now; }
+      return change();
+    }
+  } else if (!settling && average < target * 1.08) {
+    if (ratio < Math.min(best, resolutionCeiling)) { setRatio(Math.min(best, resolutionCeiling)); lastResolutionRaise = now; return change(); }
+    if (lod < 1) { landscape.lodScale = Math.min(1, lod * 1.15); return change(); }
+    // Try a faster cadence after a calm stretch; it steps straight back if the GPU cannot hold it.
+    if (cadence > 1 && now - cadenceSince > 20000) { cadence--; cadenceSince = now; return change(); }
+  }
 }
 // Live weather point supplied for the Andhra University campus.
 const LOCATION = { latitude: 17.6801, longitude: 83.2016, timezone: 'Asia/Kolkata', label: 'ANDHRA UNIVERSITY / VISAKHAPATNAM' };
@@ -295,7 +314,8 @@ function updateLighting(h) {
   }
   if (renderer) {
     renderer.toneMappingExposure = THREE.MathUtils.lerp(.94, .8, evening);
-    if (performance.now() - lastShadowUpdate > 200 || !ready) { renderer.shadowMap.needsUpdate = true; lastShadowUpdate = performance.now(); }
+    // Re-render shadows only when the sun has visibly moved (~0.3 degrees), so edges do not jump every clock tick.
+    if (!ready || performance.now() - lastShadowUpdate > 200 && sun.position.angleTo(shadowSun) > .005) { renderer.shadowMap.needsUpdate = true; lastShadowUpdate = performance.now(); shadowSun.copy(sun.position); }
   }
   needsRender = true;
 }
@@ -413,9 +433,11 @@ async function boot() {
   $('#loading-status').textContent = 'Finding the light';
   await new Promise(resolve => requestAnimationFrame(resolve));
   $('#loading-status').textContent = 'Growing the Blender landscape';
+  performance.mark('architecture-built');
   landscape = await loadBlenderEnvironment(scene, placeFacadeTrees, environmentDownload);
   buildEntranceApron(landscape.group);
   surroundings = buildSurroundings(scene, landscape, renderer, chapters.flatMap(c => [[c.eye, c.target], [new THREE.Vector3(...c.eye).sub(new THREE.Vector3(...c.target)).multiplyScalar(2.4).add(new THREE.Vector3(...c.target)).toArray(), c.target]]));
+  performance.mark('surroundings-built');
   landscape.updateLod(camera.position); // the first frame, shadow map and reflection probes skip far foliage too
   // Static scenery: compute matrices once instead of every frame (wind runs in the vertex shader).
   for (const root of [landscape.group, surroundings.belt.group, surroundings.ridge]) root.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
@@ -427,12 +449,14 @@ async function boot() {
   updateMoon();
   sky.update(0, sunlight.night, weatherState, reduced);
   updateWetMaterials();
+  performance.mark('lighting-set');
   try {
     const hdr = await skyDownload; hdr.mapping = THREE.EquirectangularReflectionMapping;
     const pmrem = new THREE.PMREMGenerator(renderer); const env = pmrem.fromEquirectangular(hdr);
     scene.environment = env.texture; scene.background = hdr; scene.backgroundBlurriness = .02; scene.backgroundRotation.y = 1.9; scene.environmentRotation.y = 1.9;
     pmrem.dispose();
   } catch { console.warn('Sky map unavailable. Using daylight fallback.'); }
+  performance.mark('sky-ready');
   updateLighting(hour);
   $('#loading-status').textContent = 'Reflecting the courtyards';
   const glass = [architecture.materials.glass, architecture.materials.rearGlass, architecture.materials.entranceReflectiveGlass];
@@ -444,7 +468,7 @@ async function boot() {
       const probeCamera = new THREE.CubeCamera(.2, 180, probe);
       const reflectionFilter = new THREE.PMREMGenerator(renderer);
       try {
-        probeCamera.position.fromArray(position); probeCamera.update(renderer, scene);
+        probeCamera.position.fromArray(position); probeCamera.update(renderer, scene); performance.mark(`probe-${i}-rendered`);
         glass[i].envMap = reflectionFilter.fromCubemap(probe.texture).texture;
         glass[i].needsUpdate = true;
       } finally {
@@ -459,8 +483,8 @@ async function boot() {
   defaultAudio.then(updateSoundButton).catch(updateSoundButton);
   setInterval(() => { if (!document.hidden) loadWeather(); }, 5 * 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - weatherState.updatedAt > 5 * 60000) loadWeather(); });
-  // Compile every shader now, so the first rain shower, interior visit or tree LOD does not stall a frame.
-  try { await renderer.compileAsync(scene, camera); } catch { /* compiles lazily instead */ }
+  performance.mark('reflections-captured');
+  performance.mark('shaders-compiled');
   ready = true; window.__portrait.ready = true;
   renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
   loadWeather();
@@ -528,7 +552,7 @@ function animate(now) {
   } else nextStrike = 0;
   if (strike) {
     const t = now - strike.start, flash = strike.pulses.reduce((m, p) => t >= p && t < p + 110 ? Math.max(m, 1 - (t - p) / 110) : m, 0) * strike.power;
-    lightning.intensity = flash * 7; scene.backgroundIntensity = skyBase + flash * 1.6;
+    lightning.intensity = flash * 3.5; scene.backgroundIntensity = skyBase + flash * .7;
     if (t > 400) { strike = null; lightning.intensity = 0; scene.backgroundIntensity = skyBase; }
     needsRender = true;
   }
@@ -537,15 +561,17 @@ function animate(now) {
   scene.fog.near = (small() ? 160 : 80) * haze; scene.fog.far = (small() ? 450 : 300) * (1 - .45 * rain.current);
   sound.setWeather(weatherState, isSheltered(camera.position.x, camera.position.y, camera.position.z), windSpeed);
   sky.update(now / 1000, sunlight.night, weatherState, reduced);
-  if (needsRender || !reduced) {
+  // Even pacing: draw every Nth display frame so motion advances in equal steps.
+  if ((needsRender || !reduced) && !(quality === 'auto' && now - lastRendered < cadence * 1000 / 60 - 4)) {
+    const interval = now - lastRendered;
     landscape.updateLod(camera.position);
     renderer.render(scene, camera);
     if (++frames % 60 === 0) drawPlan();
-    if (quality === 'auto' && !reduced && frames > 12 && frameDuration < 250) adaptResolution(frameDuration, now);
+    if (quality === 'auto' && !reduced && frames > 12 && interval < 250) adaptResolution(interval, now);
     needsRender = false; lastRendered = now;
   }
 }
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; } };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } } };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;
@@ -625,7 +651,7 @@ $('#hour').oninput = e => setHour(+e.target.value);
 $('#live-clock').onchange = e => { liveClock = e.target.checked; if (liveClock) setHour(localHour(), { manual: false }); updateMoon(); };
 document.querySelectorAll('[data-hour]').forEach(b => b.onclick = () => setHour(+b.dataset.hour));
 $('#motion').onchange = e => { drift = e.target.checked; interactive = !drift; };
-$('#quality').onchange = e => { quality = e.target.value; frameSamples.length = 0; resolutionCeiling = Infinity; if (renderer) { renderer.setPixelRatio(quality === 'high' ? Math.min(devicePixelRatio, 2) : quality === 'low' ? .9 : defaultPixelRatio()); needsRender = true; } };
+$('#quality').onchange = e => { quality = e.target.value; frameSamples.length = 0; resolutionCeiling = Infinity; cadence = 1; if (landscape) landscape.lodScale = 1; if (renderer) { setRatio(quality === 'high' ? Math.min(devicePixelRatio, 2) : quality === 'low' ? .9 : defaultPixelRatio()); needsRender = true; } };
 $('#capture').onclick = () => { if (!renderer) return; renderer.render(scene, camera); renderer.domElement.toBlob(blob => { if (!blob) return toast('Could not save the photograph.'); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'instrument-technology.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast('Your campus photograph is ready.'); }); };
 $('#fullscreen').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('#experience').requestFullscreen(); } catch { toast('Full screen is unavailable in this browser.'); } };
 document.addEventListener('fullscreenchange', () => { $('#fullscreen').innerHTML = icon(document.fullscreenElement ? 'minimize' : 'maximize'); $('#fullscreen').setAttribute('aria-label', document.fullscreenElement ? 'Exit full screen' : 'Full screen'); refreshIcons(); });

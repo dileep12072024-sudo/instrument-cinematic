@@ -20,12 +20,17 @@ try {
     const run = (n, step) => { for (let i = 0; i < n; i++) __frame(t += step); return renderer.getPixelRatio(); };
     const start = run(40, 16.7);
     const afterSwitch = (t += 30000, run(1, 0), run(60, 16.7)); // one 30 s gap: returning to the tab
-    const loaded = run(80, 40);
-    const recovered = run(400, 16.7);
-    return { start, afterSwitch, loaded, recovered };
+    const paced = (run(300, 50), __portrait.cadence); // 50 ms frames (3 display refreshes): settle at an even cadence, no blur
+    const pacedRatio = renderer.getPixelRatio(), pacedLod = __portrait.landscape.lodScale;
+    const loaded = run(400, 70), lodUnderLoad = __portrait.landscape.lodScale; // heavier: foliage, then resolution
+    const recovered = run(1600, 16.7); // raises wait for a calm 6 s stretch each
+    return { start, afterSwitch, paced, pacedRatio, pacedLod, loaded, lodUnderLoad, recovered };
   });
   assert.equal(ratios.afterSwitch, ratios.start, 'a tab switch must not lower resolution');
-  assert.ok(ratios.loaded < ratios.start, 'sustained slow frames lower resolution');
+  console.log(ratios);
+  assert.ok(ratios.paced > 1 && ratios.pacedRatio === ratios.start && ratios.pacedLod === 1, 'moderate load paces frames evenly without lowering quality');
+  assert.ok(ratios.lodUnderLoad < 1, 'distant foliage is simplified before the screen blurs');
+  assert.ok(ratios.loaded < ratios.start, 'sustained slow frames finally lower resolution');
   assert.equal(ratios.recovered, ratios.start, 'fast frames restore full resolution');
   console.log('PASS adaptive resolution', ratios);
 } finally { await browser.close(); }

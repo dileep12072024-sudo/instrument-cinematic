@@ -2,7 +2,31 @@
 
 Updated: 2026-10-12. Read this before changing the project.
 
-## Bug-Fix, Tree and Performance Pass (2026-10-12, latest)
+## Real-GPU Performance Pass (2026-10-13, latest)
+
+Measured on the user's laptop (Intel UHD Graphics, ANGLE/D3D11) by driving Windows
+Chrome over the DevTools protocol from `%TEMP%\ic-gpu\probe.mjs` (Windows node.exe,
+separate profile). WSL itself has no GPU, so headless numbers there are not performance.
+
+- Bottleneck: vegetation, both vertex (~3M tris, 1.8 verts/tri) and leaf fill.
+  Sky+building+ground alone ran at ~50-60 fps; adding vegetation dropped it to ~18.
+  Cheaper leaf shaders and an EffectComposer/SMAA path were measured and rejected
+  (the composer cost more than MSAA saved).
+- Adaptive quality now: even cadence first (60 -> 30 -> 20 fps, every Nth vsync),
+  then far-foliage LOD scale, then one resolution step to 0.85 (never 0.65);
+  restored in reverse. Measured: steady 50 ms frames at full resolution and LOD,
+  instead of uneven 20-40 fps blurring down to 0.65 (the reported "flashing").
+- Flicker fixes: LOD hysteresis, shadow map re-rendered only when the sun moves
+  ~0.3 degrees, earth patches raised with polygon offset, roof-slab band covered.
+- Right facade tree trunk was being cut: foliage trimming used the crown's 1.76 m
+  sway for every triangle. Trimming now uses each vertex's own wind weights.
+- Load: blocking `compileAsync` removed (~4 s). Production build ready in ~9-10 s
+  on the user's GPU versus ~33 s for the previously deployed build.
+- `performance.mark` stage markers (architecture-built, env-downloaded, env-parsed,
+  env-trimmed, surroundings-built, probe-N-rendered, reflections-captured) remain
+  for future load profiling.
+
+## Bug-Fix, Tree and Performance Pass (2026-10-12)
 
 - Right wing (East corridor) front: two open facade bands were closed in
   `src/terraces.js`: 8.0-8.70 (first-floor wall top to the second-floor parapet)

@@ -181,8 +181,9 @@ export function placeFacadeTrees(group) {
     apply(tree);
     if (spec.bed) for (const o of group.children.filter(o => /^Low entrance tree-bed edging/.test(o.userData.source_object || ''))) apply(o);
     if (soil[0]) { // bare earth around each trunk, as filmed, instead of paving under the root flare
-      const patch = new T.Mesh(new T.CircleGeometry(1.15, 28), soil[0]); patch.rotation.x = -Math.PI / 2;
-      patch.position.set(to.x, to.y + .045, to.z); patch.receiveShadow = true; patch.name = 'Earth around facade tree'; group.add(patch);
+      const earth = soil[0].clone(); earth.polygonOffset = true; earth.polygonOffsetFactor = earth.polygonOffsetUnits = -2; // no shimmer against paving
+      const patch = new T.Mesh(new T.CircleGeometry(1.15, 28), earth); patch.rotation.x = -Math.PI / 2;
+      patch.position.set(to.x, to.y + .06, to.z); patch.receiveShadow = true; patch.name = 'Earth around facade tree'; group.add(patch);
     }
     moved.push({ name: tree.userData.source_object, from: from.toArray().map(v => +v.toFixed(2)), to: to.toArray().map(v => +v.toFixed(2)) });
   }
