@@ -71,7 +71,7 @@ try {
       leftReturnInsideWing: sample(nodes.find(o => o.userData.source_object === 'Lower side courtyard paving'), -19, 18)?.point.y };
   });
   assert.equal(model.name, 'Blender campus environment');
-  assert.equal(model.trees, 23); assert.equal(model.missingWeights, 0); assert.equal(model.missingLeafMaps, 0);
+  assert.equal(model.trees, 24); // 23 exported + the video-guided tree right of the entrance assert.equal(model.missingWeights, 0); assert.equal(model.missingLeafMaps, 0);
   assert.ok(model.visiblePlants > 40);
   assert.ok(Math.abs(model.roadStartY) < .02, 'Drive joins the entrance datum');
   assert.ok(model.sources.some(s => s.startsWith('Pink bloom clusters')));

@@ -2,7 +2,47 @@
 
 Updated: 2026-10-12. Read this before changing the project.
 
-## Video-Guided Surroundings and Quality Pass (2026-10-12, latest)
+## Bug-Fix, Tree and Performance Pass (2026-10-12, latest)
+
+- Right wing (East corridor) front: two open facade bands were closed in
+  `src/terraces.js`: 8.0-8.70 (first-floor wall top to the second-floor parapet)
+  and 11.84-12.56 (corridor lintel to roof parapet, which exposed the roof slab).
+- Classroom-wing doorway (`src/classroom-wing.js`): the window wall now stands
+  inside the front facade (centre local x=-0.985) so the facade's blue pilasters
+  and inner face no longer poke into the corridor; the open leaves hinge on posts
+  at the wall faces instead of inside the walls.
+- Facade trees (`placeFacadeTrees` in `src/surroundings.js`, applied before
+  foliage trimming): forked tree moved to about 1.6 m from the left facade with
+  its edged bed, slender tree likewise, and a clone placed right of the porch
+  (videos 12.38.21 at 2.5-4.5 s, 12.38.14 at 6-8.5 s). Runtime-only: fold these
+  into the Blender master when it is next exported. Tree count is now 24.
+- Performance: far foliage LOD (every 2nd leaf card beyond 45 m, every 4th beyond
+  90 m) cut the arrival view from ~4.36M to ~2.37M triangles; shaders are
+  precompiled before the loader clears; static scenery matrices are frozen.
+- Loading: environment and sky downloads start at page load with real progress.
+- Mobile: panorama supports pinch (walk) and two-finger pan; `scripts/check-mobile.mjs`
+  drives real touch input on an emulated phone.
+- Rain (`src/weather-effects.js`): 5200 soft streaks fall in a volume that follows
+  the camera (was a fixed box around the building, invisible from far views); fog
+  closes in and the sky dims/greys while it rains (`src/main.js`).
+- Sound (`src/ambience.js`): audio now unlocks on touch release/tap as well as
+  pointerdown (phones never unlocked before) and fades in whenever the context
+  starts running; light rain is louder (sqrt curve); night crickets around the
+  building; distant thunder during thunderstorm weather codes.
+- Thunderstorms (weather codes 95/96/99): lightning flashes (one or two 110 ms
+  pulses, a cool directional light plus sky brightening) every 12-40 s, each
+  followed by thunder after a 0.8-4.3 s distance delay (`sound.thunder`). No
+  flashes with reduced motion. `npm run test:storm` covers both.
+- Birds: the recording fetch had a 15 s abort and no retry, so on slow links
+  (now sharing bandwidth with the early environment download) daytime ambience
+  stayed silent. Limit is 90 s with a retry every 20 s. `npm test` (check-site)
+  passes end to end again; pass the dev URL, e.g. `node scripts/check-site.mjs http://127.0.0.1:5190`.
+- Lossless WebP for the foliage PNGs was tried and rejected: sharp's encoder drops
+  the colour under transparent pixels, which darkens leaf edges in distant mips.
+- Test machine: run headless browser checks through `memcap` (see user memory) one
+  at a time; software WebGL boot takes ~90 s and the first frame up to ~2 min.
+
+## Video-Guided Surroundings and Quality Pass (2026-10-12)
 
 Both WhatsApp videos were reviewed frame by frame (480p re-encodes, so fine detail
 is limited). Runtime changes, all in three.js; the Blender master was not touched:

@@ -7,7 +7,7 @@ await mkdir('artifacts', { recursive: true });
 const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || '/home/dragon/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome', args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 // Keep real CSS viewport sizes while bounding SwiftShader's pixel workload in CI.
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: .5, reducedMotion: 'reduce' });
-page.setDefaultTimeout(60000);
+page.setDefaultTimeout(240000); // software WebGL boot takes ~90 s here
 const errors = [], failedAssets = [];
 let birdRequests = 0;
 page.on('request', request => { if (new URL(request.url()).pathname === '/media/birds.mp3') birdRequests++; });
@@ -22,9 +22,9 @@ async function pixels() {
   });
 }
 try {
-  await page.goto(url, { waitUntil: 'networkidle', timeout: 90000 });
-  await page.waitForFunction(() => window.__portrait?.ready, { timeout: 90000 });
-  await page.locator('#loader').waitFor({ state: 'hidden' });
+  await page.goto(url, { waitUntil: 'networkidle', timeout: 300000 });
+  await page.waitForFunction(() => window.__portrait?.ready, { timeout: 300000 });
+  await page.locator('#loader').waitFor({ state: 'hidden', timeout: 600000 }); // first software-rendered frame can take minutes
   assert.ok(await pixels() > 25, 'Desktop WebGL canvas should have visible geometry');
   await page.screenshot({ path: 'artifacts/desktop-arrival.png' });
   console.log('PASS desktop scene', await page.evaluate(() => ({ calls: __portrait.renderer.info.render.calls, triangles: __portrait.renderer.info.render.triangles, pixelRatio: __portrait.renderer.getPixelRatio() })));

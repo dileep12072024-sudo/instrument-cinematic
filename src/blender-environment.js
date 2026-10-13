@@ -57,14 +57,28 @@ export function applyModelWind(material, state, height) {
   };
 }
 
-export async function loadBlenderEnvironment(scene) {
+// Begins downloading the ~20 MB environment as soon as the page script runs, reporting 0..1 progress.
+export function prefetchEnvironment(onProgress) {
+  return fetch('/media/campus-environment.glb').then(async response => {
+    if (!response.ok || !response.body) throw new Error(`Environment download failed: ${response.status}`);
+    const total = +response.headers.get('content-length') || 0, reader = response.body.getReader(), parts = [];
+    let loaded = 0;
+    for (;;) { const { done, value } = await reader.read(); if (done) break; parts.push(value); loaded += value.length; if (total) onProgress?.(loaded / total); }
+    const bytes = new Uint8Array(loaded); let offset = 0;
+    for (const part of parts) { bytes.set(part, offset); offset += part.length; }
+    return bytes.buffer;
+  });
+}
+
+export async function loadBlenderEnvironment(scene, adjust, download = prefetchEnvironment()) {
   const draco = new DRACOLoader().setDecoderPath('/media/draco/').setWorkerLimit(2);
   let gltf;
-  try { gltf = await new GLTFLoader().setDRACOLoader(draco).loadAsync('/media/campus-environment.glb'); }
+  try { gltf = await new GLTFLoader().setDRACOLoader(draco).parseAsync(await download, '/media/'); }
   finally { draco.dispose(); }
   const group = gltf.scene;
   group.name = 'Blender campus environment';
   const state = { group, wind: { value: 0 }, windStrength: { value: 0 }, windDirection: { value: new T.Vector2(0, 1) }, vegetation: [], trees: [], materials: [], trimmedTriangles: 0 };
+  adjust?.(group);
   group.updateMatrixWorld(true);
   const obstacles = environmentObstacles(scene);
   group.traverse(node => {
@@ -100,7 +114,34 @@ export async function loadBlenderEnvironment(scene) {
     node.geometry.boundingSphere.radius += modelWindReach(height) / Math.max(.01, node.getWorldScale(new T.Vector3()).length() / Math.sqrt(3));
     state.vegetation.push(node);
   });
-  if (state.trees.length !== 23 || !state.groundMaterial || !state.soilMaterial || !state.pavingMaterial) throw new Error('Incomplete Blender environment export');
+  // Foliage level of detail: the roadside canopies carry ~3.8M of ~4.4M triangles. Far trees keep every 2nd/4th
+  // leaf card; the material, wind weights and silhouette stay the same, so the switch is hard to see at that range.
+  state.lods = [];
+  const sphere = new T.Sphere();
+  for (const node of state.vegetation) {
+    const index = node.geometry.index;
+    if (!node.visible || !node.material.userData.foliage || !index || index.count / 3 < 20000) continue;
+    const levels = [node];
+    for (const keep of [2, 4]) {
+      const kept = [];
+      for (let i = 0; i < index.count; i += 3) if (Math.floor(i / 6) % keep === 0) kept.push(index.getX(i), index.getX(i + 1), index.getX(i + 2));
+      const geometry = node.geometry.clone(); geometry.setIndex(kept);
+      const level = new T.Mesh(geometry, node.material);
+      level.position.copy(node.position); level.quaternion.copy(node.quaternion); level.scale.copy(node.scale);
+      Object.assign(level, { castShadow: node.castShadow, receiveShadow: true, customDepthMaterial: node.customDepthMaterial, visible: false, name: `${node.name} LOD${keep}` });
+      level.userData = node.userData;
+      node.parent.add(level); levels.push(level);
+    }
+    sphere.copy(node.geometry.boundingSphere).applyMatrix4(node.matrixWorld);
+    state.lods.push({ levels, centre: sphere.center.clone(), shown: 0 });
+  }
+  state.updateLod = eye => {
+    for (const lod of state.lods) {
+      const d = eye.distanceTo(lod.centre), level = d < 45 ? 0 : d < 90 ? 1 : 2;
+      if (level !== lod.shown) { lod.levels[lod.shown].visible = false; lod.levels[level].visible = true; lod.shown = level; }
+    }
+  };
+  if (state.trees.length < 23 || !state.groundMaterial || !state.soilMaterial || !state.pavingMaterial) throw new Error('Incomplete Blender environment export');
   // Distant continuation sits below the authored terrain, never over the roads; vegetated, as in the site videos.
   const horizon = new T.Mesh(new T.PlaneGeometry(2000, 2000), state.groundMaterial.clone());
   for (const slot of ['map', 'normalMap', 'roughnessMap']) if (horizon.material[slot]) {

@@ -105,6 +105,7 @@ export function buildClassroomWing(parent, m) {
     }
   }
   const { floor: y, ceiling } = classroom;
+  const W = -.985, inner = W + .08; // window-wall centre and its corridor face
   floor(0, -8.45, 2.17, 16.9, y);
   floor(0, -18.85, 2.17, 2.9, classroom.lowerFloor);
   // Two shallow steps, seen clearly on the return clip 103849 at 0-9s.
@@ -123,11 +124,13 @@ export function buildClassroomWing(parent, m) {
   for (const z of [.57, 2.33]) box(-1.33, (classroom.landing + ceiling) / 2, z, .14, ceiling - classroom.landing, .64, plaster);
   box(-1.33, (classroom.landing + 2.5 + ceiling) / 2, 1.45, .14, ceiling - classroom.landing - 2.5, 1.12, plaster);
   box(0, classroom.landing + .055, .30, 2.17, .11, .3, stone); box(0, classroom.landing + .165, 0, 2.17, .11, .3, stone);
-  // Window wall aligns with the existing five pierced facade bays.
-  box(-1.10, y + .63, -9, .16, 1.26, 18, plaster);
-  box(-1.10, (y + 2.8 + ceiling) / 2, -9, .16, ceiling - y - 2.8, 18, plaster);
-  for (let i = 0; i <= 5; i++) box(-1.10, y + 2.0, -i * 3.6, .16, 1.55, .60, plaster);
-  for (let i = 0; i < 5; i++) window(-1.015, y + 2.02, -1.8 - i * 3.6, 2.96, Math.PI / 2);
+  // Window wall aligns with the existing five pierced facade bays. It stands just inside the front
+  // facade, whose blue pilasters and inner face (to x=-0.915 here) would otherwise poke into the corridor.
+  box(W, y + .63, -8.76, .16, 1.26, 18.48, plaster); // runs up to the entrance posts at z=.47
+  box(W, (y + 2.8 + ceiling) / 2, -8.76, .16, ceiling - y - 2.8, 18.48, plaster);
+  box(W, y + 2.0, .3, .16, 1.55, .34, plaster);
+  for (let i = 0; i <= 5; i++) box(W, y + 2.0, -i * 3.6, .16, 1.55, .60, plaster);
+  for (let i = 0; i < 5; i++) window(W + .085, y + 2.02, -1.8 - i * 3.6, 2.96, Math.PI / 2);
   const openings = [2.3, 5.8, 9.2, 12.6];
   let previous = 0;
   for (const u of openings) {
@@ -181,10 +184,11 @@ export function buildClassroomWing(parent, m) {
     for (const dz of [-.20, .20]) tube([[x - .23, classroom.lowerFloor + 1.12 + i * .16, z + dz], [x + .23, classroom.lowerFloor + 1.12 + i * .16, z + dz]], .018, dark);
   }
   // Slim conduits and cross beams follow the filmed ceiling; no invented room fixtures.
-  for (const x of [-1.02, 1.02]) {
+  for (const far of [-1.02, 1.02]) {
+    const x = far < 0 ? inner + .025 : far; // main corridor follows the inset window wall; the far passage keeps its wall
     box(x, y + .09, -8.45, .05, .18, 16.9, stone);
-    for (let j = 0; j < 3; j++) tube([[x, ceiling - .28 - j * .045, .8], [x, ceiling - .28 - j * .045, -17.8], [x, sideCeiling - .28 - j * .045, -18.2], [x, sideCeiling - .28 - j * .045, -20.1]], .012, aluminium);
-    for (let u = 1; u < 20; u += 1.5) box(x, (u < 18 ? ceiling : sideCeiling) - .33, -u, .032, .19, .022, dark);
+    for (let j = 0; j < 3; j++) tube([[x, ceiling - .28 - j * .045, .8], [x, ceiling - .28 - j * .045, -17.8], [far, sideCeiling - .28 - j * .045, -18.2], [far, sideCeiling - .28 - j * .045, -20.1]], .012, aluminium);
+    for (let u = 1; u < 20; u += 1.5) box(u < 18 ? x : far, (u < 18 ? ceiling : sideCeiling) - .33, -u, .032, .19, .022, dark);
   }
   for (const u of [0, 7.1, 14.8, 18.8]) box(0, (u < 18 ? ceiling : sideCeiling) - .14, -u, 2.16, .30, .22, plaster);
   const lamp = new T.MeshStandardMaterial({ color: '#e9eee5', emissive: '#dceada', emissiveIntensity: 1.4 });
@@ -193,11 +197,12 @@ export function buildClassroomWing(parent, m) {
     tube([[.945, ceiling - .44, -u - .52], [.945, ceiling - .44, -u + .52]], .016, lamp);
   }
   // Classroom-wing entry transom and open slim-framed leaves.
-  for (const x of [-1.03, 1.03]) box(x, y + 1.35, .47, .05, 2.7, .07, dark);
+  const posts = [inner + .025, .995]; // each post sits on its wall face, never inside it
+  for (const x of posts) box(x, y + 1.35, .47, .05, 2.7, .07, dark);
   box(0, y + 2.8, .47, 2.16, .47, .035, dark);
   label('CLASSROOM WING', 0, y + 2.8, .50, 1.88, .36);
   for (const side of [-1, 1]) {
-    const leaf = new T.Group(); leaf.name = 'Open classroom entrance leaf'; leaf.position.set(side * 1.03, y, .46); leaf.rotation.y = -side * Math.PI * .47; group.add(leaf);
+    const leaf = new T.Group(); leaf.name = 'Open classroom entrance leaf'; leaf.position.set(posts[side > 0 ? 1 : 0], y, .46); leaf.rotation.y = -side * Math.PI * .47; group.add(leaf);
     for (const [px, py, w, h] of [[-side * .47, .04, .94, .04], [-side * .47, 2.55, .94, .04], [0, 1.28, .04, 2.56], [-side * .94, 1.28, .04, 2.56], [-side * .47, 1.15, .94, .04]]) {
       const mesh = new T.Mesh(new T.BoxGeometry(w, h, .04), dark); mesh.position.set(px, py, 0); leaf.add(mesh);
     }

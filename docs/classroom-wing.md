@@ -39,3 +39,10 @@ frames remain separate from the open ground-floor wing entrances.
 
 `node scripts/inspect-classroom-videos.mjs` generates timestamped contact sheets
 and reference frames in the ignored `artifacts/classroom-video` directory.
+
+## October 12 Fix
+
+The window wall moved 0.115 inward (centre local x=-0.985) to clear the West corridor's front facade,
+whose blue pilasters and inner face had protruded into the corridor beside the entrance. The open
+leaves now hinge on posts set at the wall faces. Conduits and skirting follow the inset wall; the far
+side passage keeps its original wall line.

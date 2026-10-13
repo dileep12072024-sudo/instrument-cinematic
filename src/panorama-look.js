@@ -9,6 +9,25 @@ export function createPanoramaLook(camera, canvas, active, changed) {
   let turning = false, moving = false;
   const direction = new T.Vector3();
   canvas.addEventListener('contextmenu', e => { if (active()) e.preventDefault(); });
+  // Phones: one finger looks, two fingers pinch to walk forward/back and drag together to pan.
+  const touches = new Map(); let spread = 0, middle = null;
+  const measure = () => { const [a, b] = [...touches.values()]; return { d: Math.hypot(a.x - b.x, a.y - b.y), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; };
+  canvas.addEventListener('pointerdown', e => {
+    if (!active() || e.pointerType !== 'touch') return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) { const m = measure(); spread = m.d; middle = m; }
+  });
+  (canvas.ownerDocument || canvas).addEventListener('pointermove', e => {
+    if (!touches.has(e.pointerId)) return;
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size !== 2 || !active()) return;
+    const m = measure();
+    move((m.d - spread) * .025);
+    direction.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    destination.addScaledVector(direction, -(m.x - middle.x) * .012); destination.y += (m.y - middle.y) * .012;
+    spread = m.d; middle = m; changed();
+  });
+  for (const type of ['pointerup', 'pointercancel']) (canvas.ownerDocument || canvas).addEventListener(type, e => touches.delete(e.pointerId));
   function move(distance) {
     if (!moving) destination.copy(camera.position);
     camera.getWorldDirection(direction);
@@ -20,6 +39,7 @@ export function createPanoramaLook(camera, canvas, active, changed) {
     target.x = angles.x; target.y = angles.y; turning = false;
     destination.copy(camera.position); moving = false;
   }, (dx, dy, pan) => {
+    if (touches.size > 1) return; // a pinch is not a look
     if (pan) {
       direction.set(1, 0, 0).applyQuaternion(camera.quaternion);
       destination.addScaledVector(direction, -dx * .018);

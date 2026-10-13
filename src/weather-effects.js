@@ -35,8 +35,15 @@ export function windVector(speed, direction) {
 }
 
 export function createRain(scene, camera) {
-  const count = 2400, geometry = new T.PlaneGeometry(.018, 1);
-  const material = new T.MeshBasicMaterial({ color: '#cadce4', transparent: true, opacity: 0, depthWrite: false, side: T.DoubleSide });
+  // Drops fall in a volume that follows the camera, so rain reads clearly from every viewpoint,
+  // including the distant arrival view (previously a fixed box around the building).
+  const count = 5200, radius = 34, above = 26, below = 14;
+  const geometry = new T.PlaneGeometry(.028, 1);
+  const fade = document.createElement('canvas'); fade.width = 4; fade.height = 64;
+  const ctx = fade.getContext('2d'), gradient = ctx.createLinearGradient(0, 0, 0, 64);
+  gradient.addColorStop(0, '#000'); gradient.addColorStop(.35, '#fff'); gradient.addColorStop(1, '#222');
+  ctx.fillStyle = gradient; ctx.fillRect(0, 0, 4, 64);
+  const material = new T.MeshBasicMaterial({ color: '#e4eef2', alphaMap: new T.CanvasTexture(fade), transparent: true, opacity: 0, depthWrite: false, side: T.DoubleSide, fog: false });
   // Clip the full streak, including its ends, at each roof and canopy boundary.
   material.onBeforeCompile = shader => {
     shader.vertexShader = 'varying vec3 rainWorld;\n' + shader.vertexShader;
@@ -46,28 +53,33 @@ export function createRain(scene, camera) {
     shader.fragmentShader = shader.fragmentShader.replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n' + clip);
   };
   const mesh = new T.InstancedMesh(geometry, material, count); mesh.name = 'Live rain'; mesh.frustumCulled = false; mesh.visible = false; scene.add(mesh);
-  const drops = Array.from({ length: count }, (_, i) => ({ x: ((i * 37.17) % 120) - 60, y: (i * 19.73) % 48 + 2, z: ((i * 53.11) % 96) - 40, speed: 7 + i % 7 * .45 }));
+  let seed = 7;
+  const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const drops = Array.from({ length: count }, () => ({ x: (random() * 2 - 1) * radius, y: random() * (above + below) - below, z: (random() * 2 - 1) * radius, speed: 8.5 + random() * 3 }));
   const dummy = new T.Object3D(), up = new T.Vector3(0, 1, 0), streak = new T.Vector3(), billboard = new T.Quaternion();
+  const wrap = (v, centre) => v - centre < -radius ? v + radius * 2 : v - centre > radius ? v - radius * 2 : v;
   return {
     current: 0,
     update(dt, weather, reduced = false) {
       this.current = T.MathUtils.damp(this.current, weather.rainFactor, 2.8, dt);
       mesh.visible = !reduced && this.current > .004;
       if (!mesh.visible) return;
-      mesh.count = Math.max(1, Math.round(count * this.current));
-      material.opacity = .22 + this.current * .23;
+      mesh.count = Math.max(1, Math.round(count * Math.sqrt(this.current)));
+      material.opacity = .38 + this.current * .4;
       const wind = windVector(weather.windSpeed, weather.windDirection).multiplyScalar(.55);
+      const eye = camera.getWorldPosition(streak);
+      const cx = eye.x, cy = eye.y, cz = eye.z;
       billboard.setFromAxisAngle(up, camera.rotation.y);
       for (let i = 0; i < mesh.count; i++) {
         const drop = drops[i];
-        drop.x += wind.x * dt; drop.z += wind.y * dt; drop.y -= drop.speed * dt;
-        if (drop.x < -60) drop.x += 120; if (drop.x > 60) drop.x -= 120;
-        if (drop.z < -40) drop.z += 96; if (drop.z > 56) drop.z -= 96;
-        if (drop.y < -.5 || isSheltered(drop.x, drop.y, drop.z, .1)) drop.y = 48 + i % 7;
+        drop.x = wrap(drop.x + wind.x * dt, cx); drop.z = wrap(drop.z + wind.y * dt, cz); drop.y -= drop.speed * dt;
+        if (drop.y < Math.max(-.5, cy - below) || isSheltered(drop.x, drop.y, drop.z, .1)) {
+          drop.y = cy + above - random() * 4; drop.x = cx + (random() * 2 - 1) * radius; drop.z = cz + (random() * 2 - 1) * radius;
+        }
         streak.set(-wind.x, drop.speed, -wind.y).normalize();
         dummy.position.set(drop.x, drop.y, drop.z);
         dummy.quaternion.setFromUnitVectors(up, streak).multiply(billboard);
-        dummy.scale.set(1, .35 + this.current * .4, 1); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
+        dummy.scale.set(1, .55 + this.current * .5, 1); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
       }
       mesh.instanceMatrix.needsUpdate = true;
     },

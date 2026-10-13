@@ -142,3 +142,51 @@ export function buildSurroundings(scene, landscape, renderer, views = []) {
     update(fogColor) { haze.copy(fogColor).lerp(dark, .35); ridge.material.color.copy(haze).multiplyScalar(1.55); },
   };
 }
+
+// Facade trees from the 2026-10-12 videos (12.38.21 at 2.5-4.5 s; 12.38.14 at 6-8.5 s): the forked tree left of the
+// porch stands about one bay out and right beside the wall, a slender one further left, and a multi-stem tree right
+// of the porch behind the parked bikes. Distances from the wall (~1.6 m) are estimates. Runs before foliage
+// trimming, so canopies are still cut back from the building.
+const facadeTrees = [
+  { source: 'Forked tree beside main entrance', base: [-8.4, 4.9], bed: true },
+  { source: 'Slender tree beside left facade', base: [-17.6, 5.0] },
+  { source: 'Forked tree beside main entrance', base: [9.0, 4.9], clone: 'Multi-stem tree right of entrance (video-guided)', turn: Math.PI * .85 },
+];
+
+export function placeFacadeTrees(group) {
+  group.updateMatrixWorld(true);
+  const owner = o => { while (o && !o.userData.source_object) o = o.parent; return o?.userData.source_object || ''; };
+  const ground = []; group.traverse(o => { if (o.isMesh && /Editable verges|Entrance concrete apron|Entrance driveway/.test(owner(o))) ground.push(o); });
+  const ray = new T.Raycaster(), down = new T.Vector3(0, -1, 0);
+  const height = (x, z) => { ray.set(new T.Vector3(x, 20, z), down); return ray.intersectObjects(ground, false)[0]?.point.y ?? 0; };
+  const root = tree => { // trunk base: centroid of the lowest vertices
+    const p = new T.Vector3(), low = []; let min = Infinity;
+    tree.traverse(o => { if (!o.isMesh) return; const a = o.geometry.attributes.position; for (let i = 0; i < a.count; i += 3) { p.fromBufferAttribute(a, i).applyMatrix4(o.matrixWorld); if (p.y < min + .4) { low.push(p.clone()); min = Math.min(min, p.y); } } });
+    const base = low.filter(v => v.y < min + .4); return base.reduce((s, v) => s.add(v), new T.Vector3()).divideScalar(base.length);
+  };
+  const find = name => { let hit; group.traverse(o => { if (!hit && o.userData.tree && o.userData.source_object === name) hit = o; }); return hit; };
+  const soil = []; group.traverse(o => { if (o.isMesh && /Exposed red earth/.test(o.material.userData?.source_material || o.material.name)) soil.push(o.material); });
+  const moved = [];
+  for (const spec of facadeTrees) {
+    let tree = find(spec.source); if (!tree) continue;
+    const from = root(tree);
+    if (spec.clone) {
+      tree = tree.clone(true); tree.userData = { ...tree.userData, source_object: spec.clone };
+      tree.traverse(o => { if (o !== tree) o.userData = { ...o.userData }; });
+      group.add(tree);
+    }
+    const to = new T.Vector3(spec.base[0], height(...spec.base) - .04, spec.base[1]); // sink slightly into the bed
+    const shift = new T.Matrix4().makeTranslation(to.x, to.y, to.z).multiply(new T.Matrix4().makeRotationY(spec.turn || 0)).multiply(new T.Matrix4().makeTranslation(-from.x, -from.y, -from.z));
+    const apply = o => { o.updateMatrixWorld(true); const world = shift.clone().multiply(o.matrixWorld); o.parent.updateMatrixWorld(true); o.matrix.copy(o.parent.matrixWorld.clone().invert().multiply(world)); o.matrix.decompose(o.position, o.quaternion, o.scale); };
+    apply(tree);
+    if (spec.bed) for (const o of group.children.filter(o => /^Low entrance tree-bed edging/.test(o.userData.source_object || ''))) apply(o);
+    if (soil[0]) { // bare earth around each trunk, as filmed, instead of paving under the root flare
+      const patch = new T.Mesh(new T.CircleGeometry(1.15, 28), soil[0]); patch.rotation.x = -Math.PI / 2;
+      patch.position.set(to.x, to.y + .045, to.z); patch.receiveShadow = true; patch.name = 'Earth around facade tree'; group.add(patch);
+    }
+    moved.push({ name: tree.userData.source_object, from: from.toArray().map(v => +v.toFixed(2)), to: to.toArray().map(v => +v.toFixed(2)) });
+  }
+  group.updateMatrixWorld(true);
+  group.userData.facadeTrees = moved;
+  return moved;
+}

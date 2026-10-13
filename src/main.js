@@ -3,8 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { createIcons, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, Images, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check } from 'lucide';
 import { buildArchitecture, buildEntranceApron } from './architecture.js';
-import { loadBlenderEnvironment } from './blender-environment.js';
-import { buildSurroundings } from './surroundings.js';
+import { loadBlenderEnvironment, prefetchEnvironment } from './blender-environment.js';
+import { buildSurroundings, placeFacadeTrees } from './surroundings.js';
 import { footprint } from './footprint.js';
 import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
@@ -84,13 +84,13 @@ function resumeDefaultSound() {
   sound.setEnabled(true).then(() => {
     if (sound.context?.state === 'running') {
       soundActivationBound = false;
-      document.removeEventListener('pointerdown', resumeDefaultSound, true);
-      document.removeEventListener('keydown', resumeDefaultSound, true);
+      for (const type of soundGestures) document.removeEventListener(type, resumeDefaultSound, true);
     }
   }).catch(() => {});
 }
-document.addEventListener('pointerdown', resumeDefaultSound, true);
-document.addEventListener('keydown', resumeDefaultSound, true);
+// Phones grant audio permission on touch release or tap, not on touch-down.
+const soundGestures = ['pointerdown', 'pointerup', 'touchend', 'click', 'keydown'];
+for (const type of soundGestures) document.addEventListener(type, resumeDefaultSound, true);
 
 let renderer;
 try {
@@ -99,6 +99,15 @@ try {
   $('#loader').innerHTML = '<p>This browser cannot start the 3D scene.</p><small>You can still explore the original photographs and film.</small><button id="fallback-archive" class="primary-btn">Open the archive</button>';
   $('#viewport').style.background = 'url(/media/entrance.webp) center/cover';
 }
+// Download the environment and sky while the page sets up, instead of after the building is built.
+const loadBar = () => $('.load-track>span');
+const environmentDownload = renderer ? prefetchEnvironment(p => {
+  const bar = loadBar(); if (bar) { bar.style.animation = 'none'; bar.style.transform = `scaleX(${p.toFixed(3)})`; }
+  if (p < 1) $('#loading-status').textContent = `Downloading the campus ${Math.round(p * 100)}%`;
+}) : null;
+environmentDownload?.catch(() => {}); // handled where it is awaited
+const skyDownload = renderer ? new HDRLoader().loadAsync('/media/sky.hdr') : null;
+skyDownload?.catch(() => {});
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#b6c5c9'); scene.fog = new THREE.Fog('#b6c5c9', 80, 300);
 const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 500);
@@ -124,6 +133,9 @@ sun.position.set(-34, 39, 30); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -55; sun.shadow.camera.right = 55; sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40; sun.shadow.camera.far = 180;
 sun.shadow.normalBias = .05; sun.shadow.bias = -.00015; sun.shadow.radius = 3; scene.add(sun);
 const ambient = new THREE.HemisphereLight('#e4eff7', '#77654c', 1.25); scene.add(ambient);
+// Lightning: a cool sky-wide flash during live thunderstorm weather (never for reduced-motion users).
+const lightning = new THREE.DirectionalLight('#dce6ff', 0); lightning.position.set(-30, 90, -60); scene.add(lightning);
+let skyBase = .95, nextStrike = 0, strike = null;
 const entranceLight = new THREE.PointLight('#fff0cc', 0, 14, 2);
 entranceLight.name = 'Entrance tube light';
 entranceLight.position.set(0, 3.30, 7.32);
@@ -270,8 +282,9 @@ function updateLighting(h) {
   sun.intensity = 3.6 * THREE.MathUtils.smoothstep(sunlight.altitude, -.833, 12) * (1 - weatherState.cloudCover / 100 * .75);
   ambient.intensity = THREE.MathUtils.lerp(.7, .5, evening) * THREE.MathUtils.lerp(1, .9, wet);
   scene.environmentIntensity = THREE.MathUtils.lerp(.42, .2, evening);
-  scene.backgroundIntensity = THREE.MathUtils.lerp(.95, .13, evening);
-  scene.fog.color.set('#b6c5c9').lerp(new THREE.Color('#182336'), evening).lerp(new THREE.Color('#64757b'), wet * .22);
+  // Overcast rain dims and greys the clear-sky photograph instead of leaving a bright blue sky.
+  skyBase = scene.backgroundIntensity = THREE.MathUtils.lerp(.95, .13, evening) * (1 - .5 * wet) * (1 - weatherState.cloudCover / 100 * .25);
+  scene.fog.color.set('#b6c5c9').lerp(new THREE.Color('#182336'), evening).lerp(new THREE.Color('#64757b'), wet * .6);
   if (scene.background?.isColor) scene.background.copy(scene.fog.color);
   surroundings?.update(scene.fog.color);
   entranceLight.intensity = evening * 40;
@@ -400,9 +413,12 @@ async function boot() {
   $('#loading-status').textContent = 'Finding the light';
   await new Promise(resolve => requestAnimationFrame(resolve));
   $('#loading-status').textContent = 'Growing the Blender landscape';
-  landscape = await loadBlenderEnvironment(scene);
+  landscape = await loadBlenderEnvironment(scene, placeFacadeTrees, environmentDownload);
   buildEntranceApron(landscape.group);
   surroundings = buildSurroundings(scene, landscape, renderer, chapters.flatMap(c => [[c.eye, c.target], [new THREE.Vector3(...c.eye).sub(new THREE.Vector3(...c.target)).multiplyScalar(2.4).add(new THREE.Vector3(...c.target)).toArray(), c.target]]));
+  landscape.updateLod(camera.position); // the first frame, shadow map and reflection probes skip far foliage too
+  // Static scenery: compute matrices once instead of every frame (wind runs in the vertex shader).
+  for (const root of [landscape.group, surroundings.belt.group, surroundings.ridge]) root.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
   // Full anisotropic filtering keeps road lines, paving and soil crisp at grazing angles.
   const anisotropy = Math.min(16, renderer.capabilities.getMaxAnisotropy());
   scene.traverse(o => { for (const m of [o.material].flat()) if (m) for (const v of Object.values(m)) if (v?.isTexture && !v.isRenderTargetTexture) v.anisotropy = Math.max(v.anisotropy, anisotropy); });
@@ -412,7 +428,7 @@ async function boot() {
   sky.update(0, sunlight.night, weatherState, reduced);
   updateWetMaterials();
   try {
-    const hdr = await new HDRLoader().loadAsync('/media/sky.hdr'); hdr.mapping = THREE.EquirectangularReflectionMapping;
+    const hdr = await skyDownload; hdr.mapping = THREE.EquirectangularReflectionMapping;
     const pmrem = new THREE.PMREMGenerator(renderer); const env = pmrem.fromEquirectangular(hdr);
     scene.environment = env.texture; scene.background = hdr; scene.backgroundBlurriness = .02; scene.backgroundRotation.y = 1.9; scene.environmentRotation.y = 1.9;
     pmrem.dispose();
@@ -443,6 +459,8 @@ async function boot() {
   defaultAudio.then(updateSoundButton).catch(updateSoundButton);
   setInterval(() => { if (!document.hidden) loadWeather(); }, 5 * 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - weatherState.updatedAt > 5 * 60000) loadWeather(); });
+  // Compile every shader now, so the first rain shower, interior visit or tree LOD does not stall a frame.
+  try { await renderer.compileAsync(scene, camera); } catch { /* compiles lazily instead */ }
   ready = true; window.__portrait.ready = true;
   renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
   loadWeather();
@@ -499,16 +517,35 @@ function animate(now) {
   const windSpeed = updateWind(landscape, weatherState, dt, reduced);
   if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
   rain.update(dt, weatherState, reduced);
+  if (weatherState.storm && !reduced) {
+    nextStrike ||= now + 5000 + Math.random() * 15000;
+    if (now > nextStrike) {
+      // At most two short pulses per strike, well under three flashes a second.
+      strike = { start: now, pulses: Math.random() < .5 ? [0] : [0, 160], power: .6 + Math.random() * .4 };
+      sound.thunder(.8 + Math.random() * 3.5);
+      nextStrike = now + 12000 + Math.random() * 28000;
+    }
+  } else nextStrike = 0;
+  if (strike) {
+    const t = now - strike.start, flash = strike.pulses.reduce((m, p) => t >= p && t < p + 110 ? Math.max(m, 1 - (t - p) / 110) : m, 0) * strike.power;
+    lightning.intensity = flash * 7; scene.backgroundIntensity = skyBase + flash * 1.6;
+    if (t > 400) { strike = null; lightning.intensity = 0; scene.backgroundIntensity = skyBase; }
+    needsRender = true;
+  }
+  // Rain closes in the view: nearer, denser haze while it falls.
+  const haze = 1 - .55 * rain.current;
+  scene.fog.near = (small() ? 160 : 80) * haze; scene.fog.far = (small() ? 450 : 300) * (1 - .45 * rain.current);
   sound.setWeather(weatherState, isSheltered(camera.position.x, camera.position.y, camera.position.z), windSpeed);
   sky.update(now / 1000, sunlight.night, weatherState, reduced);
   if (needsRender || !reduced) {
+    landscape.updateLod(camera.position);
     renderer.render(scene, camera);
     if (++frames % 60 === 0) drawPlan();
     if (quality === 'auto' && !reduced && frames > 12 && frameDuration < 250) adaptResolution(frameDuration, now);
     needsRender = false; lastRendered = now;
   }
 }
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; } };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; } };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;
