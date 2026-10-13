@@ -20,8 +20,12 @@ separate profile). WSL itself has no GPU, so headless numbers there are not perf
   ~0.3 degrees, earth patches raised with polygon offset, roof-slab band covered.
 - Right facade tree trunk was being cut: foliage trimming used the crown's 1.76 m
   sway for every triangle. Trimming now uses each vertex's own wind weights.
-- Load: blocking `compileAsync` removed (~4 s). Production build ready in ~9-10 s
-  on the user's GPU versus ~33 s for the previously deployed build.
+- Load: blocking `compileAsync` removed (~4 s). Deployed preview on the user's GPU
+  (HTTP cache disabled, so the 20 MB GLB downloads each time in ~5-6 s): ready in
+  ~36 s with cold shader caches, ~16 s on a repeat visit; served locally ~9-10 s.
+  Remaining cost is first-time ANGLE/D3D11 shader compilation and the download.
+- Frame pacing on that GPU: steady 50 ms frames (20 fps cadence), resolution held
+  at 1.0, far-foliage LOD scale ~0.6. Vegetation still limits it to ~20 fps there.
 - `performance.mark` stage markers (architecture-built, env-downloaded, env-parsed,
   env-trimmed, surroundings-built, probe-N-rendered, reflections-captured) remain
   for future load profiling.
