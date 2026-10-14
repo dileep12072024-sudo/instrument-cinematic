@@ -2,7 +2,16 @@
 
 Updated: 2026-10-12. Read this before changing the project.
 
-## Photo-Guided Detail and GPU Pass (2026-10-14, latest)
+## Archive Removal and Classroom Wing Rebuild (2026-10-14, latest)
+
+- The user asked that raw files not be shown: archive and original-film UI, dialogs and
+  code are gone, and the 15 photos, `photos.json` and `campus.mp4` are deleted from
+  `public/media` (also from `dist`). Do not reintroduce them. Old copies may linger in
+  Cloudflare's edge cache for the exact old URLs until expiry; nothing links to them.
+- Classroom wing rebuilt from the references; details in `docs/classroom-wing.md`
+  ("October 14 Rebuild").
+
+## Photo-Guided Detail and GPU Pass (2026-10-14)
 
 Verified on the user's Intel UHD laptop (real off-screen Chrome window, GPU timer queries;
 see user memory "real-gpu-measurement") and the full 17-script suite.
