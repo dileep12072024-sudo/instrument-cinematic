@@ -32,7 +32,7 @@ try {
   await page.locator('#loader').waitFor({ state: 'hidden' });
   const checks = await page.evaluate(async () => {
     const T = await import('/node_modules/three/build/three.module.js');
-    const { architecture: a, footprint, scene, landscape } = __portrait;
+    const { architecture: a, footprint, scene } = __portrait;
     const bounds = material => {
       const mesh = a.group.children.find(m => m.material === material); mesh.geometry.computeBoundingBox();
       return { min: mesh.geometry.boundingBox.min.toArray(), max: mesh.geometry.boundingBox.max.toArray() };
@@ -47,8 +47,6 @@ try {
       west: footprint[0], eastGate: bounds(a.materials.gate), westGate: bounds(a.materials.westGate),
       ac: { min: units.geometry.boundingBox.min.toArray(), max: units.geometry.boundingBox.max.toArray() },
       light: { shadow: light.castShadow, map: !!light.shadow.map, ceilingDistance: occluder?.distance, position: light.position.toArray() },
-      soilVertices: scene.getObjectByName('Uneven mottled courtyard earth').geometry.attributes.position.count,
-      leafVertices: landscape.garden.foliage.geometry.attributes.position.count,
     };
   });
   assert.equal(checks.west.bays, 4); assert.equal(checks.west.width, 12);
@@ -57,7 +55,6 @@ try {
   assert.ok(checks.westGate.min[2] > 15 && checks.westGate.max[2] < 15.2);
   assert.ok(checks.ac.min[0] >= 31 && checks.ac.max[0] < 32);
   assert.ok(checks.light.shadow && checks.light.map && checks.light.ceilingDistance > 0 && checks.light.ceilingDistance < .2);
-  assert.ok(checks.soilVertices > 20000 && checks.leafVertices === 15);
   console.log('Reference geometry and canopy occlusion:', checks);
   await hour(10);
   const hide = await page.addStyleTag({ content: '#experience > :not(#viewport){visibility:hidden!important}' });

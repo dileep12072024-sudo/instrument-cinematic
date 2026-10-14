@@ -121,7 +121,7 @@ const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 50
 let controls, architecture, landscape, surroundings, entranceWalk, panoramaLook, avatar;
 let selected = 0, transition = null, journey = false, journeyStart = 0, isOrbiting = false, doorsOpen = false, hour = 16.5, targetHour = 16.5;
 let ready = false, drift = !reduced, quality = 'auto', needsRender = true, lastRendered = 0, lastShadowUpdate = 0;
-let interactive = false;
+let interactive = false, dragging = 0, avatarMovedAt = 0;
 let panorama = false;
 function setPanorama(enabled) {
   panorama = enabled;
@@ -180,7 +180,9 @@ function adaptResolution(interval, now) {
   const change = () => { frameSamples.length = 0; lastResolutionChange = now; needsRender = true; };
   if (average > budget * (cadence > 1 ? 1.12 : 1.2)) {
     if (cadence < 2) { cadence = cadenceFloor = 2; return change(); }
-    if (ratio > .8) { resolutionCap = Math.max(.8, ratio * .88); setRatio(resolutionCap); return change(); }
+    // Phones have few CSS pixels; below ~1.1 they turn visibly soft, so they shed frames before sharpness.
+    const floor = small() ? Math.min(1.1, best) : .8;
+    if (ratio > floor + .01) { resolutionCap = Math.max(floor, ratio * .88); setRatio(resolutionCap); return change(); }
     if (cadence < 3) { cadence = cadenceFloor = 3; return change(); }
   } else if (now - lastResolutionChange > 20000) {
     const up = Math.min(best, resolutionCap, ratio / .88);
@@ -416,6 +418,9 @@ function drawPlan() {
 async function boot() {
   if (!renderer) return;
   renderer.setPixelRatio(defaultPixelRatio()); renderer.setSize(innerWidth, innerHeight);
+  { const pointers = new Set(), canvas = renderer.domElement, up = e => { pointers.delete(e.pointerId); dragging = pointers.size; };
+    canvas.addEventListener('pointerdown', e => { pointers.add(e.pointerId); dragging = pointers.size; });
+    for (const type of ['pointerup', 'pointercancel']) addEventListener(type, up); addEventListener('blur', () => { pointers.clear(); dragging = 0; }); }
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .94;
@@ -442,12 +447,15 @@ async function boot() {
   $('#loading-status').textContent = 'Growing the Blender landscape';
   performance.mark('architecture-built');
   landscape = await loadBlenderEnvironment(scene, placeFacadeTrees, environmentDownload);
+  const breathe = () => new Promise(resolve => requestAnimationFrame(resolve)); // let the loader paint between stages
+  await breathe();
   buildEntranceApron(landscape.group);
   puddles = createPuddles(landscape); puddles.attach(); rain.ground = (x, z) => puddles.heightAt(x, z);
   if (weatherState.rainHistory) { puddles.history(weatherState.rainHistory); puddles.warmed = true; }
   mergeGateParts(landscape.group);
   surroundings = buildSurroundings(scene, landscape, renderer, chapters.flatMap(c => [[c.eye, c.target], [new THREE.Vector3(...c.eye).sub(new THREE.Vector3(...c.target)).multiplyScalar(2.4).add(new THREE.Vector3(...c.target)).toArray(), c.target]]));
   performance.mark('surroundings-built');
+  await breathe();
   landscape.batchTrees(); // after the impostor belt captured the individual trees
   // Static scenery: compute matrices once instead of every frame (wind runs in the vertex shader).
   for (const root of [landscape.group, surroundings.belt.group, surroundings.ridge]) root.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
@@ -460,33 +468,39 @@ async function boot() {
   sky.update(0, sunlight.night, weatherState, reduced);
   updateWetMaterials();
   performance.mark('lighting-set');
+  // One filter for the sky and every reflection probe: each new generator recompiled its shaders (~1.6 s apiece).
+  const reflectionFilter = new THREE.PMREMGenerator(renderer);
   try {
     const hdr = await skyDownload; hdr.mapping = THREE.EquirectangularReflectionMapping;
-    const pmrem = new THREE.PMREMGenerator(renderer); const env = pmrem.fromEquirectangular(hdr);
+    const env = reflectionFilter.fromEquirectangular(hdr);
     scene.environment = env.texture; scene.background = hdr; scene.backgroundBlurriness = .02; scene.backgroundRotation.y = 1.9; scene.environmentRotation.y = 1.9;
-    pmrem.dispose();
   } catch { console.warn('Sky map unavailable. Using daylight fallback.'); }
   performance.mark('sky-ready');
   updateLighting(hour);
   $('#loading-status').textContent = 'Reflecting the courtyards';
   const glass = [architecture.materials.glass, architecture.materials.rearGlass, architecture.materials.entranceReflectiveGlass];
   glass.forEach(material => { material.visible = false; });
+  // Shaders compile in parallel off the main thread: first the reflection probes' linear (untonemapped) variants,
+  // then the screen's. Compiling them inside the first render froze the page for ~20 s on integrated GPUs.
+  const probeTarget = new THREE.WebGLCubeRenderTarget(4, { type: THREE.HalfFloatType });
+  renderer.setRenderTarget(probeTarget);
+  try { await renderer.compileAsync(scene, camera); await compileShadowShaders(); } finally { renderer.setRenderTarget(null); probeTarget.dispose(); }
+  performance.mark('probe-shaders-compiled');
   try {
     for (const [i, position] of [[0, 6, 20], [0, 6, -9], [0, 2.2, 7.25]].entries()) {
       // The entrance needs a crisp reflection; capture it once, without a per-frame render pass.
       const probe = new THREE.WebGLCubeRenderTarget(i === 2 ? 512 : 128, { type: THREE.HalfFloatType });
       const probeCamera = new THREE.CubeCamera(.2, 180, probe);
-      const reflectionFilter = new THREE.PMREMGenerator(renderer);
       try {
         probeCamera.position.fromArray(position); probeCamera.update(renderer, scene); performance.mark(`probe-${i}-rendered`);
         glass[i].envMap = reflectionFilter.fromCubemap(probe.texture).texture;
         glass[i].needsUpdate = true;
       } finally {
-        probe.dispose(); reflectionFilter.dispose();
+        probe.dispose();
       }
     }
   } finally {
-    glass.forEach(material => { material.visible = true; });
+    glass.forEach(material => { material.visible = true; }); reflectionFilter.dispose();
   }
   const defaultAudio = sound.setEnabled(true);
   updateSoundButton();
@@ -494,6 +508,7 @@ async function boot() {
   setInterval(() => { if (!document.hidden) loadWeather(); }, 5 * 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - weatherState.updatedAt > 5 * 60000) loadWeather(); });
   performance.mark('reflections-captured');
+  await renderer.compileAsync(scene, camera);
   performance.mark('shaders-compiled');
   // Walkable guide: collides with the building and ground, never with foliage or effects.
   avatar = createAvatar({ scene, camera, canvas: renderer.domElement, changed: () => { needsRender = true; }, collidables: (() => {
@@ -503,6 +518,27 @@ async function boot() {
   renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
   loadWeather();
   drawPlan(); resize(); requestAnimationFrame(animate);
+}
+// Shadow-map shaders are only built when shadows first render, synchronously (~6 s here). Compile them ahead, in
+// parallel: give each shadow caster the exact material three's shadow pass will use, then restore it.
+async function compileShadowShaders() {
+  const kinds = new Set();
+  scene.traverse(o => { if (o.isLight && o.castShadow) kinds.add(o.isPointLight ? 'distance' : 'depth'); });
+  const flip = { [THREE.FrontSide]: THREE.BackSide, [THREE.BackSide]: THREE.FrontSide, [THREE.DoubleSide]: THREE.DoubleSide };
+  const plain = { depth: new THREE.MeshDepthMaterial(), distance: new THREE.MeshDistanceMaterial() };
+  for (const kind of kinds) {
+    const swapped = [];
+    scene.traverseVisible(o => {
+      if (!o.isMesh || !o.castShadow || Array.isArray(o.material) || !o.material.visible) return;
+      const m = o.material, custom = kind === 'distance' ? o.customDistanceMaterial : o.customDepthMaterial;
+      const shadow = custom || plain[kind].clone(); // clones keep each caster's settings; programs are shared by key
+      Object.assign(shadow, { side: m.shadowSide ?? flip[m.side], alphaMap: m.alphaMap, alphaTest: m.alphaToCoverage ? .5 : m.alphaTest, map: m.map, displacementMap: m.displacementMap, displacementScale: m.displacementScale });
+      swapped.push([o, m]); o.material = shadow;
+    });
+    const fog = scene.fog; scene.fog = null; // the shadow pass renders without the scene, so without fog
+    try { await renderer.compileAsync(scene, camera); }
+    finally { scene.fog = fog; for (const [o, m] of swapped) o.material = m; }
+  }
 }
 let previous = performance.now(), frames = 0;
 function animate(now) {
@@ -516,6 +552,9 @@ function animate(now) {
   if (avatar?.active) {
     avatar.update(Math.min(frameDuration / 1000, .1)); needsRender = true;
     if (frames % 6 === 0) $('#avatar-readout').textContent = avatar.text().replace(/^Avatar: /, '');
+    // The panel steps out of the way while walking, turning or looking, and returns once the guide stands still.
+    const i = avatar.input; if (i.forward || i.strafe || i.turn || dragging) avatarMovedAt = now;
+    $('#avatar-panel').classList.toggle('quiet', now - avatarMovedAt < 1200);
   } else if (entranceWalk?.active) {
     entranceWalk.update(Math.min(frameDuration / 1000, .1));
   } else if (transition) {
@@ -584,7 +623,8 @@ function animate(now) {
   sound.setWeather(weatherState, isSheltered(camera.position.x, camera.position.y, camera.position.z), windSpeed);
   sky.update(now / 1000, sunlight.night, weatherState, reduced);
   // Even pacing: draw every Nth display frame so motion advances in equal steps.
-  if ((needsRender || !reduced) && !(quality === 'auto' && now - lastRendered < cadence * 1000 / 60 - 4)) {
+  // While a finger or mouse is dragging the view, draw every frame the display offers: input must track the hand.
+  if ((needsRender || !reduced) && !(quality === 'auto' && !dragging && now - lastRendered < cadence * 1000 / 60 - 4)) {
     const interval = now - lastRendered;
     renderer.render(scene, camera);
     if (++frames % 60 === 0) drawPlan();
@@ -592,6 +632,7 @@ function animate(now) {
     needsRender = false; lastRendered = now;
   }
 }
+performance.mark = (m => (name, ...a) => { const r = m.call(performance, name, ...a); try { if (renderer) console.log('TMP', name, renderer.info.programs.length, renderer.info.programs.map(q => q.name || q.cacheKey.split(',')[0]).slice(window.__tmpN || 0).join('|').slice(0, 400)); window.__tmpN = renderer.info.programs.length; } catch {} return r; })(performance.mark);
 window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } } };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 

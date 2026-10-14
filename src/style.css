@@ -48,6 +48,7 @@ dialog{background:#18221f;color:#edf2e4;border:1px solid #e9f0df29;border-radius
 @media(max-width:699px){.scene-meta{max-width:calc(100% - 90px)}.scene-meta #scene-mode,.scene-meta .meta-line{display:none}.weather-live{display:block;flex-basis:100%;font-size:7px;line-height:1.4}}
 /* A slim corner strip, not a card over the view. */
 .avatar-panel{position:absolute;bottom:16px;left:16px;max-width:min(430px,calc(100% - 32px));padding:7px 11px;background:#14211e8c;backdrop-filter:blur(6px);border:1px solid #ffffff22;border-radius:4px;z-index:8;pointer-events:auto}
+.avatar-panel{transition:opacity .35s ease}.avatar-panel.quiet{opacity:0;pointer-events:none}
 .avatar-readout{margin:0 0 4px;font-size:11px;line-height:1.4;color:#eef3e6;user-select:text}
 .avatar-actions{display:flex;gap:14px;flex-wrap:wrap}.avatar-actions .text-btn{font-size:10px}.avatar-actions [aria-pressed=true]{color:var(--accent)}
 .avatar-help{margin:4px 0 0;font-size:10px;color:#c7d1c2;overflow:hidden;max-height:2em;animation:avatar-hint .6s 7s forwards}

@@ -14,7 +14,7 @@
     "test:resolution": "node scripts/check-resolution.mjs",
     "test:mobile": "node scripts/check-mobile.mjs",
     "test:storm": "node scripts/check-storm.mjs",
-    "test:geometry": "node scripts/check-building-clearances.mjs && node scripts/check-terrace-coping.mjs && node scripts/check-foliage-clearance.mjs",
+    "test:geometry": "node scripts/check-building-clearances.mjs && node scripts/check-terrace-coping.mjs",
     "deploy": "wrangler pages deploy dist --project-name instrument-cinematic"
   },
   "dependencies": {

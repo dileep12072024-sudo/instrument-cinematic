@@ -1,12 +1,10 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint, groundSpine, seminarPassage, hallWindows } from './footprint.js';
-import { buildReferenceGarden, trimBuildingFoliage } from './garden.js';
 import { buildEntranceHall } from './entrance-hall.js';
 import { buildClassroomWing } from './classroom-wing.js';
 import { buildTerraces } from './terraces.js';
 import { stairs, terraceLevels } from './stair-layout.js';
-import { applyWind } from './weather-effects.js';
 
 let seed = 1937;
 const random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
@@ -595,127 +593,3 @@ export function buildEntranceApron(group) {
   return apron;
 }
 
-export function buildLandscape(scene) {
-  const group = new T.Group(); group.name = 'Courtyard and planting'; scene.add(group);
-  const mat = (color, opts = {}) => new T.MeshStandardMaterial({ color, roughness: .95, ...opts });
-  const loader = new T.TextureLoader();
-  const earthMap = loader.load('/media/earth.jpg'); earthMap.colorSpace = T.SRGBColorSpace; earthMap.wrapS = earthMap.wrapT = T.RepeatWrapping; earthMap.repeat.set(1000, 1000); earthMap.anisotropy = 8;
-  const earthNormal = loader.load('/media/earth-normal.jpg'); earthNormal.wrapS = earthNormal.wrapT = T.RepeatWrapping; earthNormal.repeat.copy(earthMap.repeat); earthNormal.anisotropy = 4;
-  const groundMat = mat('#c4ad8b', { map: earthMap, normalMap: earthNormal, normalScale: new T.Vector2(.6, .6) });
-  const slope = z => T.MathUtils.clamp((z - 11) / 25, 0, 1) * .45;
-  const groundHeight = z => -.14 - slope(z);
-  const groundGeo = new T.PlaneGeometry(2000, 2000, 1, 400); groundGeo.rotateX(-Math.PI / 2);
-  const groundPos = groundGeo.attributes.position;
-  for (let i = 0; i < groundPos.count; i++) groundPos.setY(i, groundHeight(groundPos.getZ(i)));
-  groundGeo.computeVertexNormals();
-  const ground = new T.Mesh(groundGeo, groundMat); ground.receiveShadow = true; group.add(ground);
-  const soilMap = earthMap.clone(), soilNormal = earthNormal.clone(); soilMap.repeat.set(60, 60); soilNormal.repeat.set(60, 60);
-  const soilMat = groundMat.clone(); soilMat.map = soilMap; soilMat.normalMap = soilNormal; soilMat.vertexColors = true;
-  const soilGeo = new T.PlaneGeometry(120, 120, 160, 160); soilGeo.rotateX(-Math.PI / 2);
-  const soilPos = soilGeo.attributes.position, soilColors = [], color = new T.Color();
-  for (let i = 0; i < soilPos.count; i++) {
-    const x = soilPos.getX(i), z = soilPos.getZ(i);
-    const edge = T.MathUtils.smoothstep(60 - Math.max(Math.abs(x), Math.abs(z)), 0, 4);
-    const patch = Math.sin(x * .51 + Math.sin(z * .29)) * Math.cos(z * .43) * .5 + .5;
-    soilPos.setY(i, groundHeight(z) + edge * (.005 + patch * .044));
-    color.setRGB(.73 + patch * .27, .67 + patch * .3, .58 + patch * .34); soilColors.push(color.r, color.g, color.b);
-  }
-  soilGeo.setAttribute('color', new T.Float32BufferAttribute(soilColors, 3)); soilGeo.computeVertexNormals();
-  const soil = new T.Mesh(soilGeo, soilMat); soil.name = 'Uneven mottled courtyard earth'; soil.receiveShadow = true; group.add(soil);
-  const roadMat = mat('#989a90', { map: noiseMap('#53585a', 20) }); roadMat.bumpMap = roadMat.map; roadMat.bumpScale = .016;
-  const pavingMat = mat('#c5c3b3', { map: noiseMap('#b3b3a8', 10, true), bumpScale: .018 }); pavingMat.bumpMap = pavingMat.map;
-  const curbMat = mat('#c7c4b6'), white = mat('#e3dfcb');
-  function box(w, h, d, x, y, z, material) { const m = new T.Mesh(new T.BoxGeometry(w, h, d), material); m.position.set(x, y, z); m.receiveShadow = true; group.add(m); return m; }
-  box(64, .12, 6, 0, -.045, 6.3, pavingMat);
-  for (const p of footprint.filter(p => p.depth > 20)) box(p.width + 2, .12, p.depth + 2, p.x, -.045, p.z, pavingMat);
-  function gradedBox(w, h, d, x, y, z, material) {
-    const mesh = box(w, h, d, x, y, z, material), p = mesh.geometry.attributes.position;
-    for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) - slope(z + p.getZ(i)));
-    mesh.geometry.computeVertexNormals(); return mesh;
-  }
-  gradedBox(5.2, .1, 25, 0, -.045, 23.5, roadMat).name = 'Sloping entrance drive';
-  gradedBox(180, .1, 6.5, 0, -.045, 39, roadMat);
-  for (const x of [-2.5, 2.5]) gradedBox(.065, .012, 25, x, .017, 23.5, white);
-  for (const z of [35.95, 42.04]) gradedBox(180, .014, .08, 0, .018, z, white);
-  for (const x of [-3, 3]) gradedBox(.18, .22, 24, x, .035, 23.5, curbMat);
-  for (const z of [35.7, 42.3]) gradedBox(180, .18, .22, 0, .025, z, curbMat);
-  buildEntranceApron(group);
-  const treePositions = [[-37, 10, 14], [-37, -6, 14], [-29, 18, 14], [-43, 16, 14], [41, 11, 13], [-45, -10, 14], [44, -15, 12], [-13, -25, 13], [9, -25, 15], [30, -29, 13], [-30, -29, 15]];
-  for (let i = 0; i < 26; i++) {
-    const a = random() * Math.PI * 2, r = 60 + random() * 50;
-    const z = Math.sin(a) * r;
-    if (z < 12) treePositions.push([Math.cos(a) * r, z, 10 + random() * 10]);
-  }
-  for (let i = 0; i < 16; i++) treePositions.push([-65 + i * 9, -43 - random() * 15, 11 + random() * 7]);
-  const barkMat = mat('#6b6454', { map: noiseMap('#aea38b', 2), bumpScale: .12 }); barkMat.bumpMap = barkMat.map;
-  const branchGeos = [], leaves = [], dummy = new T.Object3D();
-  const up = new T.Vector3(0, 1, 0);
-  function branch(a, b, radius) {
-    const geo = new T.CylinderGeometry(radius * .55, radius, a.distanceTo(b), 6);
-    dummy.position.copy(a).lerp(b, .5); dummy.quaternion.setFromUnitVectors(up, b.clone().sub(a).normalize()); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); geo.applyMatrix4(dummy.matrix); branchGeos.push(geo);
-  }
-  for (const [x, z, h] of treePositions) {
-    const crown = new T.Vector3(x, h * .62, z);
-    branch(new T.Vector3(x, 0, z), crown, h * .029);
-    for (let j = 0; j < 8; j++) {
-      const a = j * Math.PI / 4 + random() * .5;
-      const tip = crown.clone().add(new T.Vector3(Math.cos(a) * h * .29, h * (.12 + random() * .24), Math.sin(a) * h * .29));
-      branch(crown.clone().add(new T.Vector3(0, -random() * 1.5, 0)), tip, h * .009);
-      for (let k = 0; k < 8; k++) {
-        const end = tip.clone().add(new T.Vector3((random() - .5) * h * .48, (random() - .4) * h * .28, (random() - .5) * h * .48));
-        if (k < 3) branch(tip, end, .032);
-        leaves.push({ p: end, s: h * (.19 + random() * .12) });
-      }
-    }
-  }
-  const trunks = new T.Mesh(mergeGeometries(branchGeos), barkMat); trunks.castShadow = true; trunks.receiveShadow = true; group.add(trunks); branchGeos.forEach(g => g.dispose());
-  const leafMap = foliageTexture();
-  const leafMat = new T.MeshStandardMaterial({ map: leafMap, alphaTest: .45, side: T.DoubleSide, roughness: .95, color: '#b6c195' });
-  const foliage = new T.InstancedMesh(new T.PlaneGeometry(1, 1), leafMat, leaves.length * 2);
-  for (let i = 0; i < leaves.length; i++) for (let j = 0; j < 2; j++) {
-    const { p, s } = leaves[i]; dummy.position.copy(p); dummy.rotation.set((random() - .5) * 2.5, random() * Math.PI * 2, random() * 2); dummy.scale.set(s, s, s); dummy.updateMatrix(); foliage.setMatrixAt(i * 2 + j, dummy.matrix);
-    foliage.setColorAt(i * 2 + j, new T.Color().setHSL(.19 + random() * .07, .18 + random() * .14, .54 + random() * .2));
-  }
-  // Separate canopy shadow cards keep the shadow pass independent of leaf density.
-  foliage.castShadow = false; foliage.receiveShadow = false;
-  const shadowMaterial = new T.MeshBasicMaterial({ colorWrite: false, depthWrite: false, side: T.DoubleSide });
-  const canopyShadows = new T.InstancedMesh(new T.PlaneGeometry(1, 1), shadowMaterial, treePositions.length * 3);
-  canopyShadows.customDepthMaterial = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking, map: leafMap, alphaTest: .45, side: T.DoubleSide });
-  treePositions.forEach(([x, z, h], i) => {
-    for (let k = 0; k < 3; k++) {
-      dummy.position.set(x, h * .87, z); dummy.scale.set(h * .8, h * .65, 1);
-      dummy.rotation.set(k === 2 ? Math.PI / 2 : 0, k === 1 ? Math.PI / 2 : 0, 0);
-      dummy.updateMatrix(); canopyShadows.setMatrixAt(i * 3 + k, dummy.matrix);
-    }
-  });
-  canopyShadows.castShadow = true; group.add(canopyShadows);
-  const wind = { value: 0 };
-  const windStrength = { value: 0 }, windDirection = { value: new T.Vector2(0, 1) };
-  applyWind(leafMat, wind, windStrength, windDirection);
-  group.add(foliage);
-  const debrisMat = mat('#8b7957', { side: T.DoubleSide });
-  const debris = new T.InstancedMesh(new T.PlaneGeometry(.14, .055), debrisMat, 1900);
-  for (let i = 0; i < 1900; i++) {
-    let x = (random() - .5) * 95, z = 10 + random() * 40;
-    if (Math.abs(x) < 3 || Math.abs(z - 39) < 3.3) x += x < 0 ? -5 : 5;
-    const paved = (x < -21 && x > -35 && z < 16) || (x > 21 && x < 32 && z < 17.5);
-    dummy.position.set(x, (paved ? .022 : groundHeight(z) + .06) + random() * .01, z); dummy.rotation.set(-Math.PI / 2, 0, random() * 6); dummy.scale.setScalar(.7 + random() * 1.7); dummy.updateMatrix(); debris.setMatrixAt(i, dummy.matrix);
-    debris.setColorAt(i, new T.Color().setHSL(.07 + random() * .12, .2 + random() * .25, .3 + random() * .25));
-  }
-  group.add(debris);
-  const stones = new T.InstancedMesh(new T.IcosahedronGeometry(1, 0), mat('#a69f8c'), 280);
-  stones.name = 'Broken verge aggregate';
-  for (let i = 0; i < stones.count; i++) {
-    const side = random() < .5 ? -1 : 1, x = side * (3.2 + random() ** 2 * 19), z = 12 + random() * 23;
-    const size = .035 + random() ** 3 * .18;
-    dummy.position.set(x, groundHeight(z) + .04, z); dummy.rotation.set(random() * 3, random() * 6, random() * 3);
-    dummy.scale.set(size * 1.6, size * .5, size); dummy.updateMatrix(); stones.setMatrixAt(i, dummy.matrix);
-    stones.setColorAt(i, new T.Color().setHSL(.08, .1 + random() * .2, .35 + random() * .3));
-  }
-  stones.receiveShadow = true; group.add(stones);
-  const garden = buildReferenceGarden(group, groundHeight, wind, windStrength, windDirection);
-  const tanks = scene.getObjectByName('Reference terraces and roof stair enclosure')?.userData.tanks || [];
-  trimBuildingFoliage(foliage, tanks);
-  trimBuildingFoliage(garden.foliage, tanks);
-  return { group, foliage, wind, windStrength, windDirection, garden, groundMaterial: groundMat, soilMaterial: soilMat, pavingMaterial: pavingMat };
-}

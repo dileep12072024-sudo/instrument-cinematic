@@ -32,14 +32,12 @@ try {
   await refresh();
   await page.waitForFunction(() => __portrait.weather.loaded);
   const geometry = await page.evaluate(() => {
-    const { architecture, landscape, scene, renderer, camera } = __portrait;
+    const { architecture, scene, renderer, camera } = __portrait;
     renderer.render(scene, camera);
     const gl = renderer.getContext(), p = new Uint8Array(64 * 64 * 4);
     gl.readPixels(gl.drawingBufferWidth / 2 - 32, gl.drawingBufferHeight / 2 - 32, 64, 64, gl.RGBA, gl.UNSIGNED_BYTE, p);
-    let surrounds = 0; scene.traverse(m => { if (m.name === 'Broken square tree surround') surrounds++; });
-    return { trees: landscape.garden.trees.length, rightTrees: landscape.garden.trees.filter(t => t.x > 0 && t.x < 20 && t.z < 15).length, surrounds, panels: architecture.doors.map(d => d.pivot.children.filter(m => m.name === 'Single tall inset panel').length), colors: new Set(p).size };
+    return { panels: architecture.doors.map(d => d.pivot.children.filter(m => m.name === 'Single tall inset panel').length), colors: new Set(p).size };
   });
-  assert.equal(geometry.trees, 9); assert.equal(geometry.rightTrees, 1); assert.ok(geometry.surrounds > 30);
   assert.deepEqual(geometry.panels, [2, 2]); assert.ok(geometry.colors > 25);
   await hour(21); await page.screenshot({ path: 'artifacts/live-night.png' });
   await page.locator('[data-chapter="1"]').click();
