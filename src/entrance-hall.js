@@ -1,6 +1,6 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { groundSpine } from './footprint.js';
+import { groundSpine, hallWindows } from './footprint.js';
 import { buildSpineInterior } from './spine-interior.js';
 import { buildStairways } from './stairways.js';
 
@@ -20,6 +20,11 @@ export function buildEntranceHall(parent, exterior) {
     const g = new T.CylinderGeometry(radius, radius, start.distanceTo(end), 6);
     g.applyQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), end.clone().sub(start).normalize()));
     g.translate(...start.lerp(end, .5).toArray()); add(g, material);
+  }
+  // Flat steel strip in a side-wall plane (constant x): grilles are flat bar, and a box is cheaper than a cylinder.
+  function strip(a, b, width, material) {
+    const dy = b[1] - a[1], dz = b[2] - a[2], g = new T.BoxGeometry(.012, width, Math.hypot(dy, dz));
+    g.rotateX(-Math.atan2(dy, dz)); g.translate(a[0], (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); add(g, material);
   }
   let seed = 928;
   const rand = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
@@ -57,32 +62,52 @@ export function buildEntranceHall(parent, exterior) {
   floor.name = 'Continuous tiled entrance floor'; floor.rotation.x = -Math.PI / 2; floor.position.set(0, .164, 0);
   floor.receiveShadow = true; group.add(floor);
   // Side doors open onto the cross-corridor; upper grilles remain fixed.
+  // 14 October photographs (docs/entrance-video.md): the gate head sits at about half the clear height and
+  // the hexagon grille fills the rest up to the beam, nine rows deep.
+  const gateHead = 2.017, grilleTop = 3.66;
   for (const side of [-1, 1]) {
-    const x = side * 3.79;
+    const x = side * 3.79, win = hallWindows[side];
     const { roomFront, front, corridorCenter, corridorDepth } = groundSpine;
     box(x, 2.03, (roomFront - 6.8) / 2, .12, 3.72, roomFront + 6.8, wall);
     box(x, 5.85, -3.74, .12, 4.2, 6.12, wall);
-    // The window bay begins at 3.03; the passage now reaches the spine's front edge.
-    box(x, 2.03, 6.055, .12, 3.72, 1.29, wall);
-    box(x, .955, 4.37, .12, 1.58, 2.08, wall);
-    box(x, 3.3925, 4.37, .12, .995, 2.08, wall);
+    // Front stretch: solid wall around one steel window (hallWindows), from the passage edge to the facade.
+    box(x, 2.03, (front + win.z0) / 2, .12, 3.72, win.z0 - front, wall);
+    box(x, 2.03, (win.z1 + 6.7) / 2, .12, 3.72, 6.7 - win.z1, wall);
+    box(x, (.17 + win.y0) / 2, (win.z0 + win.z1) / 2, .12, win.y0 - .17, win.z1 - win.z0, wall);
+    box(x, (win.y1 + 3.89) / 2, (win.z0 + win.z1) / 2, .12, 3.89 - win.y1, win.z1 - win.z0, wall);
     box(x, 3.79, corridorCenter, .12, .26, corridorDepth, wall);
     box(x - side * .07, .26, 4.55, .07, .2, 4.3, tread);
     box(x - side * .07, .26, -3.74, .07, .2, 6.12, tread);
     // The camera shows the passage mouth, not the rooms beyond it.
     box(side * 4.7, .125, corridorCenter, 1.75, .07, corridorDepth, tread);
-    for (const z of [roomFront + .04, front - .04]) box(x, 1.55, z, .16, 2.78, .07, trim);
-    box(x, 2.94, corridorCenter, .16, .08, corridorDepth, trim);
-    for (let row = 0; row < 3; row++) for (let col = 0; col < 8; col++) {
-      const cy = 3.08 + row * .24, cell = (corridorDepth - .12) / 8, cz = roomFront + .06 + (col + .5) * cell;
-      const pts = [[-.4 * cell, 0], [-.2 * cell, .09], [.2 * cell, .09], [.4 * cell, 0], [.2 * cell, -.09], [-.2 * cell, -.09], [-.4 * cell, 0]];
-      for (let i = 1; i < pts.length; i++) rod([x, cy + pts[i - 1][1], cz + pts[i - 1][0]], [x, cy + pts[i][1], cz + pts[i][0]], .014, trim);
-      if (col < 7) rod([x, cy, cz + .4 * cell], [x, cy, cz + .6 * cell], .012, trim);
+    for (const z of [roomFront + .04, front - .04]) box(x, (.164 + grilleTop) / 2, z, .16, grilleTop - .164, .07, trim);
+    box(x, gateHead, corridorCenter, .16, .07, corridorDepth, trim);
+    box(x, grilleTop - .02, corridorCenter, .16, .05, corridorDepth, trim);
+    // Elongated hexagons in columns, tied vertically, with a cross between neighbours in each row.
+    const cols = 8, rows = 9, cell = (corridorDepth - .12) / cols, pitch = (grilleTop - gateHead - .06) / rows;
+    for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+      const cy = gateHead + .035 + (row + .5) * pitch, cz = roomFront + .06 + (col + .5) * cell, hx = .36 * cell, hy = .3 * pitch;
+      const pts = [[-hx, 0], [-hx / 2, hy], [hx / 2, hy], [hx, 0], [hx / 2, -hy], [-hx / 2, -hy], [-hx, 0]];
+      for (let i = 1; i < pts.length; i++) strip([x, cy + pts[i - 1][1], cz + pts[i - 1][0]], [x, cy + pts[i][1], cz + pts[i][0]], .022, trim);
+      strip([x, cy + hy, cz], [x, cy + pitch / 2, cz], .018, trim); strip([x, cy - hy, cz], [x, cy - pitch / 2, cz], .018, trim);
+      if (col < cols - 1) {
+        strip([x, cy, cz + hx], [x, cy, cz + cell - hx], .02, trim);
+        strip([x, cy - .28 * pitch, cz + cell / 2], [x, cy + .28 * pitch, cz + cell / 2], .02, trim);
+      }
     }
-    for (const z of [roomFront + .08, front - .23]) for (let j = 0; j < 6; j++) {
-      box(x + side * (.02 + j * .018), 1.54, z + j * .025, .024, 2.7, .018, trim);
+    // Folded collapsible gate leaves at both jambs: flat bars with the scissor links between them.
+    for (const [z0, dir] of [[roomFront + .08, 1], [front - .08, -1]]) {
+      const h = gateHead - .2;
+      for (let j = 0; j < 9; j++) box(x + side * .02, .18 + h / 2, z0 + dir * j * .03, .03, h, .012, trim);
+      for (let k = 0; k < 7; k++) {
+        const y0 = .25 + k * (h - .1) / 7, y1 = y0 + (h - .1) / 7;
+        strip([x + side * .02, y0, z0], [x + side * .02, y1, z0 + dir * .24], .012, trim);
+        strip([x + side * .02, y1, z0], [x + side * .02, y0, z0 + dir * .24], .012, trim);
+      }
     }
   }
+  // Downstand beams frame each passage mouth and run across the hall at the room-front and spine-front lines.
+  for (const z of [groundSpine.roomFront - .115, groundSpine.front + .115]) box(0, 3.645, z, 7.46, .23, .23, wall);
   box(0, 3.80, 4.25, 7.62, .08, 5.15, wall);
   group.userData.stairStartZ = groundSpine.roomFront;
   const stairways = buildStairways(group, { ...exterior, wall, tread });
@@ -163,27 +188,88 @@ export function buildEntranceHall(parent, exterior) {
       }
     }
   }
+  // The 14 October east-wall photograph shows the bench backs below the window sill: seat 0.53, back top 0.86.
+  const benchHeight = y => y < .65 ? .164 + (y - .164) * .753 : .53 + (y - .65) * .5;
+  for (const geometries of seatBatches.values()) for (const g of geometries) {
+    const p = g.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, benchHeight(p.getY(i)));
+    g.computeVertexNormals();
+  }
   for (const [material, geometries] of seatBatches) {
     const mesh = new T.Mesh(mergeGeometries(geometries), material);
     mesh.name = material.name; mesh.castShadow = mesh.receiveShadow = true; seating.add(mesh);
     geometries.forEach(g => g.dispose());
   }
   for (const side of [-1, 1]) {
-    // Timber-framed interior notice/window bays; unreadable notices are left unlettered.
-    for (let i = 0; i < 3; i++) {
-      const z = 3.68 + i * .69;
-      for (const edge of [-1, 1]) {
-        box(side * 3.78, 2.32, z + edge * .31, .24, 1.15, .065, exterior.entranceWood);
-        box(side * 3.78, 2.32 + edge * .55, z, .24, .05, .66, exterior.entranceWood);
-      }
-      box(side * 3.78, 2.32, z, .018, 1.04, .55, exterior.entranceGlazing);
-      for (const offset of [-.15, .15]) box(side * 3.63, 2.32, z + offset, .035, 1.04, .015, trim);
+    if (side > 0) { // the west grille (photo 3) has no fitting in front of it
+      box(side * 3.65, 2.8, 1.96, .08, .19, .24, exterior.paving);
+      rod([side * 3.66, 2.88, 1.99], [side * 3.66, 3.64, 1.99], .012, wall);
     }
-    box(side * 3.68, 3.26, 4.36, .06, .62, 1.5, exterior.entranceWood);
-    for (let i = 0; i < 8; i++) box(side * 3.63, 3.03 + i * .067, 4.36, .03, .02, 1.39, exterior.doorPanel);
-    box(side * 3.65, 2.8, 1.96, .08, .19, .24, exterior.paving);
-    rod([side * 3.66, 2.88, 1.99], [side * 3.66, 3.64, 1.99], .012, wall);
   }
+  // 14 October photographs: boards, plaques and fittings on both side walls, measured on each wall and fitted to
+  // this hall (docs/entrance-video.md). Faces are perspective-corrected crops of the photographs, so the lettering
+  // (heads of department with their terms, Ph.D awardees, staff, contacts) is the real lettering, tinsel included.
+  const fittings = {
+    wood: exterior.entranceWood, flex: trim, steel: new T.MeshStandardMaterial({ name: 'Grey steel window frames and bars', color: '#5e686c', metalness: .45, roughness: .5 }),
+    stone: new T.MeshStandardMaterial({ name: 'Black granite plaque', color: '#1f2324', roughness: .35 }),
+    red: new T.MeshStandardMaterial({ name: 'Red complaints box', color: '#76201f', roughness: .55 }),
+    grey: new T.MeshStandardMaterial({ name: 'Distribution board casing', color: '#53585a', metalness: .3, roughness: .55 }),
+    white: new T.MeshStandardMaterial({ name: 'White switch and conduit plastic', color: '#d8d4c8', roughness: .7 }),
+  };
+  // [z0, z1, y0, y1, depth, edge, atlas x, y, w, h, body bottom]; the west cabinets continue below the photographed part.
+  const wallItems = {
+    [-1]: ['west-boards', 2048, 1102, [
+      [4.84, 6.357, 2.471, 3.546, .03, 'wood', 445, 0, 789, 559], // department and Ph.D awardee boards
+      [3.584, 4.049, 2.784, 3.595, .012, 'flex', 1238, 0, 242, 422], // non-teaching staff
+      [3.258, 3.604, 1.921, 2.091, .01, 'flex', 1751, 704, 180, 88], // UGC SAP
+      [3.259, 3.599, 1.708, 1.892, .01, 'flex', 1570, 704, 177, 96], // DST FIST
+      [3.60, 4.02, .833, 1.599, .03, 'stone', 0, 704, 231, 398], // renovation plaque
+      [3.259, 3.588, .869, 1.652, .07, 'wood', 1843, 0, 171, 407], // time tables case
+      [4.88, 5.469, 1.737, 2.178, .02, 'flex', 1260, 704, 306, 229], // vision, over the window
+      [4.172, 4.854, 1.284, 2.078, .02, 'flex', 1484, 0, 355, 413], // grievance cells, over the window
+      [4.857, 6.66, 1.18, 1.736, .14, 'wood', 235, 704, 1021, 289, .91], // notice cabinets
+      [.212, 1.061, .616, 1.963, .012, 'flex', 0, 0, 441, 700], // programme objectives, beside the stair foot
+    ]],
+    [1]: ['east-boards', 2048, 962, [
+      [4.447, 4.93, 2.248, 3.308, .03, 'wood', 385, 0, 257, 551], // faculty
+      [4.93, 5.375, 2.231, 3.266, .03, 'wood', 646, 0, 245, 538], // successive heads I
+      [5.375, 5.83, 2.239, 3.273, .03, 'wood', 895, 0, 243, 538], // successive heads II
+      [5.835, 6.652, 2.327, 3.083, .012, 'flex', 0, 569, 431, 393], // student charter
+      [4.246, 4.978, .863, 1.949, .02, 'flex', 0, 0, 381, 565], // anti-ragging poster, over the window
+      [5.017, 6.391, .801, 1.626, .14, 'wood', 1142, 0, 714, 429], // notice cabinet
+      [3.773, 4.028, .958, 1.275, .14, 'red', 607, 569, 133, 165], // complaints box
+      [3.302, 3.508, 1.113, 1.267, .006, 'flex', 881, 569, 107, 80], // CCTV notice
+      [3.697, 4.021, 2.148, 2.779, .14, 'grey', 435, 569, 168, 328], // distribution board
+      [3.733, 3.989, 1.693, 1.981, .12, 'white', 744, 569, 133, 150], // isolator
+      [6.453, 6.684, 1.218, 1.344, .05, 'white', 992, 569, 120, 66], // switch box
+    ]],
+  };
+  for (const side of [-1, 1]) {
+    const [file, aw, ah, items] = wallItems[side], faces = [];
+    for (const [z0, z1, y0, y1, depth, edge, u, v, w, h, bottom = y0] of items) {
+      const zc = (z0 + z1) / 2, face = 3.73 - depth; // side walls' inner face is at 3.73
+      box(side * (3.73 - depth / 2), (bottom + y1) / 2, zc, depth, y1 - bottom, z1 - z0, fittings[edge]);
+      const g = new T.PlaneGeometry(z1 - z0, y1 - y0); g.rotateY(-side * Math.PI / 2); g.translate(side * (face - .002), (y0 + y1) / 2, zc);
+      const uv = g.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, (u + uv.getX(i) * w) / aw, 1 - (v + (1 - uv.getY(i)) * h) / ah);
+      faces.push(g);
+    }
+    const map = loader.load(`/media/entrance-hall/${file}.webp`); map.colorSpace = T.SRGBColorSpace; map.anisotropy = 8;
+    const boards = new T.Mesh(mergeGeometries(faces), new T.MeshStandardMaterial({ name: 'Photographed hall boards', map, roughness: .8, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .12 }));
+    // A trace of their own photographed light keeps high boards legible in the dim hall.
+    boards.name = `${side < 0 ? 'West' : 'East'} hall boards and notices`; boards.receiveShadow = true; group.add(boards);
+    faces.forEach(g => g.dispose());
+    // Grey steel window: frame, mullions roughly every half metre, close horizontal bars, clear glazing.
+    const { z0, z1, y0, y1 } = hallWindows[side], wx = side * 3.80, ww = z1 - z0, wh = y1 - y0, wz = (z0 + z1) / 2, steel = fittings.steel;
+    for (const z of [z0 + .025, z1 - .025]) box(wx, (y0 + y1) / 2, z, .06, wh, .05, steel);
+    for (const y of [y0 + .025, y1 - .025]) box(wx, y, wz, .06, .05, ww, steel);
+    const panes = Math.max(2, Math.round(ww / .55));
+    for (let i = 1; i < panes; i++) box(wx, (y0 + y1) / 2, z0 + i * ww / panes, .05, wh, .035, steel);
+    for (let y = y0 + .09; y < y1 - .06; y += .09) box(wx - side * .02, y, wz, .012, .018, ww - .05, steel);
+    box(wx + side * .01, (y0 + y1) / 2, wz, .006, wh - .05, ww - .05, exterior.entranceGlazing);
+  }
+  // East wall: white conduits rise from the distribution board and run along the wall top toward the passage.
+  for (const z of [3.76, 3.86, 3.96]) rod([3.69, 2.78, z], [3.69, 3.55, z], .016, fittings.white);
+  rod([3.69, 3.55, 3.30], [3.69, 3.55, 3.98], .018, fittings.white);
   // Thin security bars behind the fixed entrance sidelights, visible on looking back.
   for (const x of [-2.75, 2.75]) {
     for (let col = -2; col <= 2; col++) box(x + col * .36, 2.2, 6.92, .014, 1.98, .014, trim);
@@ -191,10 +277,11 @@ export function buildEntranceHall(parent, exterior) {
   }
   const tubeMat = new T.MeshStandardMaterial({ color: '#fffceb', emissive: '#fffceb', emissiveIntensity: 1.7 });
   const lights = [];
-  for (const side of [-1, 1]) {
-    box(side * 3.60, 2.88, 4.65, .08, .06, 1.3, tubeMat);
-    const light = new T.SpotLight('#fff4da', 7, 6, 1.25, .65, 2); light.position.set(side * 3.32, 2.86, 4.65);
-    light.target.position.set(0, .2, 4.65); group.add(light, light.target); lights.push(light);
+  // Wall tubes where the photographs show them: over the west notice boards, near the east front corner.
+  for (const [side, y, z] of [[-1, 2.18, 4.77], [1, 2.10, 6.10]]) {
+    box(side * 3.66, y, z, .05, .04, .98, tubeMat);
+    const light = new T.SpotLight('#fff4da', 7, 6, 1.25, .65, 2); light.position.set(side * 3.32, y - .02, z);
+    light.target.position.set(0, .2, z); group.add(light, light.target); lights.push(light);
   }
   const fill = new T.PointLight('#e2e9db', 10, 11, 2); fill.position.set(0, 3.25, .7); group.add(fill); lights.push(fill);
   for (const light of lights) {

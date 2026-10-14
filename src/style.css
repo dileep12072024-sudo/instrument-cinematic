@@ -46,13 +46,15 @@ dialog{background:#18221f;color:#edf2e4;border:1px solid #e9f0df29;border-radius
 .weather-detail{font-size:10px;line-height:1.5;color:#cdd8c9;margin:14px 0 8px}.weather-source{font-size:9px;text-decoration:underline;color:#acbba3}
 .scene-meta{max-width:calc(100% - 180px);flex-wrap:wrap}.weather-live{white-space:normal}
 @media(max-width:699px){.scene-meta{max-width:calc(100% - 90px)}.scene-meta #scene-mode,.scene-meta .meta-line{display:none}.weather-live{display:block;flex-basis:100%;font-size:7px;line-height:1.4}}
-.avatar-panel{position:absolute;bottom:24px;left:50%;transform:translateX(-50%);width:560px;max-width:calc(100% - 32px);padding:14px 18px;background:#14211eed;backdrop-filter:blur(12px);border:1px solid #ffffff35;border-radius:4px;z-index:8;pointer-events:auto}
-.avatar-readout{margin:0 0 8px;font-size:12px;line-height:1.5;color:#eef3e6;user-select:text}
-.avatar-actions{display:flex;gap:18px;flex-wrap:wrap}.avatar-actions .text-btn{font-size:11px}.avatar-actions [aria-pressed=true]{color:var(--accent)}
-.avatar-help{margin:8px 0 0;font-size:10px;color:#c7d1c2}
-.avatar-pad{display:none;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,44px);gap:6px;justify-content:center;margin-top:10px}
-.avatar-pad button{background:#ffffff1a;border:1px solid #ffffff40;border-radius:6px;color:#eef3e6;font-size:16px;touch-action:none;user-select:none}
+/* A slim corner strip, not a card over the view. */
+.avatar-panel{position:absolute;bottom:16px;left:16px;max-width:min(430px,calc(100% - 32px));padding:7px 11px;background:#14211e8c;backdrop-filter:blur(6px);border:1px solid #ffffff22;border-radius:4px;z-index:8;pointer-events:auto}
+.avatar-readout{margin:0 0 4px;font-size:11px;line-height:1.4;color:#eef3e6;user-select:text}
+.avatar-actions{display:flex;gap:14px;flex-wrap:wrap}.avatar-actions .text-btn{font-size:10px}.avatar-actions [aria-pressed=true]{color:var(--accent)}
+.avatar-help{margin:4px 0 0;font-size:10px;color:#c7d1c2;overflow:hidden;max-height:2em;animation:avatar-hint .6s 7s forwards}
+@keyframes avatar-hint{to{opacity:0;max-height:0;margin:0}}
+.avatar-pad{display:none;position:absolute;z-index:8;right:16px;bottom:max(16px,env(safe-area-inset-bottom));grid-template-columns:repeat(3,46px);grid-template-rows:repeat(2,42px);gap:6px}
+.avatar-pad button{background:#14211e66;border:1px solid #ffffff40;border-radius:6px;color:#eef3e6;font-size:16px;touch-action:none;user-select:none}
 .avatar-pad [data-move=forward]{grid-column:2;grid-row:1}.avatar-pad [data-move=left]{grid-column:1;grid-row:2}.avatar-pad [data-move=back]{grid-column:2;grid-row:2}.avatar-pad [data-move=right]{grid-column:3;grid-row:2}
 .avatar-view .scene-heading,.avatar-view .door-action,.avatar-view .plan,.avatar-view .chapter-bar,.avatar-view .entrance-actions{display:none}
 .avatar-view .shade{background:none}
-@media(pointer:coarse),(max-width:699px){.avatar-pad{display:grid}.avatar-help{display:none}.avatar-panel{bottom:max(12px,env(safe-area-inset-bottom));padding:10px 12px}}
+@media(pointer:coarse),(max-width:699px){.avatar-panel:not([hidden])+.avatar-pad{display:grid}.avatar-help{display:none}.avatar-panel{bottom:max(12px,env(safe-area-inset-bottom));left:12px;max-width:calc(100% - 200px);padding:6px 9px}.avatar-actions{gap:10px}}

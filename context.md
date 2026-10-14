@@ -2,7 +2,35 @@
 
 Updated: 2026-10-12. Read this before changing the project.
 
-## Walkable Guide Avatar (2026-10-14, latest)
+## Hall Side Walls From Photographs (2026-10-14, latest, awaiting user approval)
+
+- Three photos of the hall's side walls and the left (west) wing passage were measured with the
+  known lens and solved camera poses; method, numbers and the fit factors are in
+  `docs/entrance-video.md` ("14 October photographs"). Boards use perspective-corrected crops
+  (`public/media/entrance-hall/{west,east}-boards.webp`), so their lettering is real.
+- Finding: the real hall is about 4.4 high and its side walls about 4.9 long; the model hall is
+  3.6 and 3.45. Side-wall contents are fitted (heights x0.82, positions x0.704). Raising the ground
+  storey would be a building-wide change, not made.
+- `hallWindows` in `src/footprint.js` drives both the hall walls and the shell openings in
+  `architecture.js`. Check: `node scripts/check-hall-side-walls.mjs`.
+
+## Rain: Wind Slant, Splashes, Puddles (2026-10-14, awaiting user approval)
+
+- Slant: rain drifts with the same gusting wind speed the trees use (`updateWind` -> `rain.update`),
+  damped like the foliage, so lean = atan(wind / fall speed). Check: `scripts/check-rain-slant.mjs`.
+- Splashes: drops landing on the ground (height grid) or on a roof (`shelterAt`) throw a 0.26 s
+  crown within 18 m of the eye (pool of 320, additive).
+- Puddles (`src/puddles.js`): ground meshes rasterised to a 0.5 m grid with small micro-relief
+  (a visual estimate), then a priority-flood depression fill. Water drains off where the
+  modelled ground ends; building footprints are walls. The deepest hollows are the authored
+  0.45 m side-ground swales beside the drive. A fill/drain model (paving vs soil) follows the live
+  rain rate and is warm-started from the past 48 h of hourly Open-Meteo precipitation. Wet film:
+  ~30 s to wet, ~8 min to dry. Puddles from heavy rain last about an hour on paving. The
+  shader darkens and glosses ground, flattens and mirrors in puddles, and adds random drop
+  rings within ~15 m. Check: `scripts/check-puddles.mjs`. Map build ~0.1-0.3 s during loading.
+- Measured on the user's GPU: no frame-time increase vs the previous preview (within noise).
+
+## Walkable Guide Avatar (2026-10-14)
 
 - Toolbar person icon enters avatar mode (`src/avatar.js`): the user steers a human figure
   to show where their photos were taken, then copies the readout (`x y z`, level, facing

@@ -11,6 +11,7 @@ import { footprint } from './footprint.js';
 import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
 import { createRain, rainfall, updateWind, isSheltered } from './weather-effects.js';
+import { createPuddles } from './puddles.js';
 import { createEntranceWalk } from './entrance-walk.js';
 import { createPanoramaLook } from './panorama-look.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
@@ -58,8 +59,8 @@ $('#app').innerHTML = `
       <p id="avatar-readout" class="avatar-readout" role="status">Preparing the guide…</p>
       <div class="avatar-actions"><button id="avatar-eye" class="text-btn" aria-pressed="false">${icon('eye')}<span>Eye view</span></button><button id="avatar-copy" class="text-btn">${icon('copy')}<span>Copy position</span></button><button id="avatar-exit" class="text-btn">${icon('x')}<span>Exit</span></button></div>
       <p class="avatar-help">W A S D or arrow keys to walk · Q / E or ← → to turn · Shift to run · drag to look around</p>
-      <div class="avatar-pad" aria-label="Movement controls"><button data-move="forward" aria-label="Walk forward">▲</button><button data-move="left" aria-label="Turn left">◀</button><button data-move="back" aria-label="Walk back">▼</button><button data-move="right" aria-label="Turn right">▶</button></div>
     </section>
+    <div class="avatar-pad" aria-label="Movement controls"><button data-move="forward" aria-label="Walk forward">▲</button><button data-move="left" aria-label="Turn left">◀</button><button data-move="back" aria-label="Walk back">▼</button><button data-move="right" aria-label="Turn right">▶</button></div>
     <section id="walk-panel" class="walk-panel" hidden aria-label="Entrance walkthrough"><span id="walk-location">The threshold</span><div class="walk-controls"><button id="walk-back" class="icon-btn" aria-label="Previous entrance viewpoint" data-tip="Previous viewpoint">${icon('arrow-left')}</button><button id="walk-play" class="icon-btn" aria-label="Play entrance walkthrough" aria-pressed="false" data-tip="Play walkthrough"><span class="walk-play-icon">${icon('play')}</span><span class="walk-pause-icon" hidden>${icon('pause')}</span></button><input id="walk-progress" type="range" min="0" max="1000" value="0" aria-label="Position along the entrance walkthrough"/><button id="walk-forward" class="icon-btn" aria-label="Next entrance viewpoint" data-tip="Next viewpoint">${icon('arrow-right')}</button><button id="walk-exit" class="icon-btn" aria-label="Return to courtyard" data-tip="Return to courtyard">${icon('x')}</button></div></section>
     <button id="plan" class="plan" aria-label="View building from above" data-tip="Overhead view"><canvas width="220" height="120" aria-hidden="true"></canvas><span>NORTH CAMPUS ${icon('arrow-up-right')}</span></button>
     <footer class="chapter-bar"><div class="chapter-caption"><span>THE CAMPUS</span><small>Four perspectives. One place.</small></div><nav class="chapters" aria-label="Camera viewpoints">${chapters.map((c, i) => `<button data-chapter="${i}" class="chapter ${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}"><span>0${i + 1}</span><strong>${c.name}</strong><span class="chapter-line"></span></button>`).join('')}</nav><button id="next" class="next-btn" aria-label="Next viewpoint">${icon('arrow-right')}</button></footer>
@@ -218,6 +219,7 @@ function updateMoon(now = Date.now()) {
 }
 
 const rain = createRain(scene, camera);
+let puddles;
 
 function updateWeatherLabel() {
   const temp = weatherState.temperature == null ? '' : ` / ${Math.round(weatherState.temperature)}°C`;
@@ -231,9 +233,7 @@ function updateWeatherLabel() {
 function updateWetMaterials() {
   const wet = weatherState.rainFactor;
   if (!landscape) return;
-  landscape.groundMaterial.roughness = THREE.MathUtils.lerp(.95, .58, wet);
-  landscape.soilMaterial.roughness = THREE.MathUtils.lerp(.95, .58, wet);
-  landscape.pavingMaterial.roughness = THREE.MathUtils.lerp(.95, .25, wet);
+  // Ground wetness and puddles follow the water model in puddles.js, which keeps surfaces wet after rain.
   if (architecture) {
     architecture.materials.paving.roughness = THREE.MathUtils.lerp(.9, .3, wet);
     architecture.materials.glass.roughness = THREE.MathUtils.lerp(.055, .025, wet);
@@ -281,6 +281,9 @@ async function loadWeather() {
     const dailyRisk = Number.isFinite(data.daily?.precipitation_probability_max?.[dayIndex]) ? data.daily.precipitation_probability_max[dayIndex] : null;
     const risk = chances.length ? Math.max(...chances, dailyRisk ?? 0) : dailyRisk;
     weatherState.forecast = risk == null ? 'Forecast unavailable' : `Next 6 hours: ${risk}% maximum hourly rain chance.${risk >= 50 ? ' An umbrella is advisable.' : ''}${next.some(v => [95, 96, 99].includes(v.code)) ? ' Thunderstorms possible.' : ''}`;
+    // Hourly rain over the past two days warm-starts the puddles, once.
+    weatherState.rainHistory = forecast?.time?.map((t, i) => ({ t: t * 1000, mm: Number(forecast.precipitation?.[i]) || 0 })) || [];
+    if (puddles && !puddles.warmed) { puddles.history(weatherState.rainHistory); puddles.warmed = true; }
     updateWetMaterials(); updateLighting(hour); updateWeatherLabel();
   } catch {
     weatherState.stale = true;
@@ -440,6 +443,8 @@ async function boot() {
   performance.mark('architecture-built');
   landscape = await loadBlenderEnvironment(scene, placeFacadeTrees, environmentDownload);
   buildEntranceApron(landscape.group);
+  puddles = createPuddles(landscape); puddles.attach(); rain.ground = (x, z) => puddles.heightAt(x, z);
+  if (weatherState.rainHistory) { puddles.history(weatherState.rainHistory); puddles.warmed = true; }
   mergeGateParts(landscape.group);
   surroundings = buildSurroundings(scene, landscape, renderer, chapters.flatMap(c => [[c.eye, c.target], [new THREE.Vector3(...c.eye).sub(new THREE.Vector3(...c.target)).multiplyScalar(2.4).add(new THREE.Vector3(...c.target)).toArray(), c.target]]));
   performance.mark('surroundings-built');
@@ -552,7 +557,8 @@ function animate(now) {
   if (!entranceWalk?.active && !panorama && !avatar?.active) controls.update(Math.min(frameDuration / 1000, 1));
   const windSpeed = updateWind(landscape, weatherState, dt, reduced);
   if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
-  rain.update(dt, weatherState, reduced);
+  rain.update(dt, weatherState, reduced, windSpeed);
+  puddles?.update(dt, weatherState, reduced);
   lightning.visible = weatherState.storm && !reduced;
   // Hall lights only while the camera is inside the entrance hall; elsewhere they cost every lit pixel for nothing.
   const inHall = entranceWalk?.active || Math.abs(camera.position.x) < 4.2 && camera.position.z > -7.2 && camera.position.z < 7.6 && camera.position.y < 4.4;
@@ -586,7 +592,7 @@ function animate(now) {
     needsRender = false; lastRendered = now;
   }
 }
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } } };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } } };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;

@@ -15,9 +15,10 @@ export const shelters = [
   ...terraceCovers,
 ];
 
-export function isSheltered(x, y, z, margin = 0) {
-  return shelters.some(s => Math.abs(x - s.x) <= s.width / 2 + margin && Math.abs(z - s.z) <= s.depth / 2 + margin && y <= s.top + margin);
+export function shelterAt(x, y, z, margin = 0) {
+  return shelters.find(s => Math.abs(x - s.x) <= s.width / 2 + margin && Math.abs(z - s.z) <= s.depth / 2 + margin && y <= s.top + margin);
 }
+export const isSheltered = (x, y, z, margin = 0) => !!shelterAt(x, y, z, margin);
 
 export function rainfall(current) {
   // rain and showers are components of precipitation, not additional totals.
@@ -57,23 +58,45 @@ export function createRain(scene, camera) {
   const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const drops = Array.from({ length: count }, () => ({ x: (random() * 2 - 1) * radius, y: random() * (above + below) - below, z: (random() * 2 - 1) * radius, speed: 8.5 + random() * 3 }));
   const dummy = new T.Object3D(), up = new T.Vector3(0, 1, 0), streak = new T.Vector3(), billboard = new T.Quaternion();
+  // Splashes where drops land on the ground or a roof: a small crown of droplets thrown up and out, then gone
+  // within a quarter of a second. Only near the eye, where a 20 cm splash is visible at all.
+  const crown = document.createElement('canvas'); crown.width = crown.height = 64;
+  const g = crown.getContext('2d'); g.fillStyle = '#fff';
+  for (let i = 0; i < 9; i++) {
+    const a = Math.PI * (.08 + .84 * i / 8), r = 18 + (i % 3) * 6, x = 32 + Math.cos(a) * r, y = 58 - Math.sin(a) * r * 1.25;
+    g.globalAlpha = .9; g.beginPath(); g.arc(x, y, 2.2, 0, Math.PI * 2); g.fill();
+    g.globalAlpha = .35; g.lineWidth = 1.4; g.strokeStyle = '#fff'; g.beginPath(); g.moveTo(32, 60); g.lineTo(x, y); g.stroke();
+  }
+  g.globalAlpha = .55; g.beginPath(); g.ellipse(32, 60, 14, 3, 0, 0, Math.PI * 2); g.fill();
+  const splashGeometry = new T.PlaneGeometry(1, 1); splashGeometry.translate(0, .5, 0);
+  const splashes = new T.InstancedMesh(splashGeometry, new T.MeshBasicMaterial({ map: new T.CanvasTexture(crown), color: '#cfdde3', transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false }), 320);
+  splashes.name = 'Rain splashes'; splashes.frustumCulled = false; splashes.visible = false; splashes.count = 0; scene.add(splashes);
+  const splashPool = [], NEAR = 18, LIFE = .26;
+  const splashColor = new T.Color();
   const wrap = (v, centre) => v - centre < -radius ? v + radius * 2 : v - centre > radius ? v - radius * 2 : v;
   return {
-    current: 0,
-    update(dt, weather, reduced = false) {
+    current: 0, gust: 0, splashes,
+    ground: () => null, // ground height at (x, z), set once the terrain is loaded
+    // windSpeed: the gusting speed the trees sway to (updateWind), so rain and foliage lean together.
+    update(dt, weather, reduced = false, windSpeed = weather.windSpeed) {
       this.current = T.MathUtils.damp(this.current, weather.rainFactor, 2.8, dt);
       mesh.visible = !reduced && this.current > .004;
-      if (!mesh.visible) return;
+      if (!mesh.visible) { splashPool.length = 0; splashes.visible = false; return; }
       mesh.count = Math.max(1, Math.round(count * Math.sqrt(this.current)));
       material.opacity = .38 + this.current * .4;
-      const wind = windVector(weather.windSpeed, weather.windDirection).multiplyScalar(.55);
+      // Drops drift at about the air's speed, so the streak leans by atan(wind / fall speed); damped like the trees.
+      this.gust = T.MathUtils.damp(this.gust, Math.max(0, windSpeed || 0), 2, dt);
+      const wind = windVector(this.gust, weather.windDirection);
       const eye = camera.getWorldPosition(streak);
       const cx = eye.x, cy = eye.y, cz = eye.z;
       billboard.setFromAxisAngle(up, camera.rotation.y);
       for (let i = 0; i < mesh.count; i++) {
         const drop = drops[i];
         drop.x = wrap(drop.x + wind.x * dt, cx); drop.z = wrap(drop.z + wind.y * dt, cz); drop.y -= drop.speed * dt;
-        if (drop.y < Math.max(-.5, cy - below) || isSheltered(drop.x, drop.y, drop.z, .1)) {
+        const roof = shelterAt(drop.x, drop.y, drop.z, .1), ground = roof ? roof.top : this.ground(drop.x, drop.z);
+        const landed = roof || ground != null && drop.y < ground;
+        if (landed || drop.y < Math.max(-.5, cy - below)) {
+          if (landed && splashPool.length < 320 && (drop.x - cx) ** 2 + (drop.z - cz) ** 2 < NEAR * NEAR) splashPool.push({ x: drop.x, y: ground + .01, z: drop.z, age: 0, size: .12 + random() * .1 });
           drop.y = cy + above - random() * 4; drop.x = cx + (random() * 2 - 1) * radius; drop.z = cz + (random() * 2 - 1) * radius;
         }
         streak.set(-wind.x, drop.speed, -wind.y).normalize();
@@ -82,6 +105,16 @@ export function createRain(scene, camera) {
         dummy.scale.set(1, .55 + this.current * .5, 1); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
       }
       mesh.instanceMatrix.needsUpdate = true;
+      let live = 0;
+      for (const s of splashPool) {
+        s.age += dt; if (s.age > LIFE) continue;
+        const t = s.age / LIFE; dummy.position.set(s.x, s.y, s.z); dummy.quaternion.copy(billboard);
+        dummy.scale.set(s.size * (.5 + t), s.size * (.9 + .6 * t), 1); dummy.updateMatrix();
+        splashes.setMatrixAt(live, dummy.matrix); splashes.setColorAt(live, splashColor.setScalar((1 - t) * (1 - t) * material.opacity)); live++;
+      }
+      for (let i = splashPool.length - 1; i >= 0; i--) if (splashPool[i].age > LIFE) splashPool.splice(i, 1);
+      splashes.count = live; splashes.visible = live > 0;
+      if (live) { splashes.instanceMatrix.needsUpdate = true; splashes.instanceColor.needsUpdate = true; }
     },
   };
 }

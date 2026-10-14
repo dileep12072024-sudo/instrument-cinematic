@@ -21,6 +21,13 @@ export const groundSpine = {
   screenBottom: 1.47,
 };
 
+// Entrance-hall side windows (key: side, -1 = west), measured in the 14 October photos and fitted
+// to this hall; the shell openings and the steel windows share them. See docs/entrance-video.md.
+export const hallWindows = {
+  [-1]: { z0: 4.04, z1: 6.34, y0: .965, y1: 2.07 },
+  [1]: { z0: 4.06, z1: 5.10, y0: .73, y1: 1.94 },
+};
+
 // Proportions inferred from the continuous Strong Room approach, not survey lengths.
 export const seminarPassage = {
   x: 23.25, width: 2.24, end: -11.2, pierZ: -9.8,

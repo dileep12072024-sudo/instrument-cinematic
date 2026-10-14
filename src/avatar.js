@@ -125,7 +125,7 @@ export function createAvatar({ scene, camera, canvas, collidables, changed }) {
       play(!speed ? 'Idle' : input.run ? 'Run' : 'Walk');
       if (actions.Walk) actions.Walk.timeScale = input.forward < 0 ? -1 : 1;
       mixer.update(dt);
-      root.position.copy(state.pos); body.rotation.y = state.heading; blob.position.set(0, .02, 0);
+      root.position.copy(state.pos); body.rotation.y = state.heading + Math.PI; // the Mixamo figure faces -Z blob.position.set(0, .02, 0);
       // Camera: eye view stands where the person stands; follow view sits behind, pulled in before walls.
       const head = look.set(state.pos.x, state.pos.y + EYE, state.pos.z);
       const aim = new T.Vector3(Math.sin(state.heading) * Math.cos(state.pitch), Math.sin(state.pitch), Math.cos(state.heading) * Math.cos(state.pitch));

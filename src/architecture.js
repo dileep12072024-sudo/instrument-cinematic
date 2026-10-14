@@ -1,6 +1,6 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { footprint, groundSpine, seminarPassage } from './footprint.js';
+import { footprint, groundSpine, seminarPassage, hallWindows } from './footprint.js';
 import { buildReferenceGarden, trimBuildingFoliage } from './garden.js';
 import { buildEntranceHall } from './entrance-hall.js';
 import { buildClassroomWing } from './classroom-wing.js';
@@ -409,10 +409,12 @@ export function buildArchitecture(scene) {
             // Ground-floor openings connect the filmed entrance hall to each side passage.
             const { roomFront, front } = groundSpine;
             box(x + side * w / 2, 2, (roomFront - 7) / 2, .32, 4, roomFront + 7, m.wall);
-            if (front < 3.03) box(x + side * w / 2, 2, (front + 3.03) / 2, .32, 4, 3.03 - front, m.wall);
-            box(x + side * w / 2, 2, 6.205, .32, 4, 1.59, m.wall);
-            box(x + side * w / 2, .8725, 4.37, .32, 1.745, 2.08, m.wall);
-            box(x + side * w / 2, 3.4475, 4.37, .32, 1.105, 2.08, m.wall);
+            // Steel side windows: openings from the 14 October photographs (hallWindows).
+            const win = hallWindows[side], sx = x + side * w / 2, wz = (win.z0 + win.z1) / 2, ww = win.z1 - win.z0;
+            box(sx, 2, (front + win.z0) / 2, .32, 4, win.z0 - front, m.wall);
+            box(sx, 2, (win.z1 + 7) / 2, .32, 4, 7 - win.z1, m.wall);
+            box(sx, win.y0 / 2, wz, .32, win.y0, ww, m.wall);
+            box(sx, (win.y1 + 4) / 2, wz, .32, 4 - win.y1, ww, m.wall);
             box(x + side * w / 2, 3.8, groundSpine.corridorCenter, .32, .4, groundSpine.corridorDepth, m.wall);
             // Tower storeys are 4.2 high; join the 4.0-high entrance shell to the upper facade.
             const storey = (h - 1.4) / Math.round((h - 1.4) / 4);
