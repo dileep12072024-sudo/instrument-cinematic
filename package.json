@@ -20,7 +20,8 @@
   "dependencies": {
     "lucide": "^0.577.0",
     "suncalc": "^2.0.2",
-    "three": "^0.183.0"
+    "three": "^0.183.0",
+    "three-mesh-bvh": "0.9.15"
   },
   "devDependencies": {
     "@gltf-transform/core": "4.5.1",

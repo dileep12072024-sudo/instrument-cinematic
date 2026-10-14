@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import { createIcons, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check } from 'lucide';
+import { createIcons, PersonStanding, Eye, Copy, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check } from 'lucide';
 import { buildArchitecture, buildEntranceApron } from './architecture.js';
 import { loadBlenderEnvironment, prefetchEnvironment } from './blender-environment.js';
 import { buildSurroundings, placeFacadeTrees } from './surroundings.js';
 import { mergeStaticDetail, mergeGateParts } from './batching.js';
+import { createAvatar } from './avatar.js';
 import { footprint } from './footprint.js';
 import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
@@ -17,7 +18,7 @@ import './style.css';
 
 const $ = s => document.querySelector(s);
 const icon = name => `<i data-lucide="${name}"></i>`;
-const icons = { Move, Volume2, VolumeX, Map: MapIcon, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check };
+const icons = { PersonStanding, Eye, Copy, Move, Volume2, VolumeX, Map: MapIcon, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check };
 const refreshIcons = () => createIcons({ icons, attrs: { 'stroke-width': 1.5 } });
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const small = () => innerWidth < 700;
@@ -41,6 +42,7 @@ $('#app').innerHTML = `
       <button class="icon-btn" id="light" aria-label="Light and quality" aria-expanded="false" data-tip="Light & quality">${icon('sun')}</button>
       <button class="icon-btn" id="orbit" aria-label="Orbit building" aria-pressed="false" data-tip="Orbit building">${icon('compass')}</button>
       <button class="icon-btn" id="panorama" aria-label="Panorama exploration" aria-pressed="false" data-tip="Panorama exploration">${icon('move')}</button>
+      <button class="icon-btn" id="avatar-mode" aria-label="Walk as a person" aria-pressed="false" data-tip="Walk as a person">${icon('person-standing')}</button>
       <button class="icon-btn mobile-plan" id="mobile-plan" aria-label="View building from above" data-tip="Overhead view">${icon('map')}</button>
       <span class="tools-divider"></span>
       <button class="icon-btn" id="zoom-in" aria-label="Zoom in" data-tip="Zoom in">${icon('plus')}</button>
@@ -52,6 +54,12 @@ $('#app').innerHTML = `
     </div>
     <section id="light-panel" class="light-panel" hidden aria-label="Scene settings"><div class="panel-title">The light of a place<button class="icon-btn" id="light-close" aria-label="Close settings">${icon('x')}</button></div><div class="light-presets"><button data-hour="10" aria-label="Morning light">${icon('sun')}<span>Daylight</span></button><button data-hour="16.5" class="selected" aria-label="Afternoon light">${icon('sunset')}<span>Afternoon</span></button><button data-hour="18.8" aria-label="Blue hour">${icon('moon')}<span>Blue hour</span></button></div><label class="range-label" for="hour">Time of day <output id="hour-output">16:30</output></label><input id="hour" type="range" min="8" max="19" value="16.5" step="0.1"/><div class="quality-row"><label for="quality">Render quality</label><select id="quality"><option value="auto">Adaptive</option><option value="high">High</option><option value="low">Performance</option></select></div><label class="motion-row" for="motion">Camera drift<input type="checkbox" id="motion" ${reduced ? '' : 'checked'} /></label></section>
     <div class="entrance-actions"><button id="door" class="door-action" hidden aria-pressed="false">${icon('door-open')}<span>Open the doors</span></button><button id="enter-hall" class="primary-btn" hidden>${icon('arrow-up-right')}<span>Step inside</span></button></div>
+    <section id="avatar-panel" class="avatar-panel" hidden aria-label="Walking guide">
+      <p id="avatar-readout" class="avatar-readout" role="status">Preparing the guide…</p>
+      <div class="avatar-actions"><button id="avatar-eye" class="text-btn" aria-pressed="false">${icon('eye')}<span>Eye view</span></button><button id="avatar-copy" class="text-btn">${icon('copy')}<span>Copy position</span></button><button id="avatar-exit" class="text-btn">${icon('x')}<span>Exit</span></button></div>
+      <p class="avatar-help">W A S D or arrow keys to walk · Q / E or ← → to turn · Shift to run · drag to look around</p>
+      <div class="avatar-pad" aria-label="Movement controls"><button data-move="forward" aria-label="Walk forward">▲</button><button data-move="left" aria-label="Turn left">◀</button><button data-move="back" aria-label="Walk back">▼</button><button data-move="right" aria-label="Turn right">▶</button></div>
+    </section>
     <section id="walk-panel" class="walk-panel" hidden aria-label="Entrance walkthrough"><span id="walk-location">The threshold</span><div class="walk-controls"><button id="walk-back" class="icon-btn" aria-label="Previous entrance viewpoint" data-tip="Previous viewpoint">${icon('arrow-left')}</button><button id="walk-play" class="icon-btn" aria-label="Play entrance walkthrough" aria-pressed="false" data-tip="Play walkthrough"><span class="walk-play-icon">${icon('play')}</span><span class="walk-pause-icon" hidden>${icon('pause')}</span></button><input id="walk-progress" type="range" min="0" max="1000" value="0" aria-label="Position along the entrance walkthrough"/><button id="walk-forward" class="icon-btn" aria-label="Next entrance viewpoint" data-tip="Next viewpoint">${icon('arrow-right')}</button><button id="walk-exit" class="icon-btn" aria-label="Return to courtyard" data-tip="Return to courtyard">${icon('x')}</button></div></section>
     <button id="plan" class="plan" aria-label="View building from above" data-tip="Overhead view"><canvas width="220" height="120" aria-hidden="true"></canvas><span>NORTH CAMPUS ${icon('arrow-up-right')}</span></button>
     <footer class="chapter-bar"><div class="chapter-caption"><span>THE CAMPUS</span><small>Four perspectives. One place.</small></div><nav class="chapters" aria-label="Camera viewpoints">${chapters.map((c, i) => `<button data-chapter="${i}" class="chapter ${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}"><span>0${i + 1}</span><strong>${c.name}</strong><span class="chapter-line"></span></button>`).join('')}</nav><button id="next" class="next-btn" aria-label="Next viewpoint">${icon('arrow-right')}</button></footer>
@@ -109,7 +117,7 @@ skyDownload?.catch(() => {});
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#b6c5c9'); scene.fog = new THREE.Fog('#b6c5c9', 80, 300);
 const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 500);
-let controls, architecture, landscape, surroundings, entranceWalk, panoramaLook;
+let controls, architecture, landscape, surroundings, entranceWalk, panoramaLook, avatar;
 let selected = 0, transition = null, journey = false, journeyStart = 0, isOrbiting = false, doorsOpen = false, hour = 16.5, targetHour = 16.5;
 let ready = false, drift = !reduced, quality = 'auto', needsRender = true, lastRendered = 0, lastShadowUpdate = 0;
 let interactive = false;
@@ -350,6 +358,7 @@ function updateChapter(index) {
   $('#experience').classList.toggle('detail-view', index !== 0);
 }
 function selectChapter(index) {
+  if (avatar?.active) leaveAvatar();
   if (entranceWalk?.active) leaveHall(false);
   setPanorama(false);
   $('#experience').classList.remove('footprint-view');
@@ -370,6 +379,7 @@ function stopJourney() {
   $('#film').setAttribute('aria-pressed', 'false'); $('#scene-mode').textContent = 'LIVE EXPLORATION'; refreshIcons();
 }
 function startJourney() {
+  if (avatar?.active) leaveAvatar();
   if (!ready) return;
   if (entranceWalk?.active) leaveHall(false);
   if (journey) return stopJourney();
@@ -480,6 +490,10 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - weatherState.updatedAt > 5 * 60000) loadWeather(); });
   performance.mark('reflections-captured');
   performance.mark('shaders-compiled');
+  // Walkable guide: collides with the building and ground, never with foliage or effects.
+  avatar = createAvatar({ scene, camera, canvas: renderer.domElement, changed: () => { needsRender = true; }, collidables: (() => {
+    let list; return () => list ||= (() => { const out = []; const add = root => root?.traverse(o => { if (o.isMesh && o.visible !== false && !o.isInstancedMesh && !o.userData.windHeight && !/Batched trees|Live rain|sky|cloud|moon|horizon|Distant/i.test(o.name + (o.parent?.name || ''))) out.push(o); });
+      add(architecture.group); add(landscape.group); add(surroundings.sheds); return out; })(); })() });
   ready = true; window.__portrait.ready = true; readyAt = performance.now();
   renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
   loadWeather();
@@ -494,7 +508,10 @@ function animate(now) {
   const modalOpen = !!document.querySelector('dialog[open]');
   if (modalOpen) return;
   panoramaLook.update(Math.min(frameDuration / 1000, .1));
-  if (entranceWalk?.active) {
+  if (avatar?.active) {
+    avatar.update(Math.min(frameDuration / 1000, .1)); needsRender = true;
+    if (frames % 6 === 0) $('#avatar-readout').textContent = avatar.text().replace(/^Avatar: /, '');
+  } else if (entranceWalk?.active) {
     entranceWalk.update(Math.min(frameDuration / 1000, .1));
   } else if (transition) {
     const raw = THREE.MathUtils.clamp((now - transition.start) / transition.duration, 0, 1), t = raw * raw * raw * (raw * (raw * 6 - 15) + 10);
@@ -532,14 +549,14 @@ function animate(now) {
     }
   }
   // Orbit speed follows wall time, including slower devices; damping is for pointer input.
-  if (!entranceWalk?.active && !panorama) controls.update(Math.min(frameDuration / 1000, 1));
+  if (!entranceWalk?.active && !panorama && !avatar?.active) controls.update(Math.min(frameDuration / 1000, 1));
   const windSpeed = updateWind(landscape, weatherState, dt, reduced);
   if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
   rain.update(dt, weatherState, reduced);
   lightning.visible = weatherState.storm && !reduced;
   // Hall lights only while the camera is inside the entrance hall; elsewhere they cost every lit pixel for nothing.
   const inHall = entranceWalk?.active || Math.abs(camera.position.x) < 4.2 && camera.position.z > -7.2 && camera.position.z < 7.6 && camera.position.y < 4.4;
-  if (architecture.interior.lights[0].visible !== inHall) { architecture.interior.lights.forEach(light => { light.visible = inHall; light.shadow.needsUpdate = true; }); needsRender = true; }
+  if (architecture.interior.lights[0].visible !== inHall) { architecture.interior.lights.forEach(light => { light.visible = inHall; light.shadow.needsUpdate = true; }); renderer.shadowMap.needsUpdate = true; needsRender = true; }
   if (weatherState.storm && !reduced) {
     nextStrike ||= now + 5000 + Math.random() * 15000;
     if (now > nextStrike) {
@@ -569,7 +586,7 @@ function animate(now) {
     needsRender = false; lastRendered = now;
   }
 }
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } } };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } } };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;
@@ -584,7 +601,7 @@ function leaveHall(returnToEntrance = true) {
   $('#scene-mode').textContent = 'LIVE EXPLORATION';
   if (returnToEntrance) { selectChapter(1); $('#enter-hall').focus(); }
 }
-$('#enter-hall').onclick = () => {
+$('#enter-hall').onclick = () => { if (avatar?.active) leaveAvatar();
   if (!ready) return;
   stopJourney(); setOrbit(false); setPanorama(false); transition = null; interactive = true;
   $('#experience').classList.remove('footprint-view');
@@ -614,8 +631,8 @@ function syncSound() {
   sound.setMuted(document.hidden).catch(() => {});
 }
 document.addEventListener('visibilitychange', syncSound);
-$('#orbit').onclick = () => { if (entranceWalk?.active) return; setPanorama(false); stopJourney(); transition = null; interactive = true; setOrbit(!isOrbiting); };
-$('#panorama').onclick = () => {
+$('#orbit').onclick = () => { if (avatar?.active) leaveAvatar(); if (entranceWalk?.active) return; setPanorama(false); stopJourney(); transition = null; interactive = true; setOrbit(!isOrbiting); };
+$('#panorama').onclick = () => { if (avatar?.active) leaveAvatar();
   if (entranceWalk?.active) {
     entranceWalk.exit();
     $('#experience').classList.remove('interior-view');
@@ -641,7 +658,7 @@ for (const [id, factor] of [['zoom-in', .8], ['zoom-out', 1.25]]) $(`#${id}`).on
   const v = camera.position.clone().sub(controls.target); v.setLength(THREE.MathUtils.clamp(v.length() * factor, controls.minDistance, controls.maxDistance));
   fly(v.add(controls.target).toArray(), controls.target.toArray(), 600);
 };
-$('#plan').onclick = $('#mobile-plan').onclick = () => { setPanorama(false); stopJourney(); interactive = true; setOrbit(false); $('#experience').classList.add('footprint-view'); fly([0, small() ? 210 : 100, .1], [0, 0, 0]); };
+$('#plan').onclick = $('#mobile-plan').onclick = () => { if (avatar?.active) leaveAvatar(); setPanorama(false); stopJourney(); interactive = true; setOrbit(false); $('#experience').classList.add('footprint-view'); fly([0, small() ? 210 : 100, .1], [0, 0, 0]); };
 $('#door').onclick = () => { doorsOpen = !doorsOpen; $('#door span').textContent = doorsOpen ? 'Close the doors' : 'Open the doors'; $('#door').setAttribute('aria-pressed', doorsOpen); };
 $('#light').onclick = () => { const open = $('#light-panel').hidden; $('#light-panel').hidden = !open; $('#light').setAttribute('aria-expanded', open); };
 $('#light-close').onclick = () => { $('#light-panel').hidden = true; $('#light').setAttribute('aria-expanded', false); $('#light').focus(); };
@@ -655,7 +672,7 @@ $('#fullscreen').onclick = async () => { try { if (document.fullscreenElement) a
 document.addEventListener('fullscreenchange', () => { $('#fullscreen').innerHTML = icon(document.fullscreenElement ? 'minimize' : 'maximize'); $('#fullscreen').setAttribute('aria-label', document.fullscreenElement ? 'Exit full screen' : 'Full screen'); refreshIcons(); });
 window.addEventListener('resize', resize);
 renderer?.domElement.addEventListener('keydown', e => {
-  if (entranceWalk?.active) return;
+  if (entranceWalk?.active || avatar?.active) return;
   if (['+', '=', '-', 'Home', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
   if (e.key === '+' || e.key === '=') $('#zoom-in').click();
   if (e.key === '-') $('#zoom-out').click();
@@ -677,4 +694,36 @@ document.querySelectorAll('.close-dialog').forEach(b => b.onclick = () => b.clos
 document.querySelectorAll('dialog').forEach(d => {
   d.addEventListener('click', e => { if (e.target !== d) return; const r = d.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close(); });
   d.addEventListener('close', () => { needsRender = true; });
+});
+
+// Walk as a person: a guide figure the visitor steers to show exactly where a photo was taken.
+async function enterAvatar() {
+  if (!ready || !avatar) return;
+  if (entranceWalk?.active) leaveHall(false);
+  stopJourney(); setOrbit(false); setPanorama(false); transition = null; interactive = true; controls.enabled = false;
+  doorsOpen = true; $('#door span').textContent = 'Close the doors'; $('#door').setAttribute('aria-pressed', 'true'); // so the guide can walk in
+  camera.fov = 60; camera.updateProjectionMatrix();
+  $('#experience').classList.add('avatar-view'); $('#experience').classList.remove('footprint-view');
+  $('#avatar-panel').hidden = false; $('#avatar-mode').setAttribute('aria-pressed', 'true');
+  $('#avatar-readout').textContent = 'Preparing the guide…';
+  try { await avatar.enter(); renderer.domElement.focus({ preventScroll: true }); }
+  catch (e) { console.error(e); toast('The guide could not load. Please try again.'); leaveAvatar(); }
+}
+function leaveAvatar() {
+  avatar?.exit(); controls.enabled = true; camera.fov = 43; camera.updateProjectionMatrix();
+  $('#experience').classList.remove('avatar-view'); $('#avatar-panel').hidden = true; $('#avatar-mode').setAttribute('aria-pressed', 'false');
+}
+$('#avatar-mode').onclick = () => avatar?.active ? (leaveAvatar(), selectChapter(1)) : enterAvatar();
+$('#avatar-exit').onclick = () => { leaveAvatar(); selectChapter(1); };
+$('#avatar-eye').onclick = () => { const on = !avatar.state.eye; avatar.setEye(on); $('#avatar-eye').setAttribute('aria-pressed', on); $('#avatar-eye span').textContent = on ? 'Follow view' : 'Eye view'; camera.fov = on ? 68 : 60; camera.updateProjectionMatrix(); };
+$('#avatar-copy').onclick = async () => {
+  const text = avatar.text();
+  try { await navigator.clipboard.writeText(text); toast('Position copied. Paste it into our chat.'); }
+  catch { $('#avatar-readout').textContent = text; getSelection().selectAllChildren($('#avatar-readout')); toast('Select and copy the highlighted text.'); }
+};
+// Phone controls: hold an arrow to walk or turn.
+document.querySelectorAll('[data-move]').forEach(b => {
+  const set = on => { const k = b.dataset.move; if (k === 'forward') avatar.input.forward = on ? 1 : 0; if (k === 'back') avatar.input.forward = on ? -1 : 0; if (k === 'left') avatar.input.turn = on ? 1 : 0; if (k === 'right') avatar.input.turn = on ? -1 : 0; };
+  b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); set(true); });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(type, () => set(false));
 });
