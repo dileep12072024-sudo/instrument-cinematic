@@ -93,11 +93,13 @@ export function createLiveSky(scene, camera) {
       // Compose the lunar backdrop above the roofline, with a centred mobile framing.
       moonDirection.set(camera.aspect < .85 ? -.465 : -.25, .104, camera.aspect < .85 ? -.885 : -.968).normalize();
       moon.position.copy(camera.position).addScaledVector(moonDirection, 240); moon.lookAt(camera.position);
-      const moonOpacity = T.MathUtils.smoothstep(night, .65, .95);
+      // Cloud hides the moon: thinning from 30 % cover, gone by 85 %, and always gone while it rains.
+      const clear = weather.storm || weather.rainFactor > 0 ? 0 : 1 - T.MathUtils.smoothstep(weather.cloudCover, 30, 85);
+      const moonOpacity = T.MathUtils.smoothstep(night, .65, .95) * clear;
       moon.visible = moonOpacity > 0 && illumination > .005;
       moonUniforms.opacity.value = moonOpacity;
       moonlight.position.copy(moonDirection).multiplyScalar(80);
-      moonlight.intensity = .14 * Math.pow(illumination, 1.4) * moonOpacity * (1 - weather.cloudCover / 100);
+      moonlight.intensity = .14 * Math.pow(illumination, 1.4) * moonOpacity;
       // A light that is off still costs every lit pixel on integrated GPUs; only include it while it shines.
       moonlight.visible = moonlight.intensity > .001;
       // Lightning is handled in main.js, synchronised with thunder (this used to flash independently).

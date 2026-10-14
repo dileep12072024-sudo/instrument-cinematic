@@ -61,6 +61,13 @@ try {
   });
   assert.deepEqual(phasePixels.dark, phasePixels.sky, 'Unilluminated half is transparent, not a dark disc');
   assert.ok(phasePixels.lit.some((v, i) => Math.abs(v - phasePixels.sky[i]) > 20), 'Illuminated half retains lunar texture');
+  // Rain or thick cloud hides the moon at night; it returns when the sky clears.
+  const moonAfter = weather => page.evaluate(w => { const { weather: state, scene } = __portrait; const saved = { ...state }; Object.assign(state, w);
+    __portrait.renderer.render(scene, __portrait.camera); const sky = scene.getObjectByName('Photographic phased moon');
+    return new Promise(done => requestAnimationFrame(() => requestAnimationFrame(() => { const r = { visible: sky.visible, opacity: sky.material.uniforms.opacity.value }; Object.assign(state, saved); done(r); }))); }, weather);
+  for (const w of [{ rainFactor: .4, cloudCover: 80 }, { rainFactor: 0, cloudCover: 95 }, { storm: true, rainFactor: 1, cloudCover: 100 }])
+    assert.deepEqual(await moonAfter(w), { visible: false, opacity: 0 }, `Moon hidden by ${JSON.stringify(w)}`);
+  assert.ok((await moonAfter({ rainFactor: 0, cloudCover: 1 })).visible, 'Moon back under a clear sky');
   for (const hour of [10, 12, 16.5]) {
     await page.locator('#hour').evaluate((e, hour) => { e.value = hour; e.dispatchEvent(new Event('input')); }, hour);
     await page.waitForFunction(() => !__portrait.scene.getObjectByName('Photographic phased moon').visible);
