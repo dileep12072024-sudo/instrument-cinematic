@@ -5,6 +5,7 @@ import { createIcons, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus,
 import { buildArchitecture, buildEntranceApron } from './architecture.js';
 import { loadBlenderEnvironment, prefetchEnvironment } from './blender-environment.js';
 import { buildSurroundings, placeFacadeTrees } from './surroundings.js';
+import { mergeStaticDetail, mergeGateParts } from './batching.js';
 import { footprint } from './footprint.js';
 import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
@@ -134,7 +135,7 @@ sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -55; sun.shadow.cam
 sun.shadow.normalBias = .05; sun.shadow.bias = -.00015; sun.shadow.radius = 3; scene.add(sun);
 const ambient = new THREE.HemisphereLight('#e4eff7', '#77654c', 1.25); scene.add(ambient);
 // Lightning: a cool sky-wide flash during live thunderstorm weather (never for reduced-motion users).
-const lightning = new THREE.DirectionalLight('#dce6ff', 0); lightning.position.set(-30, 90, -60); scene.add(lightning);
+const lightning = new THREE.DirectionalLight('#dce6ff', 0); lightning.position.set(-30, 90, -60); lightning.visible = false; scene.add(lightning);
 let skyBase = .95, nextStrike = 0, strike = null;
 const shadowSun = new THREE.Vector3();
 const entranceLight = new THREE.PointLight('#fff0cc', 0, 14, 2);
@@ -157,34 +158,28 @@ for (const x of [-2, 2]) {
 }
 const defaultPixelRatio = () => Math.min(devicePixelRatio, 1.35);
 const frameSamples = [];
-let resolutionCeiling = Infinity, lastResolutionChange = 0, lastResolutionRaise = -Infinity, ceilingSetAt = -Infinity;
+let lastResolutionChange = 0;
 // Previously this only ever lowered the pixel ratio, so every tab switch (one huge frame) blurred the scene for good.
-let cadence = 1, cadenceSince = 0; // render every Nth display frame (1 = 60 fps, 2 = 30, 3 = 20)
+let readyAt = Infinity, cadence = 1, cadenceFloor = 1; // render every Nth display frame (1 = 60 fps, 2 = 30, 3 = 20); floor = fastest that held
+let resolutionCap = Infinity; // highest pixel ratio this device has proven it can sustain (session-long)
 const setRatio = ratio => renderer.setPixelRatio(ratio);
-// Adaptive quality for weak GPUs, least visible first: (1) an even 30 fps, (2) an even 20 fps,
-// (3) simplified distant foliage, (4) one resolution step to 0.85; restored in reverse order.
-// Even frame spacing reads as smooth; the old version blurred straight to 0.65 and oscillated (flashing).
+// Adaptive quality for weak GPUs. Goal: one steady state, never oscillation (sharp/soft switching reads as flashing).
+// Under load: (1) even 30 fps, (2) small resolution steps (x0.88) down to 0.8, (3) even 20 fps.
+// Every 20 s of stability it tries one step better; a step that fails becomes a permanent limit, so nothing flips back.
 function adaptResolution(interval, now) {
-  frameSamples.push(interval); if (frameSamples.length > 30) frameSamples.shift();
-  if (frameSamples.length < 30 || now - lastResolutionChange < 1500) return;
-  const settling = now - lastResolutionChange < 6000;
-  const average = frameSamples.reduce((a, b) => a + b, 0) / frameSamples.length, ratio = renderer.getPixelRatio();
-  const target = cadence * 1000 / 60, lod = landscape?.lodScale ?? 1, best = defaultPixelRatio();
-  if (now - ceilingSetAt > 60000) resolutionCeiling = Infinity;
+  frameSamples.push(interval); if (frameSamples.length > 40) frameSamples.shift();
+  if (frameSamples.length < 40 || now - lastResolutionChange < 2000 || now - readyAt < 4000) return; // skip shader warm-up
+  const average = frameSamples.slice().sort((a, b) => a - b)[20], ratio = renderer.getPixelRatio(); // median: one-off stalls do not count
+  const budget = cadence * 1000 / 60, best = defaultPixelRatio();
   const change = () => { frameSamples.length = 0; lastResolutionChange = now; needsRender = true; };
-  if (average > target * (cadence > 1 ? 1.15 : 1.25)) {
-    if (cadence < 3) { cadence++; cadenceSince = now; return change(); }
-    if (lod > .5) { landscape.lodScale = Math.max(.5, lod * .8); return change(); }
-    if (ratio > Math.min(best, .85)) {
-      setRatio(Math.min(best, .85));
-      if (now - lastResolutionRaise < 6000) { resolutionCeiling = Math.min(best, .85); ceilingSetAt = now; }
-      return change();
-    }
-  } else if (!settling && average < target * 1.08) {
-    if (ratio < Math.min(best, resolutionCeiling)) { setRatio(Math.min(best, resolutionCeiling)); lastResolutionRaise = now; return change(); }
-    if (lod < 1) { landscape.lodScale = Math.min(1, lod * 1.15); return change(); }
-    // Try a faster cadence after a calm stretch; it steps straight back if the GPU cannot hold it.
-    if (cadence > 1 && now - cadenceSince > 20000) { cadence--; cadenceSince = now; return change(); }
+  if (average > budget * (cadence > 1 ? 1.12 : 1.2)) {
+    if (cadence < 2) { cadence = cadenceFloor = 2; return change(); }
+    if (ratio > .8) { resolutionCap = Math.max(.8, ratio * .88); setRatio(resolutionCap); return change(); }
+    if (cadence < 3) { cadence = cadenceFloor = 3; return change(); }
+  } else if (now - lastResolutionChange > 20000) {
+    const up = Math.min(best, resolutionCap, ratio / .88);
+    if (up > ratio + .01) { setRatio(up); return change(); }
+    if (cadence > cadenceFloor) { cadence--; return change(); }
   }
 }
 // Live weather point supplied for the Andhra University campus.
@@ -306,7 +301,7 @@ function updateLighting(h) {
   scene.fog.color.set('#b6c5c9').lerp(new THREE.Color('#182336'), evening).lerp(new THREE.Color('#64757b'), wet * .6);
   if (scene.background?.isColor) scene.background.copy(scene.fog.color);
   surroundings?.update(scene.fog.color);
-  entranceLight.intensity = evening * 40;
+  entranceLight.intensity = evening * 40; entranceLight.visible = evening > .001; // off lights still cost every lit pixel
   warm.opacity = evening * .6; warm.emissiveIntensity = evening * 1.4;
   if (architecture) {
     for (const material of [architecture.materials.glass, architecture.materials.rearGlass]) material.envMapIntensity = THREE.MathUtils.lerp(1.4, .22, evening);
@@ -430,15 +425,18 @@ async function boot() {
   $('#loading-status').textContent = 'Reconstructing the architecture';
   await new Promise(resolve => requestAnimationFrame(resolve));
   architecture = buildArchitecture(scene);
+  architecture.mergedDrawCalls = mergeStaticDetail(architecture.group); // ~400 fewer draw calls
+  architecture.interior.lights.forEach(light => { light.visible = false; }); // switched on inside the hall only
   $('#loading-status').textContent = 'Finding the light';
   await new Promise(resolve => requestAnimationFrame(resolve));
   $('#loading-status').textContent = 'Growing the Blender landscape';
   performance.mark('architecture-built');
   landscape = await loadBlenderEnvironment(scene, placeFacadeTrees, environmentDownload);
   buildEntranceApron(landscape.group);
+  mergeGateParts(landscape.group);
   surroundings = buildSurroundings(scene, landscape, renderer, chapters.flatMap(c => [[c.eye, c.target], [new THREE.Vector3(...c.eye).sub(new THREE.Vector3(...c.target)).multiplyScalar(2.4).add(new THREE.Vector3(...c.target)).toArray(), c.target]]));
   performance.mark('surroundings-built');
-  landscape.updateLod(camera.position); // the first frame, shadow map and reflection probes skip far foliage too
+  landscape.batchTrees(); // after the impostor belt captured the individual trees
   // Static scenery: compute matrices once instead of every frame (wind runs in the vertex shader).
   for (const root of [landscape.group, surroundings.belt.group, surroundings.ridge]) root.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
   // Full anisotropic filtering keeps road lines, paving and soil crisp at grazing angles.
@@ -485,7 +483,7 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - weatherState.updatedAt > 5 * 60000) loadWeather(); });
   performance.mark('reflections-captured');
   performance.mark('shaders-compiled');
-  ready = true; window.__portrait.ready = true;
+  ready = true; window.__portrait.ready = true; readyAt = performance.now();
   renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
   loadWeather();
   drawPlan(); resize(); requestAnimationFrame(animate);
@@ -541,6 +539,10 @@ function animate(now) {
   const windSpeed = updateWind(landscape, weatherState, dt, reduced);
   if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
   rain.update(dt, weatherState, reduced);
+  lightning.visible = weatherState.storm && !reduced;
+  // Hall lights only while the camera is inside the entrance hall; elsewhere they cost every lit pixel for nothing.
+  const inHall = entranceWalk?.active || Math.abs(camera.position.x) < 4.2 && camera.position.z > -7.2 && camera.position.z < 7.6 && camera.position.y < 4.4;
+  if (architecture.interior.lights[0].visible !== inHall) { architecture.interior.lights.forEach(light => { light.visible = inHall; light.shadow.needsUpdate = true; }); needsRender = true; }
   if (weatherState.storm && !reduced) {
     nextStrike ||= now + 5000 + Math.random() * 15000;
     if (now > nextStrike) {
@@ -564,7 +566,6 @@ function animate(now) {
   // Even pacing: draw every Nth display frame so motion advances in equal steps.
   if ((needsRender || !reduced) && !(quality === 'auto' && now - lastRendered < cadence * 1000 / 60 - 4)) {
     const interval = now - lastRendered;
-    landscape.updateLod(camera.position);
     renderer.render(scene, camera);
     if (++frames % 60 === 0) drawPlan();
     if (quality === 'auto' && !reduced && frames > 12 && interval < 250) adaptResolution(interval, now);
@@ -651,7 +652,7 @@ $('#hour').oninput = e => setHour(+e.target.value);
 $('#live-clock').onchange = e => { liveClock = e.target.checked; if (liveClock) setHour(localHour(), { manual: false }); updateMoon(); };
 document.querySelectorAll('[data-hour]').forEach(b => b.onclick = () => setHour(+b.dataset.hour));
 $('#motion').onchange = e => { drift = e.target.checked; interactive = !drift; };
-$('#quality').onchange = e => { quality = e.target.value; frameSamples.length = 0; resolutionCeiling = Infinity; cadence = 1; if (landscape) landscape.lodScale = 1; if (renderer) { setRatio(quality === 'high' ? Math.min(devicePixelRatio, 2) : quality === 'low' ? .9 : defaultPixelRatio()); needsRender = true; } };
+$('#quality').onchange = e => { quality = e.target.value; frameSamples.length = 0; resolutionCap = Infinity; cadence = cadenceFloor = 1; if (renderer) { setRatio(quality === 'high' ? Math.min(devicePixelRatio, 2) : quality === 'low' ? .9 : defaultPixelRatio()); needsRender = true; } };
 $('#capture').onclick = () => { if (!renderer) return; renderer.render(scene, camera); renderer.domElement.toBlob(blob => { if (!blob) return toast('Could not save the photograph.'); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'instrument-technology.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast('Your campus photograph is ready.'); }); };
 $('#fullscreen').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('#experience').requestFullscreen(); } catch { toast('Full screen is unavailable in this browser.'); } };
 document.addEventListener('fullscreenchange', () => { $('#fullscreen').innerHTML = icon(document.fullscreenElement ? 'minimize' : 'maximize'); $('#fullscreen').setAttribute('aria-label', document.fullscreenElement ? 'Exit full screen' : 'Full screen'); refreshIcons(); });

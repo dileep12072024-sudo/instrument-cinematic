@@ -2,7 +2,35 @@
 
 Updated: 2026-10-12. Read this before changing the project.
 
-## Real-GPU Performance Pass (2026-10-13, latest)
+## Photo-Guided Detail and GPU Pass (2026-10-14, latest)
+
+Verified on the user's Intel UHD laptop (real off-screen Chrome window, GPU timer queries;
+see user memory "real-gpu-measurement") and the full 17-script suite.
+
+- Cleanup: git-ignored `artifacts/` removed; LFS copies already on the remote pruned.
+  Blender files untouched.
+- Flicker source (frame differencing): leaf specular sparkle. Leaves are matte.
+- `scripts/simplify-environment.mjs` simplified branch/trunk geometry only; GLB 20.7 ->
+  17.9 MB, identical in side-by-side GPU captures.
+- `src/batching.js`: static detail groups and gate parts merged; trees batched per
+  material (`batchTrees`, bend scale baked into _wind.x); distance LOD removed.
+  Draw calls 629 -> 307, render() CPU ~17 -> ~8 ms. Batched leaves use Lambert.
+- Lights that are off are excluded (hall lights only inside the hall, entrance light at
+  night, moonlight when lit, lightning in storms); duplicate sky flash removed.
+- Adaptive quality settles once: 30 fps, then x0.88 resolution steps to 0.8, then 20 fps;
+  failed levels never retried. On the user's laptop: steady 50 ms frames at 0.8.
+- Leaf cost (~14 ms) is the jacaranda canopies' screen coverage. Tried and rejected,
+  with measurements: depth pre-pass (slower), coverage-compensated thinning (no gain),
+  outside-in ordering (much slower, breaks vertex reuse), alpha-to-coverage (noise).
+- Visuals from the 2026-10-13 photos/video: right tree in a raised brick planter with a
+  cracked concrete cap (`raisedPlanter`, tree at 7.2, 5.0); sparse magenta-pink blooms
+  (every 3rd bract piece, centres hidden); low uncapped brick edging behind the east
+  kerb; two weathered sheds among the left trees (`leftSheds`, skipped if on a road).
+  Classroom corridor: brass-grilled brown windows, electrical boxes and conduit drops,
+  high niches, blank faculty name boards (no invented text), dark floor bands and a
+  patterned tile inlay. No debris, per the user. Positions/sizes are photo estimates.
+
+## Real-GPU Performance Pass (2026-10-13)
 
 Measured on the user's laptop (Intel UHD Graphics, ANGLE/D3D11) by driving Windows
 Chrome over the DevTools protocol from `%TEMP%\ic-gpu\probe.mjs` (Windows node.exe,

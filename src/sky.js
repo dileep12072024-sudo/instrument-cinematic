@@ -79,8 +79,6 @@ export function createLiveSky(scene, camera) {
   const moonDirection = new T.Vector3();
   const moonlight = new T.DirectionalLight('#c7d8ff', 0); scene.add(moonlight);
   let illumination = 0;
-  const flash = new T.DirectionalLight('#d9e6ff', 0); flash.position.set(-10, 60, -45); scene.add(flash);
-  let nextFlash = 12, flashEnd = 0;
   return {
     moon, uniforms,
     phase(state) {
@@ -100,11 +98,9 @@ export function createLiveSky(scene, camera) {
       moonUniforms.opacity.value = moonOpacity;
       moonlight.position.copy(moonDirection).multiplyScalar(80);
       moonlight.intensity = .14 * Math.pow(illumination, 1.4) * moonOpacity * (1 - weather.cloudCover / 100);
-      if (!weather.storm || reduced) { flash.intensity = 0; nextFlash = time + 12; }
-      else {
-        if (time > nextFlash) { flashEnd = time + .25; nextFlash = time + 14 + Math.random() * 18; }
-        flash.intensity = time < flashEnd ? 2.3 * Math.max(0, Math.sin((flashEnd - time) * 30)) : 0;
-      }
+      // A light that is off still costs every lit pixel on integrated GPUs; only include it while it shines.
+      moonlight.visible = moonlight.intensity > .001;
+      // Lightning is handled in main.js, synchronised with thunder (this used to flash independently).
     }
   };
 }

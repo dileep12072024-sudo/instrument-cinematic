@@ -183,6 +183,49 @@ export function buildClassroomWing(parent, m) {
     for (const dx of [-.23, .23]) for (const dz of [-.20, .20]) tube([[x + dx, classroom.lowerFloor + .10 + i * .16, z + dz], [x + dx, classroom.lowerFloor + 1.12 + i * .16, z + dz]], .018, dark);
     for (const dz of [-.20, .20]) tube([[x - .23, classroom.lowerFloor + 1.12 + i * .16, z + dz], [x + .23, classroom.lowerFloor + 1.12 + i * .16, z + dz]], .018, dark);
   }
+  // Room-side wall details from the 2026-10-13 corridor photos and 103849 (no debris, no invented text):
+  // brown-framed brass-grilled windows between doors, electrical boxes fed from the conduit run,
+  // high square wall niches, faculty name boards, darker floor bands and the patterned tile inlay.
+  const brass = new T.MeshStandardMaterial({ name: 'Brass window grilles', color: '#b49a5c', metalness: .55, roughness: .42 });
+  const curtain = new T.MeshStandardMaterial({ name: 'Maroon room curtains behind grilles', color: '#4a2328', roughness: .9 });
+  const panelGrey = new T.MeshStandardMaterial({ name: 'Grey distribution boxes', color: '#9fa5a3', metalness: .45, roughness: .45 });
+  const panelWhite = new T.MeshStandardMaterial({ name: 'White isolator boxes', color: '#e6e5dd', roughness: .6 });
+  const face = 1.02; // room-side wall face (local x)
+  for (const c of [4.05, 7.5, 10.9, 15.6]) {
+    const sill = y + .95, w = 1.62, h = 1.42, mid = sill + h / 2;
+    box(face - .004, mid, -c, .008, h - .06, w - .06, curtain);
+    for (const dz of [-w / 2, -w / 6, w / 6, w / 2]) box(face - .03, mid, -c + dz, .06, h, .07, wood);
+    for (const dy of [-h / 2, h / 2]) box(face - .03, mid + dy, -c, .06, .07, w + .07, wood);
+    for (let dz = -w / 2 + .1; dz < w / 2 - .05; dz += .1) box(face - .045, mid, -c + dz, .012, h - .07, .012, brass);
+    for (let dy = -h / 2 + .16; dy < h / 2 - .05; dy += .16) box(face - .045, mid + dy, -c, .012, .012, w - .07, brass);
+  }
+  for (const c of [5.03, 13.95]) { // clear wall spans between a door and a window
+    box(face - .08, y + 2.75, -c, .16, .55, .42, panelGrey);
+    box(face - .07, y + 2.2, -c, .14, .36, .30, panelWhite);
+    tube([[face - .05, y + 3.02, -c], [face - .05, ceiling - .28, -c]], .014, aluminium);
+    tube([[face - .05, y + 2.38, -c + .1], [face - .05, y + 2.48, -c + .1]], .012, dark);
+  }
+  for (let u = 1.2; u < 17; u += 3.45) { // shallow niches high on the room wall
+    for (const s of [-1, 1]) { box(face - .012, ceiling - .75, -u + s * .26, .024, .40, .05, plaster); box(face - .012, ceiling - .75 + s * .2, -u, .024, .05, .52, plaster); }
+  }
+  const board = texture((c, w, h) => { c.fillStyle = '#f2f1ea'; c.fillRect(0, 0, w, h); c.fillStyle = '#28324a'; c.fillRect(12, h * .2, w * .55, h * .16); c.fillStyle = '#5b6274'; c.fillRect(12, h * .52, w * .72, h * .1); c.fillRect(12, h * .7, w * .4, h * .1); }, 256, 96);
+  const boardMat = new T.MeshStandardMaterial({ map: board, roughness: .7 });
+  for (const u of [5.8, 9.2]) {
+    const sign = new T.Mesh(new T.PlaneGeometry(.46, .17), boardMat); sign.rotation.y = Math.PI / 2; sign.position.set(face - .26, y + 2.62, -(u + .72)); group.add(sign);
+    const back = sign.clone(); back.rotation.y = -Math.PI / 2; back.position.x += .002; group.add(back);
+    box(face - .02, y + 2.74, -(u + .72), .04, .02, .02, dark);
+  }
+  const bandStone = stone.clone(); bandStone.color.set('#6f706b');
+  for (const z of [-3.2, -13.6]) floor(0, z, 2.17, .9, y + .002, bandStone);
+  const inlay = texture((c, w, h) => {
+    c.fillStyle = '#e8e4d6'; c.fillRect(0, 0, w, h);
+    for (let gx = 0; gx < 8; gx++) for (let gy = 0; gy < 4; gy++) {
+      const x = gx * w / 8 + w / 16, yy = gy * h / 4 + h / 8, r = w / 22;
+      c.fillStyle = '#2f5a4a'; c.beginPath(); for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4 + Math.PI / 8; c.lineTo(x + Math.cos(a) * r, yy + Math.sin(a) * r); } c.fill();
+      c.fillStyle = '#c9b98d'; c.fillRect(x - r * .25, yy - r * .25, r * .5, r * .5);
+    }
+  }, 512, 256);
+  floor(0, -9.95, 2.0, 1.0, y + .003, new T.MeshStandardMaterial({ name: 'Patterned tile inlay', map: inlay, roughness: .4 }));
   // Slim conduits and cross beams follow the filmed ceiling; no invented room fixtures.
   for (const far of [-1.02, 1.02]) {
     const x = far < 0 ? inner + .025 : far; // main corridor follows the inset window wall; the far passage keeps its wall

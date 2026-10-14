@@ -63,6 +63,7 @@ try {
     }
     return { name: landscape.group.name, trees: landscape.trees.length, vegetation: vegetation.length, sources, missingWeights: vegetation.filter(o => !o.geometry.attributes._wind).length,
       trimmed: landscape.trimmedTriangles, visiblePlants: vegetation.filter(o => o.visible).length,
+      batchedTreeMeshes: vegetation.reduce((n, o) => n + (o.userData.batchedTrees || 0), 0), treeBatches: vegetation.filter(o => o.userData.batchedTrees).length,
       missingLeafMaps: vegetation.filter(o => o.material.userData.foliage && /leaves|shrub|grass/.test(o.material.name) && !o.material.map).length,
       roadStartY: hit?.point.y, rootWeight, flowers, bareCourts,
       approachFlare: !!sample(road, 4.7, 10.8) && !sample(road, 4.7, 28),
@@ -71,8 +72,11 @@ try {
       leftReturnInsideWing: sample(nodes.find(o => o.userData.source_object === 'Lower side courtyard paving'), -19, 18)?.point.y };
   });
   assert.equal(model.name, 'Blender campus environment');
-  assert.equal(model.trees, 24); // 23 exported + the video-guided tree right of the entrance assert.equal(model.missingWeights, 0); assert.equal(model.missingLeafMaps, 0);
-  assert.ok(model.visiblePlants > 40);
+  assert.equal(model.trees, 24); // 23 exported + the video-guided tree right of the entrance
+  assert.equal(model.missingWeights, 0); assert.equal(model.missingLeafMaps, 0);
+  // Trees are batched per material (one draw each); count the tree meshes inside the batches too.
+  assert.ok(model.treeBatches >= 4 && model.treeBatches <= 8, `tree batches: ${model.treeBatches}`);
+  assert.ok(model.visiblePlants - model.treeBatches + model.batchedTreeMeshes > 40);
   assert.ok(Math.abs(model.roadStartY) < .02, 'Drive joins the entrance datum');
   assert.ok(model.sources.some(s => s.startsWith('Pink bloom clusters')));
   assert.ok(model.sources.includes('Spreading canopy beside tank terrace'));

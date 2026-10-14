@@ -18,19 +18,20 @@ try {
     renderer.render = () => {}; // timing logic only; software WebGL frames are irrelevant here
     let t = performance.now() + 10000;
     const run = (n, step) => { for (let i = 0; i < n; i++) __frame(t += step); return renderer.getPixelRatio(); };
-    const start = run(40, 16.7);
-    const afterSwitch = (t += 30000, run(1, 0), run(60, 16.7)); // one 30 s gap: returning to the tab
-    const paced = (run(300, 50), __portrait.cadence); // 50 ms frames (3 display refreshes): settle at an even cadence, no blur
-    const pacedRatio = renderer.getPixelRatio(), pacedLod = __portrait.landscape.lodScale;
-    const loaded = run(400, 70), lodUnderLoad = __portrait.landscape.lodScale; // heavier: foliage, then resolution
-    const recovered = run(1600, 16.7); // raises wait for a calm 6 s stretch each
-    return { start, afterSwitch, paced, pacedRatio, pacedLod, loaded, lodUnderLoad, recovered };
+    t += 5000; // past the post-load warm-up window
+    const start = run(60, 16.7);
+    const afterSwitch = (t += 30000, run(1, 0), run(80, 16.7)); // one 30 s gap: returning to the tab
+    const paced = (run(300, 33.4), __portrait.cadence); // GPU only manages every 2nd refresh: even 30 fps, same resolution
+    const pacedRatio = renderer.getPixelRatio();
+    const loaded = run(200, 50); // too slow even for 30 fps: small resolution steps
+    const settled = []; for (let i = 0; i < 12; i++) settled.push(run(60, 33.4)); // fits 30 fps at the reached level
+    const recovered = run(2000, 33.4); // upgrade attempts never exceed the level that failed
+    return { start, afterSwitch, paced, pacedRatio, loaded, settled, recovered, cadence: __portrait.cadence };
   });
   assert.equal(ratios.afterSwitch, ratios.start, 'a tab switch must not lower resolution');
-  console.log(ratios);
-  assert.ok(ratios.paced > 1 && ratios.pacedRatio === ratios.start && ratios.pacedLod === 1, 'moderate load paces frames evenly without lowering quality');
-  assert.ok(ratios.lodUnderLoad < 1, 'distant foliage is simplified before the screen blurs');
-  assert.ok(ratios.loaded < ratios.start, 'sustained slow frames finally lower resolution');
-  assert.equal(ratios.recovered, ratios.start, 'fast frames restore full resolution');
+  assert.ok(ratios.paced === 2 && ratios.pacedRatio === ratios.start, 'moderate load paces at an even 30 fps without lowering resolution');
+  assert.ok(ratios.loaded < ratios.start && ratios.loaded >= .8, 'heavy load lowers resolution in small steps');
+  assert.equal(new Set(ratios.settled).size, 1, 'no oscillation once a sustainable level is found');
+  assert.ok(ratios.recovered <= ratios.loaded / .88 + .001, 'a level that failed is not retried');
   console.log('PASS adaptive resolution', ratios);
 } finally { await browser.close(); }

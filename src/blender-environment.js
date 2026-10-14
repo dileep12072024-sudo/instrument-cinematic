@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint } from './footprint.js';
 import { terraceCovers, terraceLevels } from './stair-layout.js';
 
@@ -63,6 +64,51 @@ export function applyModelWind(material, state, height) {
 }
 
 // Begins downloading the ~20 MB environment as soon as the page script runs, reporting 0..1 progress.
+// Merge every tree mesh into one draw per material. On integrated GPUs the per-draw CPU cost (ANGLE/D3D11) was the
+// frame-rate limit: ~94 tree meshes, each with its own material, against a 16 ms budget. Each tree's bend scale is
+// baked into its _wind.x weights so one shared material (bend 1) moves every vertex exactly as before.
+export function batchTrees(state) {
+  const batches = new Map(), matrix = new T.Matrix4();
+  for (const node of state.vegetation) {
+    let owner = node; while (owner && !owner.userData.tree) owner = owner.parent;
+    if (!owner || !node.visible) continue;
+    const key = node.material.userData.source_material || node.material.name;
+    if (!batches.has(key)) batches.set(key, { meshes: [], material: node.material });
+    batches.get(key).meshes.push(node);
+  }
+  const batched = [];
+  for (const [key, { meshes, material }] of batches) {
+    const geometries = meshes.map(node => {
+      const g = (node.geometry.index ? node.geometry : node.geometry).clone();
+      g.applyMatrix4(matrix.copy(node.matrixWorld));
+      const wind = g.getAttribute('_wind'), bend = Math.max(.035, (node.userData.windHeight / 12) ** 2);
+      for (let i = 0; i < wind.count; i++) wind.setX(i, wind.getX(i) * bend);
+      for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', '_wind'].includes(name)) g.deleteAttribute(name);
+      return g;
+    });
+    let shared = material.clone();
+    // Leaves are matte: diffuse (Lambert) shading looks the same as the PBR clone but costs ~7 ms less per frame on
+    // the integrated GPU it was measured on (millions of small alpha-tested leaf pixels).
+    if (material.userData.foliage) {
+      shared = new T.MeshLambertMaterial({ name: material.name, map: material.map, normalMap: material.normalMap, normalScale: material.normalScale, alphaTest: material.alphaTest, side: material.side, color: material.color });
+      shared.userData = { ...material.userData };
+    }
+    applyModelWind(shared, state, 12); // bend scale 1: baked per vertex above
+    const depth = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking, map: shared.map, alphaTest: shared.alphaTest, side: shared.side });
+    applyModelWind(depth, state, 12);
+    const mesh = new T.Mesh(mergeGeometries(geometries, false), shared);
+    Object.assign(mesh, { name: `Batched trees: ${key}`, castShadow: true, receiveShadow: true, customDepthMaterial: depth });
+    mesh.userData = { batchedTrees: meshes.length, windHeight: 12, sourceObject: key };
+    mesh.geometry.computeBoundingSphere(); mesh.geometry.boundingSphere.radius += modelWindReach(12 * 1.3);
+    state.group.add(mesh); batched.push(mesh);
+    for (const node of meshes) { node.removeFromParent(); node.geometry.dispose(); }
+    geometries.forEach(g => g.dispose());
+  }
+  state.vegetation = state.vegetation.filter(node => node.parent).concat(batched);
+  state.materials.push(...batched.map(m => m.material));
+  return batched.length;
+}
+
 export function prefetchEnvironment(onProgress) {
   return fetch('/media/campus-environment.glb').then(async response => {
     if (!response.ok || !response.body) throw new Error(`Environment download failed: ${response.status}`);
@@ -111,8 +157,13 @@ export async function loadBlenderEnvironment(scene, adjust, download = prefetchE
     node.userData.windHeight = height;
     state.trimmedTriangles += clearModelVegetation(node, obstacles, height);
     if (material.userData.foliage) {
-      material.transparent = false; material.alphaTest = .45; material.depthWrite = true;
+      material.transparent = false; material.alphaTest = .45; material.depthWrite = true; // alpha-to-coverage dithers into noise on ANGLE/D3D11
       material.side = T.DoubleSide;
+      // Specular sparkle: tiny leaves with a roughness map and full-strength normal map alias into crawling
+      // white glints at a distance. Leaves are matte; keep a gentle normal for close-up relief.
+      material.roughnessMap = null; material.roughness = .92;
+      if (material.normalMap) material.normalScale.setScalar(.45);
+      material.envMapIntensity = .75;
     }
     applyModelWind(material, state, height);
     node.castShadow = true;
@@ -123,41 +174,7 @@ export async function loadBlenderEnvironment(scene, adjust, download = prefetchE
     state.vegetation.push(node);
   });
   performance.mark('env-trimmed');
-  // Foliage level of detail: the roadside canopies carry ~3.8M of ~4.4M triangles. Far trees keep every 2nd/4th
-  // leaf card; the material, wind weights and silhouette stay the same, so the switch is hard to see at that range.
-  state.lods = []; state.lodScale = 1; // lowered by main.js on weak GPUs before screen resolution
-  const sphere = new T.Sphere();
-  for (const node of state.vegetation) {
-    const index = node.geometry.index;
-    if (!node.visible || !index || index.count / 3 < 20000) continue;
-    const foliage = node.material.userData.foliage, wind = node.geometry.getAttribute('_wind');
-    // Branches: far levels drop only outer twig segments (all vertices highly flexible), never limbs or trunk.
-    if (!foliage && !(wind && /branches/.test(node.material.name))) continue;
-    const levels = [node];
-    for (const [keep, flex] of [[2, .5], [4, .35]]) {
-      const kept = [];
-      for (let i = 0; i < index.count; i += 3) {
-        const a = index.getX(i), b = index.getX(i + 1), c = index.getX(i + 2);
-        if (foliage ? Math.floor(i / 6) % keep === 0 : Math.min(wind.getX(a), wind.getX(b), wind.getX(c)) <= flex) kept.push(a, b, c);
-      }
-      const geometry = node.geometry.clone(); geometry.setIndex(kept);
-      const level = new T.Mesh(geometry, node.material);
-      level.position.copy(node.position); level.quaternion.copy(node.quaternion); level.scale.copy(node.scale);
-      Object.assign(level, { castShadow: node.castShadow, receiveShadow: true, customDepthMaterial: node.customDepthMaterial, visible: false, name: `${node.name} LOD${keep}` });
-      level.userData = node.userData;
-      node.parent.add(level); levels.push(level);
-    }
-    sphere.copy(node.geometry.boundingSphere).applyMatrix4(node.matrixWorld);
-    state.lods.push({ levels, centre: sphere.center.clone(), shown: 0 });
-  }
-  state.updateLod = eye => {
-    for (const lod of state.lods) {
-      // Hysteresis: a drifting camera near a boundary must not flip detail back and forth.
-      const d = eye.distanceTo(lod.centre), bias = lod.shown === 0 ? 4 : lod.shown === 1 ? -4 : 0;
-      const s = state.lodScale, level = d < (45 + bias) * s ? 0 : d < (90 + (lod.shown === 2 ? -6 : 6)) * s ? 1 : 2;
-      if (level !== lod.shown) { lod.levels[lod.shown].visible = false; lod.levels[level].visible = true; lod.shown = level; }
-    }
-  };
+  state.batchTrees = () => batchTrees(state); // called by main.js once the impostor belt has been captured
   if (state.trees.length < 23 || !state.groundMaterial || !state.soilMaterial || !state.pavingMaterial) throw new Error('Incomplete Blender environment export');
   // Distant continuation sits below the authored terrain, never over the roads; vegetated, as in the site videos.
   const horizon = new T.Mesh(new T.PlaneGeometry(2000, 2000), state.groundMaterial.clone());

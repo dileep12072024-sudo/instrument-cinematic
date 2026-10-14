@@ -9,7 +9,7 @@ import { environmentObstacles } from './blender-environment.js';
 const rng = seed => () => ((seed = (seed + 0x6D2B79F5) | 0, seed = Math.imul(seed ^ (seed >>> 15), seed | 1), seed ^= seed + Math.imul(seed ^ (seed >>> 7), seed | 61), ((seed ^ (seed >>> 14)) >>> 0) / 4294967296));
 
 function tuneMaterials(landscape) {
-  const tint = { 'Draft asphalt aggregate': '#6c6e72', 'Concrete kerb': '#bdb8ae', 'Exposed red earth': '#f0a27a', 'Papery pink bracts': '#ff4a3a', 'Rose bract variation': '#e8392e' };
+  const tint = { 'Draft asphalt aggregate': '#6c6e72', 'Concrete kerb': '#bdb8ae', 'Exposed red earth': '#f0a27a', 'Papery pink bracts': '#cf2a62', 'Rose bract variation': '#b01f50' }; // magenta-pink, as photographed 2026-10-13
   for (const m of landscape.materials) {
     const name = (m.userData.source_material || m.name).replace(/^Web - /, '').replace(/\.\d+$/, '');
     if (tint[name]) m.color.set(tint[name]);
@@ -106,7 +106,8 @@ function hillRidge(scene) {
   return ridge;
 }
 
-// Low brick plinth with concrete cap, directly behind the east kerb near the flowering shrubs.
+// Low brick edging just behind the east kerb, in front of the flowering bush (photos 2026-10-13: uncapped brickwork,
+// knee-low, about two metres long). Height and length are estimates against the 0.14 m kerb.
 function kerbPlinth(landscape) {
   const kerb = []; landscape.group.traverse(o => { if (o.isMesh && /East driveway kerb/.test(o.userData.sourceObject || '')) kerb.push(o); });
   const ground = []; landscape.group.traverse(o => { if (o.isMesh && /Editable verges/.test(o.userData.sourceObject || '')) ground.push(o); });
@@ -114,20 +115,71 @@ function kerbPlinth(landscape) {
   const edge = z => { for (let x = 9; x > 1; x -= .02) { ray.set(new T.Vector3(x, 5, z), down); if (ray.intersectObjects(kerb, false).length) return x; } return null; };
   const z = 20.5, a = edge(z - 1), b = edge(z + 1), c = edge(z);
   if (a == null || b == null || c == null) return null;
-  const length = 1.4, depth = .9, height = .38; // estimated against the 0.14 m kerb in the footage
-  const x = c + .2 + depth / 2;
+  const length = 2.0, depth = .34, height = .3;
+  const x = c + .25 + depth / 2;
   ray.set(new T.Vector3(x, 5, z), down);
   const y = ray.intersectObjects(ground, false)[0]?.point.y ?? 0;
-  const plinth = new T.Group(); plinth.name = 'Low brick plinth behind east kerb (provisional)';
-  const brick = new T.Mesh(new T.BoxGeometry(depth, height, length), new T.MeshStandardMaterial({ color: '#8f4f3a', roughness: .92 }));
-  brick.position.y = height / 2 - .06; // sunk slightly so it sits in sloping ground
-  const cap = new T.Mesh(new T.BoxGeometry(depth + .08, .07, length + .08), new T.MeshStandardMaterial({ color: '#8e8b83', roughness: .9 }));
-  cap.position.y = height - .06 + .035;
-  plinth.add(brick, cap);
-  plinth.position.set(x, y, z); plinth.rotation.y = Math.atan2(b - a, 2);
-  plinth.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } });
+  const map = brickTexture(); map.repeat.set(length / .9, height / .45);
+  const plinth = new T.Mesh(new T.BoxGeometry(depth, height + .06, length), new T.MeshStandardMaterial({ name: 'Edging brick', map, roughness: .95 }));
+  plinth.name = 'Low brick edging behind east kerb (photo-guided)';
+  plinth.position.set(x, y + height / 2 - .03, z); plinth.rotation.y = Math.atan2(b - a, 2);
+  plinth.castShadow = plinth.receiveShadow = true;
   landscape.group.add(plinth);
   return plinth;
+}
+
+// Sparse blooms: the photographed bushes are mostly green leaves with scattered magenta flowers, not solid colour.
+function thinBlooms(landscape) {
+  landscape.group.traverse(o => {
+    if (!o.isMesh || !o.geometry.index) return;
+    const name = o.material.userData?.source_material || o.material.name;
+    if (/Small ivory flower centres/.test(name)) { o.visible = false; return; } // sub-centimetre centres; invisible at viewing range
+    if (!/Papery pink bracts|Rose bract variation/.test(name)) return;
+    const index = o.geometry.index.array, n = o.geometry.attributes.position.count, parent = Int32Array.from({ length: n }, (_, i) => i);
+    const find = i => { while (parent[i] !== i) i = parent[i] = parent[parent[i]]; return i; };
+    for (let t = 0; t < index.length; t += 3) { const r = find(index[t]); parent[find(index[t + 1])] = r; parent[find(index[t + 2])] = r; }
+    const order = new Map(), kept = [];
+    for (let t = 0; t < index.length; t += 3) { const r = find(index[t]); if (!order.has(r)) order.set(r, order.size); if (order.get(r) % 3 === 0) kept.push(index[t], index[t + 1], index[t + 2]); }
+    o.geometry = o.geometry.clone(); o.geometry.setIndex(kept);
+  });
+}
+
+// Low sheds among the trees on the left (photo 2026-10-13, looking out from the porch): single-storey, pale walls,
+// dark doorways, low pitched roofs. Footprints and positions are estimates; skipped if they would touch a road.
+function leftSheds(scene, landscape) {
+  const hard = []; landscape.group.traverse(o => { if (o.isMesh && /Road|driveway|edge paint|kerb|paving|apron/i.test(o.userData.sourceObject || '')) hard.push(o); });
+  const terrain = []; landscape.group.traverse(o => { if (o.isMesh && /Editable verges/.test(o.userData.sourceObject || '')) terrain.push(o); });
+  const ray = new T.Raycaster(), down = new T.Vector3(0, -1, 0), group = new T.Group(); group.name = 'Left-side sheds among trees (photo-guided)';
+  const grime = document.createElement('canvas'); grime.width = 256; grime.height = 128; const gg = grime.getContext('2d');
+  gg.fillStyle = '#cfc5b1'; gg.fillRect(0, 0, 256, 128);
+  const fade = gg.createLinearGradient(0, 128, 0, 70); fade.addColorStop(0, '#8a6a52cc'); fade.addColorStop(1, '#8a6a5200'); gg.fillStyle = fade; gg.fillRect(0, 70, 256, 58); // splash-back from red earth
+  for (let i = 0; i < 260; i++) { gg.fillStyle = `rgba(90,84,70,${.03 + (i % 7) * .012})`; gg.fillRect((i * 83) % 256, (i * 41) % 70, 2 + i % 9, 6 + i % 23); } // rain streaks
+  const grimeMap = new T.CanvasTexture(grime); grimeMap.colorSpace = T.SRGBColorSpace;
+  const wall = new T.MeshStandardMaterial({ name: 'Shed lime-washed walls', map: grimeMap, roughness: .95 });
+  const roof = new T.MeshStandardMaterial({ name: 'Shed weathered roof sheets', color: '#5f605c', roughness: .85, metalness: .1, side: T.DoubleSide });
+  const doorway = new T.MeshStandardMaterial({ name: 'Shed doorways', color: '#2a2724', roughness: 1 });
+  for (const [x, z, w, d, turn] of [[-27, 31, 9, 4.6, .1], [-37.5, 27.5, 7, 4.2, -.05]]) {
+    const corners = [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2], [0, 0]].map(([dx, dz]) => [x + dx * Math.cos(turn) + dz * Math.sin(turn), z - dx * Math.sin(turn) + dz * Math.cos(turn)]);
+    let blocked = false, low = Infinity;
+    for (const [cx, cz] of corners) { ray.set(new T.Vector3(cx, 30, cz), down); const hit = ray.intersectObjects([...hard, ...terrain], false)[0]; if (hit && hard.includes(hit.object)) blocked = true; low = Math.min(low, hit ? hit.point.y : -2.2); }
+    if (blocked) continue;
+    const shed = new T.Group(); shed.position.set(x, low - .05, z); shed.rotation.y = turn;
+    const body = new T.Mesh(new T.BoxGeometry(w, 2.7, d), wall); body.position.y = 1.35;
+    const ridge = 3.45, roofGeo = new T.BufferGeometry();
+    const hw = w / 2 + .35, hd = d / 2 + .45;
+    roofGeo.setAttribute('position', new T.Float32BufferAttribute([-hw, 2.65, -hd, hw, 2.65, -hd, hw, ridge, 0, -hw, 2.65, -hd, hw, ridge, 0, -hw, ridge, 0, -hw, ridge, 0, hw, ridge, 0, hw, 2.65, hd, -hw, ridge, 0, hw, 2.65, hd, -hw, 2.65, hd], 3));
+    roofGeo.computeVertexNormals();
+    const top = new T.Mesh(roofGeo, roof);
+    shed.add(body, top);
+    for (const side of [-1, 1]) for (const dx of [-w / 3, 0, w / 3]) { // doorways and small windows on both long sides
+      const door = new T.Mesh(new T.PlaneGeometry(.95, 2.05), doorway); door.position.set(dx, 1.03, side * (d / 2 + .005)); door.rotation.y = side < 0 ? Math.PI : 0; shed.add(door);
+      const win = new T.Mesh(new T.PlaneGeometry(.6, .5), doorway); win.position.set(dx + w / 6, 1.9, side * (d / 2 + .005)); win.rotation.y = door.rotation.y; if (Math.abs(dx + w / 6) < w / 2 - .4) shed.add(win);
+    }
+    shed.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+    group.add(shed);
+  }
+  scene.add(group);
+  return group;
 }
 
 export function buildSurroundings(scene, landscape, renderer, views = []) {
@@ -135,9 +187,11 @@ export function buildSurroundings(scene, landscape, renderer, views = []) {
   const belt = treeBelt(scene, landscape, renderer, views.map(([e, l]) => [new T.Vector3(...e).setY(0), new T.Vector3(...l).setY(0)]));
   const ridge = hillRidge(scene);
   const plinth = kerbPlinth(landscape);
+  thinBlooms(landscape);
+  const sheds = leftSheds(scene, landscape);
   const haze = new T.Color(), dark = new T.Color('#4c5a55');
   return {
-    belt, ridge, plinth,
+    belt, ridge, plinth, sheds,
     // Follow the fog so the ridge darkens with dusk/rain instead of glowing at night.
     update(fogColor) { haze.copy(fogColor).lerp(dark, .35); ridge.material.color.copy(haze).multiplyScalar(1.55); },
   };
@@ -150,8 +204,45 @@ export function buildSurroundings(scene, landscape, renderer, views = []) {
 const facadeTrees = [
   { source: 'Forked tree beside main entrance', base: [-8.4, 4.9], bed: true },
   { source: 'Slender tree beside left facade', base: [-17.6, 5.0] },
-  { source: 'Forked tree beside main entrance', base: [9.0, 4.9], clone: 'Multi-stem tree right of entrance (video-guided)', turn: Math.PI * .85 },
+  // Right of the porch: rises from a raised square brick planter with a cracked concrete cap (photos 2026-10-13).
+  { source: 'Forked tree beside main entrance', base: [7.2, 5.0], clone: 'Multi-stem tree right of entrance (video-guided)', turn: Math.PI * .85, planter: true },
 ];
+
+const PLANTER = { size: 1.7, height: .5, cap: .08, hole: .4, soil: .4 };
+const brickTexture = () => {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = '#b9ab95'; g.fillRect(0, 0, 256, 128); // mortar
+  for (let row = 0; row < 8; row++) for (let col = -1; col < 5; col++) {
+    const x = col * 64 + (row % 2) * 32 + 2, y = row * 16 + 2, shade = 120 + ((row * 7 + col * 13) % 5) * 9;
+    g.fillStyle = `rgb(${shade + 40},${shade - 38},${shade - 62})`; g.fillRect(x, y, 60, 12);
+  }
+  const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 8; return t;
+};
+// Raised square planter: brick sides under a concrete cap with a round opening and cracks (no debris).
+function raisedPlanter(x, y, z, soilMaterial) {
+  const { size, height, cap, hole } = PLANTER, group = new T.Group(); group.name = 'Raised brick planter (right facade tree)';
+  const brickMap = brickTexture(); brickMap.repeat.set(size / .9, height / .45);
+  const brick = new T.MeshStandardMaterial({ name: 'Planter brick', map: brickMap, roughness: .95 });
+  const capC = document.createElement('canvas'); capC.width = capC.height = 256; const g = capC.getContext('2d');
+  g.fillStyle = '#a9a69c'; g.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 900; i++) { g.fillStyle = i % 2 ? '#7f7d7433' : '#c8c5bb33'; g.fillRect((i * 97) % 256, (i * 57) % 256, 3, 3); }
+  g.strokeStyle = '#4c4a44'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, 70); g.lineTo(60, 92); g.lineTo(96, 88); g.moveTo(256, 150); g.lineTo(205, 168); g.lineTo(190, 210); g.lineTo(200, 256); g.stroke();
+  const capMap = new T.CanvasTexture(capC); capMap.colorSpace = T.SRGBColorSpace;
+  const concrete = new T.MeshStandardMaterial({ name: 'Planter concrete cap', map: capMap, roughness: .9 });
+  const wall = new T.Mesh(new T.BoxGeometry(size - .06, height - cap + .08, size - .06), brick);
+  wall.position.y = (height - cap) / 2 - .04;
+  const shape = new T.Shape(); shape.moveTo(-size / 2, -size / 2); shape.lineTo(size / 2, -size / 2); shape.lineTo(size / 2, size / 2); shape.lineTo(-size / 2, size / 2); shape.closePath();
+  const opening = new T.Path(); opening.absarc(.08, -.05, hole, 0, Math.PI * 2, true); shape.holes.push(opening);
+  const top = new T.ExtrudeGeometry(shape, { depth: cap, bevelEnabled: true, bevelSize: .012, bevelThickness: .012, bevelSegments: 1, curveSegments: 28 });
+  top.rotateX(-Math.PI / 2); top.translate(0, height - cap, 0);
+  const uv = top.attributes.uv, pos = top.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / size + .5, pos.getZ(i) / size + .5);
+  const capMesh = new T.Mesh(top, concrete);
+  const fill = new T.Mesh(new T.CircleGeometry(hole + .01, 28), soilMaterial); fill.rotation.x = -Math.PI / 2; fill.position.set(.08, height - .07, .05);
+  group.add(wall, capMesh, fill);
+  group.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
+  group.position.set(x - .08, y, z + .05);
+  return group;
+}
 
 export function placeFacadeTrees(group) {
   group.updateMatrixWorld(true);
@@ -175,12 +266,14 @@ export function placeFacadeTrees(group) {
       tree.traverse(o => { if (o !== tree) o.userData = { ...o.userData }; });
       group.add(tree);
     }
-    const to = new T.Vector3(spec.base[0], height(...spec.base) - .04, spec.base[1]); // sink slightly into the bed
+    const ground0 = height(...spec.base);
+    const to = new T.Vector3(spec.base[0], ground0 + (spec.planter ? PLANTER.soil : -.04), spec.base[1]); // in the planter's soil, or sunk slightly into the bed
     const shift = new T.Matrix4().makeTranslation(to.x, to.y, to.z).multiply(new T.Matrix4().makeRotationY(spec.turn || 0)).multiply(new T.Matrix4().makeTranslation(-from.x, -from.y, -from.z));
     const apply = o => { o.updateMatrixWorld(true); const world = shift.clone().multiply(o.matrixWorld); o.parent.updateMatrixWorld(true); o.matrix.copy(o.parent.matrixWorld.clone().invert().multiply(world)); o.matrix.decompose(o.position, o.quaternion, o.scale); };
     apply(tree);
     if (spec.bed) for (const o of group.children.filter(o => /^Low entrance tree-bed edging/.test(o.userData.source_object || ''))) apply(o);
-    if (soil[0]) { // bare earth around each trunk, as filmed, instead of paving under the root flare
+    if (spec.planter) group.add(raisedPlanter(to.x, ground0, to.z, soil[0]));
+    else if (soil[0]) { // bare earth around each trunk, as filmed, instead of paving under the root flare
       const earth = soil[0].clone(); earth.polygonOffset = true; earth.polygonOffsetFactor = earth.polygonOffsetUnits = -2; // no shimmer against paving
       const patch = new T.Mesh(new T.CircleGeometry(1.15, 28), earth); patch.rotation.x = -Math.PI / 2;
       patch.position.set(to.x, to.y + .06, to.z); patch.receiveShadow = true; patch.name = 'Earth around facade tree'; group.add(patch);
