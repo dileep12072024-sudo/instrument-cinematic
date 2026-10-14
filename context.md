@@ -2,7 +2,22 @@
 
 Updated: 2026-10-12. Read this before changing the project.
 
-## Archive Removal and Classroom Wing Rebuild (2026-10-14, latest)
+## Walkable Guide Avatar (2026-10-14, latest)
+
+- Toolbar person icon enters avatar mode (`src/avatar.js`): the user steers a human figure
+  to show where their photos were taken, then copies the readout (`x y z`, level, facing
+  in degrees where 0 = toward the main entrance) into the chat. Use those coordinates to
+  place the camera when matching a photo; they are scene metres, not survey data.
+- Model `public/media/avatar/person.glb` is the three.js r183 example `Soldier.glb`
+  (Mixamo, Idle/Walk/Run). Collisions use `three-mesh-bvh` 0.9.15 against architecture,
+  landscape and sheds only (not foliage). Pose persists in localStorage `avatar-pose`.
+- Fixed with it: hall lights switch on when the camera crosses the doorway; with
+  `shadowMap.autoUpdate` off they also need `renderer.shadowMap.needsUpdate`, otherwise
+  their shadow maps are never drawn and the frame shows only sky.
+- Next (user-led, part by part): three photos around the central stair entry, then a
+  ground-floor west-wing video. Confirm each part with the user before the next.
+
+## Archive Removal and Classroom Wing Rebuild (2026-10-14)
 
 - The user asked that raw files not be shown: archive and original-film UI, dialogs and
   code are gone, and the 15 photos, `photos.json` and `campus.mp4` are deleted from
