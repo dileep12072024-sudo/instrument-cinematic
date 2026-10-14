@@ -109,28 +109,19 @@ try {
   assert.equal(await page.evaluate(() => __portrait.renderer.getPixelRatio()), .9);
   await page.locator('#quality').selectOption('auto');
   await page.locator('#light-close').click();
-  await page.locator('#archive').click();
-  console.log('Checking archive');
-  await page.locator('#archive-dialog').waitFor({ state: 'visible' });
-  await page.waitForFunction(() => document.querySelector('#archive-image').complete && document.querySelector('#archive-image').naturalWidth > 0);
-  assert.equal(await page.locator('[data-photo]').count(), 15);
-  await page.locator('#photo-next').click();
-  assert.equal(await page.locator('#photo-index').textContent(), '02 / 15');
-  await page.screenshot({ path: 'artifacts/desktop-archive.png' });
-  await page.getByRole('button', { name: 'Close archive', exact: true }).click();
+  // The raw photo archive and original footage were removed on request: no UI, and the files are not served.
+  assert.equal(await page.locator('#archive, #archive-dialog, #original-film, #video-dialog, video').count(), 0, 'No raw archive or film UI');
+  for (const file of ['/media/photos.json', '/media/entrance.webp', '/media/campus.mp4']) {
+    const status = await page.evaluate(async f => (await fetch(f)).status, file);
+    const type = await page.evaluate(async f => (await fetch(f)).headers.get('content-type') || '', file);
+    assert.ok(status === 404 || /text\/html/.test(type), `${file} must not be served (got ${status} ${type})`);
+  }
   await page.locator('#reset').click();
-  await page.locator('#original-film').click();
-  await page.waitForFunction(() => document.querySelector('video').readyState >= 2);
-  await page.waitForFunction(() => __portrait.sound.muted && __portrait.sound.context.state === 'suspended');
-  assert.ok(await page.locator('video').evaluate(v => v.duration) > 30);
-  await page.getByRole('button', { name: 'Close film', exact: true }).click();
-  await page.waitForFunction(() => document.querySelector('video').paused);
-  assert.equal(await page.locator('video').evaluate(v => v.paused), true);
   await page.waitForFunction(() => !__portrait.sound.muted && __portrait.sound.context.state === 'running');
   await page.locator('#sound').click();
   await page.waitForFunction(() => !__portrait.sound.enabled && __portrait.sound.context.state === 'suspended');
   console.log('PASS solid rear wall, reflections, inward 180-degree doors and ambient audio controls');
-  console.log('PASS daylight, quality, 15-image archive and original video playback');
+  console.log('PASS daylight, quality, and no raw archive or footage exposed');
   await page.locator('#reset').click();
   const download = page.waitForEvent('download');
   await page.locator('#capture').click();
@@ -160,9 +151,6 @@ try {
   await page.mouse.move(170, 300); await page.mouse.down(); await page.mouse.move(220, 320, { steps: 8 }); await page.mouse.up();
   const afterDrag = await page.evaluate(() => __portrait.camera.position.toArray());
   assert.notDeepEqual(beforeDrag, afterDrag);
-  await page.locator('#archive').click();
-  await page.screenshot({ path: 'artifacts/mobile-archive.png' });
-  await page.getByRole('button', { name: 'Close archive', exact: true }).click();
   const overflows = await page.evaluate(() => [...document.querySelectorAll('button,h1')].filter(e => e.offsetWidth > 0 && e.scrollWidth > e.clientWidth + 3).map(e => e.textContent));
   assert.deepEqual(overflows, []);
   await page.setViewportSize({ width: 844, height: 390 });

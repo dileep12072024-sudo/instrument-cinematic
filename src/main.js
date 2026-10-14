@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import { createIcons, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, Images, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check } from 'lucide';
+import { createIcons, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check } from 'lucide';
 import { buildArchitecture, buildEntranceApron } from './architecture.js';
 import { loadBlenderEnvironment, prefetchEnvironment } from './blender-environment.js';
 import { buildSurroundings, placeFacadeTrees } from './surroundings.js';
@@ -17,7 +17,7 @@ import './style.css';
 
 const $ = s => document.querySelector(s);
 const icon = name => `<i data-lucide="${name}"></i>`;
-const icons = { Move, Volume2, VolumeX, Map: MapIcon, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, Images, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check };
+const icons = { Move, Volume2, VolumeX, Map: MapIcon, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check };
 const refreshIcons = () => createIcons({ icons, attrs: { 'stroke-width': 1.5 } });
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const small = () => innerWidth < 700;
@@ -32,11 +32,11 @@ $('#app').innerHTML = `
     <div id="viewport"></div><div class="shade" aria-hidden="true"></div>
     <header class="topbar">
       <a href="#" class="brand" aria-label="Instrument Technology home"><span class="brand-mark" aria-hidden="true">IT<span></span></span><span>ANDHRA UNIVERSITY<small>A CAMPUS PORTRAIT</small></span></a>
-      <nav aria-label="Main navigation"><button id="archive" class="nav-link">${icon('images')}<span>The archive</span><span class="count">15</span></button><button id="about" class="icon-btn" aria-label="About this portrait" data-tip="About this portrait">${icon('info')}</button><span class="nav-divider"></span><button id="film" class="film-btn">${icon('play')}<span>Play the journey</span></button></nav>
+      <nav aria-label="Main navigation"><button id="about" class="icon-btn" aria-label="About this portrait" data-tip="About this portrait">${icon('info')}</button><span class="nav-divider"></span><button id="film" class="film-btn">${icon('play')}<span>Play the journey</span></button></nav>
     </header>
     <div class="scene-meta"><span class="live-dot"></span><span id="scene-mode">LIVE EXPLORATION</span><span class="meta-line"></span><span id="time-label">16:30 / AFTERNOON</span><span class="meta-line weather-divider"></span><span id="weather-label" class="weather-live">SYNCING SKY</span></div>
     <div class="scene-number" aria-hidden="true"><span id="scene-number">01</span><small>/ 04</small></div>
-    <section class="scene-heading"><p class="eyebrow" id="eyebrow">THE DEPARTMENT / NORTH CAMPUS</p><h1>${chapters[0].title}</h1><p class="scene-note">${icon('map-pin')}<span id="scene-note">${chapters[0].note}</span></p><div class="heading-actions"><button id="explore" class="primary-btn">Enter the courtyard ${icon('arrow-up-right')}</button><button id="original-film" class="text-btn">${icon('play')} Original film</button></div></section>
+    <section class="scene-heading"><p class="eyebrow" id="eyebrow">THE DEPARTMENT / NORTH CAMPUS</p><h1>${chapters[0].title}</h1><p class="scene-note">${icon('map-pin')}<span id="scene-note">${chapters[0].note}</span></p><div class="heading-actions"><button id="explore" class="primary-btn">Enter the courtyard ${icon('arrow-up-right')}</button></div></section>
     <div class="scene-tools" aria-label="Scene tools">
       <button class="icon-btn" id="light" aria-label="Light and quality" aria-expanded="false" data-tip="Light & quality">${icon('sun')}</button>
       <button class="icon-btn" id="orbit" aria-label="Orbit building" aria-pressed="false" data-tip="Orbit building">${icon('compass')}</button>
@@ -59,8 +59,6 @@ $('#app').innerHTML = `
     <div id="loader" class="loader"><span class="loading-mark">IT</span><p>A place comes into focus.</p><span class="load-track"><span></span></span><small id="loading-status">Preparing the campus</small></div>
     <div id="toast" role="status" hidden></div>
   </main>
-  <dialog id="archive-dialog" class="archive-dialog"><div class="dialog-top"><span class="eyebrow">FIELD NOTES / NORTH CAMPUS</span><button class="icon-btn close-dialog" aria-label="Close archive">${icon('x')}</button></div><div class="archive-heading"><h2>The original <em>perspectives.</em></h2><button id="archive-film" class="text-btn">${icon('play')} Watch the film</button></div><div class="photo-layout"><figure><img id="archive-image" alt=""/><figcaption><span id="photo-title"></span><span id="photo-index"></span></figcaption></figure><div class="photo-side"><div class="photo-thumbnails"></div><div class="photo-arrows"><button id="photo-prev" class="icon-btn" aria-label="Previous photo">${icon('arrow-left')}</button><span>FROM THE CAMPUS</span><button id="photo-next" class="icon-btn" aria-label="Next photo">${icon('arrow-right')}</button></div></div></div></dialog>
-  <dialog id="video-dialog" class="video-dialog"><div class="dialog-top"><span class="eyebrow">THE CAMPUS / ORIGINAL FOOTAGE</span><button class="icon-btn close-dialog" aria-label="Close film">${icon('x')}</button></div><video controls playsinline preload="none" poster="/media/entrance.webp"><source src="/media/campus.mp4" type="video/mp4" /></video></dialog>
   <dialog id="about-dialog" class="about-dialog"><div class="dialog-top"><span class="eyebrow">ABOUT THE PORTRAIT</span><button class="icon-btn close-dialog" aria-label="Close about">${icon('x')}</button></div><h2>Built around<br><em>a real place.</em></h2><p>Department of Instrument Technology.<br>Andhra University, Visakhapatnam.</p><p>This independent architectural portrait is reconstructed from the supplied campus photographs, video, and footprint. The blue structural frame, open corridors, entrance, and different wing heights follow those references.</p><p>Geometry is constructed directly in Three.js. Dimensions, hidden elevations, planting, and materials are interpreted; this is not a measured survey or a photogrammetric scan.</p><a href="https://www.google.com/maps/search/?api=1&query=Andhra+University+Department+of+Instrument+Technology" target="_blank" rel="noopener" class="text-btn">Find the department ${icon('arrow-up-right')}</a><div class="credits">Original photographs & footage supplied by the project owner. Sky lighting: <a href="https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky" target="_blank" rel="noopener">Poly Haven / CC0</a>.</div></dialog>`;
 $('#about').insertAdjacentHTML('afterend', `<button id="sound" class="icon-btn" aria-label="Mute ambient sound" aria-pressed="true" data-tip="Mute ambient sound">${icon('volume-2')}</button>`);
 $('#walk-location').insertAdjacentHTML('beforebegin', '<select id="walk-route" aria-label="Interior route"><option value="hall">Central hall</option><option value="right">Ground-floor right wing</option><option value="seminar">Seminar Hall surrounds</option><option value="classroom">Upstairs classroom wing</option></select>');
@@ -97,8 +95,7 @@ let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 } catch {
-  $('#loader').innerHTML = '<p>This browser cannot start the 3D scene.</p><small>You can still explore the original photographs and film.</small><button id="fallback-archive" class="primary-btn">Open the archive</button>';
-  $('#viewport').style.background = 'url(/media/entrance.webp) center/cover';
+  $('#loader').innerHTML = '<p>This browser cannot start the 3D scene.</p><small>Please try a current version of Chrome, Edge, Firefox or Safari with hardware acceleration on.</small>';
 }
 // Download the environment and sky while the page sets up, instead of after the building is built.
 const loadBar = () => $('.load-track>span');
@@ -614,7 +611,7 @@ $('#ambient-volume').oninput = e => {
   sound.setVolume(+e.target.value / 100); $('#volume-output').textContent = `${e.target.value}%`;
 };
 function syncSound() {
-  sound.setMuted(document.hidden || $('#video-dialog').open).catch(() => {});
+  sound.setMuted(document.hidden).catch(() => {});
 }
 document.addEventListener('visibilitychange', syncSound);
 $('#orbit').onclick = () => { if (entranceWalk?.active) return; setPanorama(false); stopJourney(); transition = null; interactive = true; setOrbit(!isOrbiting); };
@@ -675,33 +672,9 @@ renderer?.domElement.addEventListener('keydown', e => {
 renderer?.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); ready = false; toast('The graphics context was interrupted. Recovering...'); });
 renderer?.domElement.addEventListener('webglcontextrestored', () => location.reload());
 
-let photos = [], photoIndex = 0;
-function showPhoto(index) {
-  if (!photos.length) return;
-  photoIndex = (index + photos.length) % photos.length;
-  $('#archive-image').src = photos[photoIndex].src; $('#archive-image').alt = photos[photoIndex].title;
-  $('#photo-title').textContent = photos[photoIndex].title;
-  $('#photo-index').textContent = `${String(photoIndex + 1).padStart(2, '0')} / ${photos.length}`;
-  document.querySelectorAll('[data-photo]').forEach(b => { b.classList.toggle('selected', +b.dataset.photo === photoIndex); b.setAttribute('aria-pressed', +b.dataset.photo === photoIndex); });
-}
-async function openArchive() {
-  if (!photos.length) {
-    try { const r = await fetch('/media/photos.json'); if (!r.ok) throw new Error('Archive unavailable'); photos = await r.json(); }
-    catch { return toast('The archive could not load. Please try again.'); }
-    $('.photo-thumbnails').innerHTML = photos.map((p, i) => `<button data-photo="${i}" aria-label="${p.title}"><img src="${p.src}" alt="" loading="lazy" /></button>`).join('');
-    document.querySelectorAll('[data-photo]').forEach(b => b.onclick = () => showPhoto(+b.dataset.photo));
-  }
-  stopJourney(); showPhoto(photoIndex); $('#archive-dialog').showModal();
-}
-function openVideo() { stopJourney(); $('#archive-dialog').close(); $('#video-dialog').showModal(); syncSound(); $('video').play().catch(() => {}); }
-$('#archive').onclick = openArchive;
-if ($('#fallback-archive')) $('#fallback-archive').onclick = openArchive;
-$('#original-film').onclick = openVideo; $('#archive-film').onclick = openVideo;
-$('#photo-prev').onclick = () => showPhoto(photoIndex - 1); $('#photo-next').onclick = () => showPhoto(photoIndex + 1);
-$('#archive-dialog').addEventListener('keydown', e => { if (e.key === 'ArrowLeft') showPhoto(photoIndex - 1); if (e.key === 'ArrowRight') showPhoto(photoIndex + 1); });
 $('#about').onclick = () => { stopJourney(); $('#about-dialog').showModal(); };
 document.querySelectorAll('.close-dialog').forEach(b => b.onclick = () => b.closest('dialog').close());
 document.querySelectorAll('dialog').forEach(d => {
   d.addEventListener('click', e => { if (e.target !== d) return; const r = d.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close(); });
-  d.addEventListener('close', () => { if (d.id === 'video-dialog') { $('video').pause(); syncSound(); } needsRender = true; });
+  d.addEventListener('close', () => { needsRender = true; });
 });

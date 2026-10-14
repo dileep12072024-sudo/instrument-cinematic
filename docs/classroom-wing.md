@@ -46,3 +46,21 @@ The window wall moved 0.115 inward (centre local x=-0.985) to clear the West cor
 whose blue pilasters and inner face had protruded into the corridor beside the entrance. The open
 leaves now hinge on posts set at the wall faces. Conduits and skirting follow the inset wall; the far
 side passage keeps its original wall line.
+
+## October 14 Rebuild (photos 2026-10-13, clips 094701, 094920, 103154, 103849)
+
+- Entrance: black steel frame; transom with a white panel and the CLASSROOM WING board;
+  a fixed sidelight and one leaf (glass above, cream panel below, PUSH sticker) opened
+  against the right wall. Library door: LIBRARY plate above its pane, DEPARTMENT LIBRARY
+  board over the door.
+- Main corridor: the facade wall's sliding windows show the cream concrete lattice with
+  daylit lens-shaped holes through clear glass (not printed film); grey-brown linear-grain
+  floor; green-and-cream star inlay across the corridor past the second door; the first two
+  room doors stand open into the corridor (unlit rooms behind; interiors not invented);
+  blank hanging name boards (real names not reproduced). No grilled windows on this wall.
+- Side passage: brown-framed brass-grilled windows, electrical boxes with conduit drops and
+  high niches on the door wall; light-grey square tile band and a darker band on the floor;
+  lattice windows above the stained lower wall opposite. Its window wall sits 0.3 m inside
+  the west wing's east face (that face and its blue pilasters showed through). Ceiling at
+  7.22, below the west wing roof slab. The stored furniture was removed (no debris).
+- Ceilings carry a faint emissive term: the references show bright white ceilings.
