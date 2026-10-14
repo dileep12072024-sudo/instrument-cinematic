@@ -83,3 +83,11 @@ for (let i = 0; i < 120; i++) {
 }
 assert.ok(Math.abs(last - .3375) < 1e-10, 'A 150px drag stays a gentle 19-degree turn');
 console.log('PASS responsive, frame-rate-independent panorama smoothing');
+
+// Moving down (Q, right-drag, pinch) must stop above ground: views from beneath showed the building floating.
+const groundCanvas = new Canvas(), groundCamera = new PerspectiveCamera(43);
+const groundLook = createPanoramaLook(groundCamera, groundCanvas, () => true, () => {});
+groundCamera.position.set(0, 1.6, 20);
+for (let i = 0; i < 20; i++) { groundCanvas.dispatchEvent(Object.assign(new Event('keydown', { cancelable: true }), { key: 'q' })); groundLook.update(1); }
+assert.ok(groundCamera.position.y >= .5 - 1e-9, `camera stays above ground (y=${groundCamera.position.y})`);
+console.log('PASS panorama never goes below ground');

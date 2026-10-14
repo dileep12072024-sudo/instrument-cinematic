@@ -11,7 +11,7 @@ export function buildTerraces(parent, m) {
   const cylinder = (x, y, z, r, h, material) => { const g = new T.CylinderGeometry(r, r, h, 32); g.translate(x, y, z); add(g, material); };
   function tube(points, radius, material) {
     const curve = new T.CatmullRomCurve3(points.map(p => new T.Vector3(...p)));
-    add(new T.TubeGeometry(curve, points.length * 8, radius, 6, false), material);
+    add(new T.TubeGeometry(curve, points.length === 2 ? 1 : points.length * 8, radius, 12, false), material);
   }
   let seed = 104806;
   const random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
@@ -194,8 +194,10 @@ export function buildTerraces(parent, m) {
   box(13, 12.2, 3.35, 18, .72, .20, m.wall); // facade line (3.25) out past the roof slab edge (3.425); clear of the corner stair treads
   box(13, 11.55, 3.25, 18, .58, .22, m.wall);
   for (let x = 4.2; x <= 22; x += 2.96) box(x, 10.25, 3.25, .34, 2.02, .24, m.wall);
-  tube([[4.2, 9.72, 3.22], [21.8, 9.72, 3.22]], .034, m.metal);
-  for (let x = 4.6; x < 22; x += .74) tube([[x, 9.49, 3.22], [x, 9.72, 3.22]], .019, m.metal);
+  // Guard rail: polished steel that catches the sky (the shared 'metal' is a dull painted finish for grilles).
+  const railSteel = new T.MeshStandardMaterial({ name: 'Polished steel guard rail', color: '#d4d8da', metalness: .95, roughness: .22, envMapIntensity: 1.3 });
+  tube([[4.2, 9.72, 3.22], [21.8, 9.72, 3.22]], .034, railSteel);
+  for (let x = 4.6; x < 22; x += .74) tube([[x, 9.49, 3.22], [x, 9.72, 3.22]], .019, railSteel);
 
   // Single upper stair and three-window landing sit under the metal-sheet headhouse.
   for (const side of [-1, 1]) box(side * 3.96, (stairs.top + 15.54) / 2, -2.8, .16, 15.54 - stairs.top, 8.2, m.wall);

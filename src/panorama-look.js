@@ -1,6 +1,8 @@
 import * as T from 'three';
 import { bindDragLook } from './drag-look.js';
 
+const MIN_EYE = .5;
+
 // Free exploration turns at the eye, without orbiting a distant building centre.
 export function createPanoramaLook(camera, canvas, active, changed) {
   const angles = new T.Euler(0, 0, 0, 'YXZ');
@@ -82,6 +84,9 @@ export function createPanoramaLook(camera, canvas, active, changed) {
     update(dt) {
       if (!active()) { turning = moving = false; return; }
       if (moving) {
+        // Never below ground: the highest terrain is the entrance datum (y = 0), so 0.5 m keeps every view above
+        // the ground surface instead of under it, where the building appeared to float over a flat plate.
+        destination.y = Math.max(destination.y, MIN_EYE);
         camera.position.lerp(destination, 1 - Math.exp(-12 * dt));
         if (camera.position.distanceToSquared(destination) < .00000001) { camera.position.copy(destination); moving = false; }
         changed();
