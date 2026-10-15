@@ -16,6 +16,25 @@ const hits = (eye, direction, far = 10) => new T.Raycaster(new T.Vector3(...eye)
 const wing = scene.getObjectByName('Upstairs classroom wing');
 const wingHits = (eye, direction, far = 2) => hits(wing.localToWorld(new T.Vector3(...eye)).toArray(), new T.Vector3(...direction).transformDirection(wing.matrixWorld).toArray(), far);
 const rise = classroom.stepRise;
+assert.equal(wing.userData.mainDoorOffsets.length, 4, 'Main corridor retains four observed room fronts, distinct from the three classroom signs');
+assert.ok(16.9 - wing.userData.mainDoorOffsets.at(-1) < 1, 'Last main-corridor front stays beside the junction steps');
+assert.ok(!wingHits([.8, classroom.floor + .09, -16.2], [1, 0, 0], .4).some(h => h.object.material.name === 'Classroom veined stone tiles'), 'Skirting stops beside the doorway instead of covering its leaf');
+const roomSigns = wing.getObjectsByProperty('isMesh', true).filter(o => o.name.startsWith('Door sign: CLASS ROOM'));
+assert.deepEqual(roomSigns.map(o => o.name).sort(), ['II', 'III', 'IV'].map(n => `Door sign: CLASS ROOM - ${n}`), 'The three reference classroom doors are II, III and IV');
+const plaque = wing.getObjectByName('Class III information plaque');
+assert.ok(plaque?.material.map && plaque.position.x > .23, 'Reference plaque is on the wall to the right of Class III');
+assert.equal(wing.getObjectByName('Door sign: CLASS ROOM - III').position.x, -.35, 'Class III door is offset left, as filmed');
+for (const x of [-1, .27, .65, 1.04]) {
+  const hit = wingHits([x, classroom.lowerFloor + 1, -19.9], [0, 0, -1], .5)[0];
+  assert.equal(hit?.object.material.name, 'Weathered classroom plaster', 'Moving the Class III door leaves no openings in its side piers');
+}
+for (const height of [.15, 1, 1.8, 2.4]) {
+  for (const z of [-19.8, -19.15, -18.6]) {
+    const hit = wingHits([8.8, classroom.lowerFloor + height, z], [1, 0, 0], 3)[0];
+    assert.equal(hit?.object.material.name, 'Weathered classroom plaster', 'No stored panel, false doorway or debris blocks the passage end');
+    assert.ok(Math.abs(hit.distance - 2.125) < .001, 'The passage ends at its solid wall, not an invented room recess');
+  }
+}
 assert.ok(Math.abs(rise - .18) < 1e-9, 'Both classroom flights match the user-confirmed ground-floor right-wing rise');
 for (const [z, expected] of [[1, classroom.landing], [-.15, classroom.floor + 2 * rise], [-.45, classroom.floor + rise], [-1, classroom.floor], [-16.8, classroom.floor], [-17.08, classroom.lowerFloor + 2 * rise], [-17.44, classroom.lowerFloor + rise], [-18.5, classroom.lowerFloor]]) {
   for (const x of [-.82, 0, .86]) {

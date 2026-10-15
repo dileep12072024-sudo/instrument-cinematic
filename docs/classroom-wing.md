@@ -77,7 +77,8 @@ it and older clips 094701 (1s), 094920 (17s), 103849 (0s and 5s) were cross-chec
 - 61-102s: the camera turns right into the perpendicular passage. Room doors and timber/brass
   grilled windows are on the left; aluminium sliding windows are on the right.
 - 107-117s: sliding glass is separate from the thick pierced concrete screen behind it;
-  Class Room I / Strong Room is near the passage end. Retain the no-debris decision.
+  Class Room IV / Strong Room is near the passage end (the numeral was corrected on recheck).
+  Retain the no-debris decision.
 - Photo `RUIDa39d8438ea004ddb9d1eb7ed6a94ac2f.jpg` and return clip 0s show **three** junction risers.
   `RUID780e661b996046de896ac6c392bd759a.jpg` shows the entrance is higher than the corridor.
 - User clarification: match the ground-floor right-wing flight count and height difference.
@@ -97,7 +98,7 @@ depth, aluminium tracks, handles and partly slid clear/tinted glass panes. Windo
 and pier dimensions share the actual frame boundaries, avoiding unintentional slits.
 
 Room II is now modelled on the left wall at the lower junction; III remains ahead. Side-passage
-plain doors and Class Room I inspection pane match the provided photos. Fine dimensions and
+plain doors and Class Room IV inspection pane match the provided photos. Fine dimensions and
 bay spacing remain proportion estimates, not a measured reconstruction. No room interiors
 or readable faculty names were invented. No raw reference photos/videos are shipped publicly.
 
@@ -112,3 +113,57 @@ desktop/mobile views with no runtime/shader errors. Screenshots were inspected a
 main corridor, three-riser junction and side passage. Closed the ceiling-height transition and
 floor seam at the turn; narrowed the old blue exterior trim to prevent an interior protrusion.
 These software-rendered checks do not establish real-GPU frame rates or survey accuracy.
+
+## October 15 Recheck: Three Classrooms, No Terminal Door
+
+The owner clarified that the brown panel at the far end is stored against the wall with
+discarded furniture, not a doorway into a fourth classroom. Re-extracted the October 13 clip
+at 0, 12, 24, 32, 44, 56, 64, 72, 80, 88, 96, 104, 112 and 117 seconds, then compared the supplied
+corridor photos. The 117-second close-up clearly reads **CLASS ROOM - IV**, not I. The three
+identified classroom entrances are II (left at the junction), III (ahead), and IV (on the
+side-passage room wall). The other photographed plain doors are retained without invented labels.
+
+Removed the false terminal door and its hardware. The end remains a continuous plaster wall,
+with no room recess, leaning panel, stacked furniture or loose debris. The existing passage
+length and the confirmed three 18 cm risers per flight are unchanged. Dimensions remain
+proportional estimates; this correction does not establish surveyed measurements.
+
+The new `Videos/20261014_111121.mp4` was checked at 0, 4, 8, 12, 16, 20, 24, 28, 32, 36 and 38
+seconds. It approaches the CLASSROOM WING doorway across the stair landing from the other
+corridor. `Videos/20261014_110743.jpg` shows the decorated OFFICE corridor and dark stone steps;
+its finishes must not be copied indiscriminately onto the lighter classroom corridor.
+
+Regression rays now require an unobstructed solid plaster end wall at several heights and
+across the passage width, and exactly the three identified classroom signs. The browser check
+also captures the corridor end on desktop and mobile.
+
+Rechecked the older continuous approach (`103154`, every five seconds from 0 to 70s) for
+corridor proportions and door spacing. Its five facade bays constrain the main corridor;
+the four room-front openings are distinct from the three labelled classrooms. The existing
+20.3 m main run and 9.8 m return remain estimates, not newly measured dimensions. No global
+length scaling was applied: it would also move the approved junction, facade and steps without
+measurement evidence. Removing the false end door eliminates the suggestion of a further room.
+The final main-corridor room front moved from local z=-12.6 to -16.2, close to the steps as
+seen at 30-50s and in the reverse corridor photograph. This is a proportional placement,
+not a measured distance. Faculty fronts use timber panels instead of copying the classroom
+inspection pane onto every door; the two near leaves remain open.
+
+At 60s, Class III's door is visibly left of centre, with a black plaque on the right pier.
+Offset the door left, rebuilt its closed side piers and added a 0.74 x 0.62 m plaque (estimated
+from its size relative to the door). The plaque is a shallow modelled slab with generated
+gold border/lettering, transcribed only where readable in the local 60-second frame. The
+unclear date and crest are omitted, not invented. No photo crop, reference frame or video
+is shipped; the temporary crop remains in ignored `artifacts/` for comparison only.
+Rounded the pointed lens-shaped lattice openings to match the close-ups and gave stair faces
+the same world-scale tile mapping as the floor, avoiding stretched grain. Step heights,
+panorama controls and the Blender master are unchanged.
+Room-side skirting stops at each doorway; the procedural stone grain uses lower contrast so
+it does not read as dense stripes across the treads and landings.
+
+Final recheck: geometry and panorama/walk interaction tests pass, as does the strict coplanar
+surface scan. The browser check passed on Windows Chrome / Intel UHD Direct3D11: 501 route
+positions, six desktop views, two phone views, nonblank canvas pixels and no runtime/shader
+errors. The production build passes (existing large-chunk warning remains). Initial Linux
+software-rendered attempts hit the test memory cap or were interrupted by live-source reloads;
+the final run used an isolated release snapshot. This validates rendering, not a frame-rate
+guarantee or exact surveyed dimensions.

@@ -22,12 +22,12 @@ export function buildClassroomWing(parent, m) {
       return;
     }
     const g = new T.BoxGeometry(w, h, d); g.translate(x, y, z);
-    if (mat === plaster) {
+    if (mat === plaster || mat === stone) {
       const { position: p, normal: n, uv } = g.attributes;
       for (let i = 0; i < p.count; i++) {
         const u = Math.abs(n.getX(i)) > .5 ? p.getZ(i) : p.getX(i);
         const v = Math.abs(n.getY(i)) > .5 ? p.getZ(i) : p.getY(i);
-        uv.setXY(i, u / 3, v / 3);
+        uv.setXY(i, u / (mat === stone ? .64 : 3), v / (mat === stone ? .88 : 3));
       }
     }
     add(g, mat);
@@ -43,8 +43,8 @@ export function buildClassroomWing(parent, m) {
   let seed = 103154;
   const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const stoneMap = texture((c, w, h) => {
-    c.fillStyle = '#7b766e'; c.fillRect(0, 0, w, h); // grey-brown linear-grain vitrified tiles
-    for (let i = 0; i < 4500; i++) { c.strokeStyle = rand() > .5 ? '#dcd5c62a' : '#2f2b272e'; c.lineWidth = .3 + rand() * 2; const x = rand() * w; c.beginPath(); c.moveTo(x, 0); c.bezierCurveTo(x + 12, h / 3, x - 8, h * .7, x + rand() * 8, h); c.stroke(); }
+    c.fillStyle = '#817e73'; c.fillRect(0, 0, w, h); // grey-brown linear-grain vitrified tiles
+    for (let i = 0; i < 2200; i++) { c.strokeStyle = rand() > .5 ? '#c0b9aa12' : '#393a3510'; c.lineWidth = .3 + rand() * 2; const x = rand() * w; c.beginPath(); c.moveTo(x, 0); c.bezierCurveTo(x + 12, h / 3, x - 8, h * .7, x + rand() * 8, h); c.stroke(); }
     c.strokeStyle = '#4d504c88'; c.lineWidth = 1; c.strokeRect(0, 0, w, h);
   });
   const stone = new T.MeshStandardMaterial({ name: 'Classroom veined stone tiles', map: stoneMap, roughness: .32, envMapIntensity: .22 });
@@ -66,7 +66,7 @@ export function buildClassroomWing(parent, m) {
     const map = texture((c, w, h) => { c.fillStyle = bg; c.fillRect(0, 0, w, h); c.fillStyle = fg; c.font = `bold ${text.length > 18 ? 34 : 48}px sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, w / 2, h / 2, w - 26); }, 512, 128);
     const mesh = new T.Mesh(new T.PlaneGeometry(width, height), new T.MeshStandardMaterial({ map, roughness: .75 })); mesh.position.set(x, y, z); group.add(mesh); return mesh;
   }
-  function door(x, bottom, z, width, name = '', glazed = true, { open = 0, plateAbove = false } = {}) {
+  function door(x, bottom, z, width, name = '', glazed = true, { open = 0, plateAbove = false, panelled = false } = {}) {
     const h = 2.32, front = z + .046;
     for (const s of [-1, 1]) box(x + s * (width / 2 + .036), bottom + h / 2, z, .072, h + .07, .10, wood);
     box(x, bottom + h + .035, z, width + .14, .07, .10, wood);
@@ -76,6 +76,13 @@ export function buildClassroomWing(parent, m) {
       const opening = new T.Path(); opening.moveTo(-.195, 1.55); opening.lineTo(-.195, 1.89); opening.lineTo(.195, 1.89); opening.lineTo(.195, 1.55); opening.closePath(); leaf.holes.push(opening);
     }
     const panel = new T.ExtrudeGeometry(leaf, { depth: .046, bevelEnabled: true, bevelSize: .002, bevelThickness: .002, bevelSegments: 1, steps: 1 }); panel.translate(x, bottom, z - .023); add(panel, wood);
+    if (panelled) {
+      for (const s of [-1, 1]) {
+        const face = z + s * .03;
+        for (const dx of [-width / 2 + .055, width / 2 - .055]) box(x + dx, bottom + h / 2, face, .11, h, .02, wood);
+        for (const dy of [.055, .73, 1.46, h - .055]) box(x, bottom + dy, face, width, .11, .02, wood);
+      }
+    }
     // The small inspection pane sits in a recessed timber bead, not a projecting box.
     if (glazed) {
       box(x, bottom + 1.72, z, .39, .34, .012, doorGlass);
@@ -86,7 +93,7 @@ export function buildClassroomWing(parent, m) {
     for (const dx of [.09, .24, .40]) box(x + dx, bottom + .70, front, .026, .085, .022, aluminium);
     tube([[x + .29, bottom + .65, front], [x + .30, bottom + .60, front], [x + .34, bottom + .65, front]], .008, aluminium);
     const lock = new T.CylinderGeometry(.035, .035, .018, 12); lock.rotateX(Math.PI / 2); lock.translate(x + .315, bottom + .59, front); add(lock, aluminium);
-    if (name) label(name, x, bottom + (plateAbove ? 1.98 : 1.40), front + .02, .52, .11, '#182220', '#eeeedd');
+    if (name) label(name, x, bottom + (plateAbove ? 1.98 : 1.40), front + .02, .52, .11, '#182220', '#eeeedd').name = `Door sign: ${name}`;
     if (open) { // swing the leaf about its left hinge, into the corridor
       const hinge = new T.Matrix4().makeTranslation(x - width / 2, 0, z).multiply(new T.Matrix4().makeRotationY(-open)).multiply(new T.Matrix4().makeTranslation(-(x - width / 2), 0, -z));
       for (const [material, gs] of batches) for (let j = leafStart.get(material) || 0; j < gs.length; j++) gs[j].applyMatrix4(hinge);
@@ -108,13 +115,13 @@ export function buildClassroomWing(parent, m) {
       for (let row = 0; row < rows; row++) for (let col = 0; col < cols - (row % 2); col++) {
         const cx = -width / 2 + (col + .5 + (row % 2) / 2) * dx, cy = -height / 2 + (row + .5) * dy;
         const hole = new T.Path();
-        for (let i = 0; i < 6; i++) {
-          const a = Math.PI / 2 - i * Math.PI / 3, px = cx + Math.cos(a) * dx * .34, py = cy + Math.sin(a) * dy * .39;
-          if (i) hole.lineTo(px, py); else hole.moveTo(px, py);
-        }
+        const rx = dx * .34, ry = dy * .39;
+        hole.moveTo(cx, cy + ry);
+        hole.bezierCurveTo(cx + rx * 1.33, cy + ry * .45, cx + rx * 1.33, cy - ry * .45, cx, cy - ry);
+        hole.bezierCurveTo(cx - rx * 1.33, cy - ry * .45, cx - rx * 1.33, cy + ry * .45, cx, cy + ry);
         hole.closePath(); shape.holes.push(hole);
       }
-      const screen = new T.ExtrudeGeometry(shape, { depth: .075, bevelEnabled: true, bevelSize: .004, bevelThickness: .004, bevelSegments: 1, steps: 1 });
+      const screen = new T.ExtrudeGeometry(shape, { depth: .075, curveSegments: 4, bevelEnabled: true, bevelSize: .004, bevelThickness: .004, bevelSegments: 1, steps: 1 });
       screen.translate(0, 0, -.15); screens.set(width, screen);
     }
     add(screens.get(width).clone().applyMatrix4(transform), screenMaterial);
@@ -170,7 +177,8 @@ export function buildClassroomWing(parent, m) {
   for (let i = 0; i <= 5; i++) box(W, y + 1.82, -i * 3.6, .16, 1.48, .64, plaster);
   for (let i = 0; i < 5; i++) window(W + .085, y + 1.82, -1.8 - i * 3.6, 2.96, Math.PI / 2);
   const roomDark = new T.MeshStandardMaterial({ name: 'Unlit room interior', color: '#191714', roughness: 1 });
-  const openings = [2.3, 5.8, 9.2, 12.6];
+  const openings = [2.3, 5.8, 9.2, 16.2]; // last front is beside the lower junction, not halfway along the blank wall
+  group.userData.mainDoorOffsets = openings;
   let previous = 0;
   for (const u of openings) {
     const start = u - .58;
@@ -178,7 +186,7 @@ export function buildClassroomWing(parent, m) {
     box(1.10, (y + 2.4 + ceiling) / 2, -u, .16, ceiling - y - 2.4, 1.16, plaster);
     // Each door is a closed room front; the films do not establish the room interiors.
     const before = new Set(group.children), first = new Map([...batches].map(([m, a]) => [m, a.length]));
-    door(0, y, 0, 1.02, '', true, { open: u < 6 ? Math.PI * .5 : 0 });
+    door(0, y, 0, 1.02, '', false, { open: u < 6 ? Math.PI * .5 : 0, panelled: true });
     if (u < 6) box(0, y + 1.25, -.6, 1.12, 2.5, 1.0, roomDark); // unlit room beyond the open door
     const matrix = new T.Matrix4().makeRotationY(-Math.PI / 2); matrix.setPosition(1.04, 0, -u);
     for (const [material, gs] of batches) for (let j = first.get(material) || 0; j < gs.length; j++) gs[j].applyMatrix4(matrix);
@@ -195,9 +203,32 @@ export function buildClassroomWing(parent, m) {
   const iiTransform = new T.Matrix4().makeRotationY(Math.PI / 2); iiTransform.setPosition(-1.04, 0, -19.15);
   for (const [material, gs] of batches) for (let j = iiStart.get(material) || 0; j < gs.length; j++) gs[j].applyMatrix4(iiTransform);
   for (const child of group.children) if (!iiChildren.has(child)) child.applyMatrix4(iiTransform);
-  for (const x of [-.84, .84]) box(x, (classroom.lowerFloor + sideCeiling) / 2, -20.35, .49, sideCeiling - classroom.lowerFloor, .16, plaster);
-  box(0, (classroom.lowerFloor + 2.42 + sideCeiling) / 2, -20.35, 1.2, sideCeiling - classroom.lowerFloor - 2.42, .16, plaster);
-  door(0, classroom.lowerFloor, -20.24, 1.08, 'CLASS ROOM - III');
+  // 103154 at 60s: III is left of centre; its information plaque occupies the right pier.
+  for (const [left, right] of [[-1.085, -.93], [.23, 1.10]]) box((left + right) / 2, (classroom.lowerFloor + sideCeiling) / 2, -20.35, right - left, sideCeiling - classroom.lowerFloor, .16, plaster);
+  box(-.35, (classroom.lowerFloor + 2.42 + sideCeiling) / 2, -20.35, 1.16, sideCeiling - classroom.lowerFloor - 2.42, .16, plaster);
+  door(-.35, classroom.lowerFloor, -20.24, 1.02, 'CLASS ROOM - III');
+  const plaqueMap = texture((c, w, h) => {
+    c.fillStyle = '#101916'; c.fillRect(0, 0, w, h);
+    c.strokeStyle = '#a3945d'; c.lineWidth = 2;
+    for (const inset of [22, 34]) c.strokeRect(inset, inset, w - 2 * inset, h - 2 * inset);
+    c.fillStyle = '#b0a377'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    // Only lettering legible in the 60-second reference frame; no invented date or crest.
+    for (const [line, py, size, bold] of [
+      ['ANDHRA UNIVERSITY', .13, 52, true],
+      ['COLLEGE OF ENGINEERING (A)', .34, 30, true],
+      ['DEPARTMENT OF INSTRUMENT TECHNOLOGY', .38, 20, false],
+      ['SMART CLASS ROOM-II & III', .43, 36, true],
+      ['INAUGURATED', .48, 26, false], ['BY', .515, 22, false],
+      ['Prof. G. NAGESWARA RAO', .58, 34, true], ['HON\'BLE VICE-CHANCELLOR, A.U.', .62, 21, false],
+      ['Prof. P.S. AVADHANI', .69, 34, true], ['PRINCIPAL, AUCE(A)', .73, 21, false],
+      ['Prof. D.V. RAMA KOTI REDDY', .80, 32, true], ['HEAD OF THE DEPARTMENT', .84, 21, false],
+    ]) {
+      c.font = `${bold ? 'bold ' : ''}${size}px ${py < .2 ? 'serif' : 'sans-serif'}`;
+      c.fillText(line, w / 2, h * py, w - 100);
+    }
+  }, 1024, 860);
+  const plaque = new T.Mesh(new T.BoxGeometry(.74, .62, .018), new T.MeshStandardMaterial({ name: 'Class III black information plaque', map: plaqueMap, roughness: .22 }));
+  plaque.name = 'Class III information plaque'; plaque.position.set(.65, classroom.lowerFloor + 1.57, -20.26); group.add(plaque);
   floor(5.9925, -19.15, 9.815, 2.3, classroom.lowerFloor);
   box(6.0, sideCeiling, -19.15, 9.8, .12, 2.5, ceilingPlaster);
   box(6.0, (classroom.lowerFloor + sideCeiling) / 2, -20.4, 9.8, sideCeiling - classroom.lowerFloor, .18, plaster);
@@ -208,7 +239,7 @@ export function buildClassroomWing(parent, m) {
   for (const x of [1.2, 4.4, 7.6, 10.8]) box(x, classroom.lowerFloor + 1.82, SW, .35, 1.48, .16, plaster);
   for (const x of [2.8, 6, 9.2]) window(x, classroom.lowerFloor + 1.82, SW - .08, 2.85, Math.PI);
   for (const x of [2.5, 5.8, 8.9]) {
-    door(x, classroom.lowerFloor, -20.28, .96, x === 8.9 ? 'CLASS ROOM - I' : '', x === 8.9);
+    door(x, classroom.lowerFloor, -20.28, .96, x === 8.9 ? 'CLASS ROOM - IV' : '', x === 8.9);
     floor(x, -19.15, .48, 2.3, classroom.lowerFloor + .002, m.tread);
   }
   // Uneven lower-wall staining is visible in the side passage; keep it flush to the plaster.
@@ -220,11 +251,9 @@ export function buildClassroomWing(parent, m) {
   });
   const stain = new T.Mesh(new T.PlaneGeometry(9.3, 2.3), new T.MeshStandardMaterial({ map: wear, transparent: true, depthWrite: false, roughness: 1 }));
   stain.position.set(6, classroom.lowerFloor + 1.15, SW - .095); stain.rotation.y = Math.PI; group.add(stain);
+  // The brown panel at 96-104s is stored against this wall, not another doorway.
+  // Leave the wall closed and the passage clear; stored panels and debris are omitted.
   box(11, (classroom.lowerFloor + sideCeiling) / 2, -19.15, .15, sideCeiling - classroom.lowerFloor, 2.5, plaster);
-  const terminalStart = new Map([...batches].map(([material, gs]) => [material, gs.length]));
-  door(0, classroom.lowerFloor, 0, 1.02, '', false);
-  const terminalTransform = new T.Matrix4().makeRotationY(-Math.PI / 2); terminalTransform.setPosition(10.88, 0, -19.15);
-  for (const [material, gs] of batches) for (let j = terminalStart.get(material) || 0; j < gs.length; j++) gs[j].applyMatrix4(terminalTransform);
   // Room-side wall details from the 2026-10-13 corridor photos and 103849 (no debris, no invented text):
   // brown-framed brass-grilled windows between doors, electrical boxes fed from the conduit run,
   // high square wall niches, faculty name boards, darker floor bands and the patterned tile inlay.
@@ -274,7 +303,14 @@ export function buildClassroomWing(parent, m) {
   // Slim conduits and cross beams follow the filmed ceiling; no invented room fixtures.
   for (const far of [-1.02, 1.02]) {
     const x = far < 0 ? inner + .025 : far; // main corridor follows the inset window wall; the far passage keeps its wall
-    box(x, y + .09, -8.45, .05, .18, 16.9, stone);
+    if (far < 0) box(x, y + .09, -8.45, .05, .18, 16.9, stone);
+    else {
+      let start = 0;
+      for (const end of [...openings.map(u => u - .60), 16.9]) {
+        if (end > start) box(x, y + .09, -(start + end) / 2, .05, .18, end - start, stone);
+        start = end + 1.20;
+      }
+    }
     for (let j = 0; j < 3; j++) tube([[x, ceiling - .28 - j * .045, .8], [x, ceiling - .28 - j * .045, -17.8], [far, sideCeiling - .28 - j * .045, -18.2], [far, sideCeiling - .28 - j * .045, -20.1]], .012, aluminium);
     for (let u = 1; u < 20; u += 1.5) box(u < 18 ? x : far, (u < 18 ? ceiling : sideCeiling) - .33, -u, .032, .19, .022, dark);
   }

@@ -3,7 +3,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
 await mkdir('artifacts/classroom-review', { recursive: true });
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/home/dragon/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome', args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+const executablePath = process.env.CHROMIUM_PATH || (process.platform === 'win32' ? 'C:/Program Files/Google/Chrome/Application/chrome.exe' : '/home/dragon/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome');
+const browser = await chromium.launch({ executablePath, args: ['--no-sandbox', ...(process.platform === 'win32' ? ['--use-angle=d3d11'] : ['--enable-unsafe-swiftshader'])] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: .75 });
 page.setDefaultTimeout(300000);
 const errors = [];
@@ -22,6 +23,11 @@ await page.route('https://api.open-meteo.com/**', route => route.fulfill({ json:
 try {
   await page.goto(process.argv[2] || 'http://localhost:5190', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__portrait?.ready);
+  console.log('Renderer:', await page.evaluate(() => {
+    const gl = __portrait.renderer.getContext(), info = gl.getExtension('WEBGL_debug_renderer_info');
+    return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : 'Unavailable';
+  }));
+  assert.ok(await page.evaluate(() => __portrait.scene.getObjectByName('Class III information plaque')?.material.map.image?.width > 0), 'Modelled plaque lettering is available');
   await page.waitForFunction(() => typeof window.__frame === 'function');
   await page.locator('#loader').waitFor({ state: 'hidden' });
   await page.locator('#hour').evaluate(e => { e.value = 11; e.dispatchEvent(new Event('input')); });
@@ -44,7 +50,7 @@ try {
   });
   await writeFile('artifacts/classroom-review/route.json', JSON.stringify(failures, null, 2));
   assert.deepEqual(failures, [], 'Camera must remain at walking height across both stair transitions');
-  for (const [progress, name, reverse] of [[0, 'entry', false], [350, 'main', false], [630, 'three-steps', true], [700, 'junction', false], [860, 'side', false]]) {
+  for (const [progress, name, reverse] of [[0, 'entry', false], [350, 'main', false], [630, 'three-steps', true], [700, 'junction', false], [860, 'side', false], [1000, 'end-wall', false]]) {
     await page.locator('#walk-progress').evaluate((e, p) => { e.value = p; e.dispatchEvent(new Event('input')); }, progress);
     const colors = await page.evaluate(reverse => {
       __advance(); const { renderer, scene, camera } = __portrait;
@@ -59,8 +65,17 @@ try {
     console.log('Captured', name);
   }
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.evaluate(() => { __advance(); const { renderer, scene, camera } = __portrait; renderer.render(scene, camera); });
-  await page.screenshot({ path: 'artifacts/classroom-review/mobile.png' });
+  for (const [progress, name] of [[700, 'mobile-junction'], [1000, 'mobile']]) {
+    await page.locator('#walk-progress').evaluate((e, p) => { e.value = p; e.dispatchEvent(new Event('input')); }, progress);
+    const colors = await page.evaluate(() => {
+      __advance(); const { renderer, scene, camera } = __portrait; renderer.render(scene, camera);
+      const gl = renderer.getContext(), data = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+      gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, data);
+      return new Set(data).size;
+    });
+    assert.ok(colors > 20, `${name} canvas must not be blank`);
+    await page.screenshot({ path: `artifacts/classroom-review/${name}.png` });
+  }
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(errors, []);
   console.log('PASS classroom route, desktop/mobile renders, nonblank canvas and no runtime/shader errors');
