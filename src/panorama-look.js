@@ -8,7 +8,8 @@ export function createPanoramaLook(camera, canvas, active, changed) {
   const angles = new T.Euler(0, 0, 0, 'YXZ');
   const target = { x: 0, y: 0 };
   const destination = camera.position.clone();
-  let turning = false, moving = false;
+  let turning = false, moving = false, inertia = null, follow = 12;
+  const velocity = { x: 0, y: 0, t: 0 };
   const direction = new T.Vector3();
   canvas.addEventListener('contextmenu', e => { if (active()) e.preventDefault(); });
   // Phones: one finger looks, two fingers pinch to walk forward/back and drag together to pan.
@@ -29,7 +30,12 @@ export function createPanoramaLook(camera, canvas, active, changed) {
     destination.addScaledVector(direction, -(m.x - middle.x) * .012); destination.y += (m.y - middle.y) * .012;
     spread = m.d; middle = m; changed();
   });
-  for (const type of ['pointerup', 'pointercancel']) (canvas.ownerDocument || canvas).addEventListener(type, e => touches.delete(e.pointerId));
+  for (const type of ['pointerup', 'pointercancel']) (canvas.ownerDocument || canvas).addEventListener(type, e => {
+    const flick = type === 'pointerup' && touches.size === 1 && touches.has(e.pointerId) && active() && performance.now() - velocity.t < 80;
+    touches.delete(e.pointerId);
+    // Glide on and ease to a stop, unless the finger rested before lifting.
+    if (flick && Math.hypot(velocity.x, velocity.y) > .25) { inertia = { x: T.MathUtils.clamp(velocity.x, -6, 6), y: T.MathUtils.clamp(velocity.y, -6, 6) }; changed(); }
+  });
   function move(distance) {
     if (!moving) destination.copy(camera.position);
     camera.getWorldDirection(direction);
@@ -38,7 +44,7 @@ export function createPanoramaLook(camera, canvas, active, changed) {
   }
   bindDragLook(canvas, active, () => {
     angles.setFromQuaternion(camera.quaternion, 'YXZ');
-    target.x = angles.x; target.y = angles.y; turning = false;
+    target.x = angles.x; target.y = angles.y; turning = false; inertia = null; velocity.x = velocity.y = 0; velocity.t = performance.now();
     destination.copy(camera.position); moving = false;
   }, (dx, dy, pan) => {
     if (touches.size > 1) return; // a pinch is not a look
@@ -47,10 +53,15 @@ export function createPanoramaLook(camera, canvas, active, changed) {
       destination.addScaledVector(direction, -dx * .018);
       destination.y += dy * .018; moving = true;
     } else {
-      const sensitivity = 1.8 / Math.max(360, canvas.clientHeight || 800);
+      // A finger swipe across a phone's short side turns about 100 degrees; the mouse keeps its finer scale.
+      const touch = touches.size > 0, side = touch ? Math.min(canvas.clientWidth || 800, canvas.clientHeight || 800) : canvas.clientHeight || 800;
+      const sensitivity = 1.8 / Math.max(360, side);
       target.y -= dx * sensitivity;
       target.x = T.MathUtils.clamp(target.x - dy * sensitivity, -1.35, 1.35);
-      turning = true;
+      turning = true; follow = touch ? 30 : 12; // the view stays under the finger
+      // Release velocity (rad/s), smoothed over the last few moves, carries a flick on after the finger lifts.
+      const now = performance.now(), span = Math.max(1, now - velocity.t) / 1000, k = Math.min(1, span / .05);
+      velocity.y += (-dx * sensitivity / span - velocity.y) * k; velocity.x += (-dy * sensitivity / span - velocity.x) * k; velocity.t = now;
     }
     changed();
   });
@@ -82,7 +93,12 @@ export function createPanoramaLook(camera, canvas, active, changed) {
   return {
     move,
     update(dt) {
-      if (!active()) { turning = moving = false; return; }
+      if (!active()) { turning = moving = false; inertia = null; return; }
+      if (inertia) {
+        target.y += inertia.y * dt; target.x = T.MathUtils.clamp(target.x + inertia.x * dt, -1.35, 1.35);
+        const decay = Math.exp(-3.2 * dt); inertia.x *= decay; inertia.y *= decay; turning = true;
+        if (Math.hypot(inertia.x, inertia.y) < .02) inertia = null;
+      }
       if (moving) {
         // Never below ground: the highest terrain is the entrance datum (y = 0), so 0.5 m keeps every view above
         // the ground surface instead of under it, where the building appeared to float over a flat plate.
@@ -92,10 +108,10 @@ export function createPanoramaLook(camera, canvas, active, changed) {
         changed();
       }
       if (!turning) return;
-      angles.x = T.MathUtils.damp(angles.x, target.x, 12, dt);
-      angles.y = T.MathUtils.damp(angles.y, target.y, 12, dt);
+      angles.x = T.MathUtils.damp(angles.x, target.x, follow, dt);
+      angles.y = T.MathUtils.damp(angles.y, target.y, follow, dt);
       angles.z = 0;
-      if (Math.abs(angles.x - target.x) + Math.abs(angles.y - target.y) < .00001) {
+      if (!inertia && Math.abs(angles.x - target.x) + Math.abs(angles.y - target.y) < .00001) {
         angles.x = target.x; angles.y = target.y; turning = false;
       }
       camera.quaternion.setFromEuler(angles); changed();

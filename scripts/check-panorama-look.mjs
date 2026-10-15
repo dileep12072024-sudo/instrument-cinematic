@@ -18,9 +18,19 @@ for (const pointerType of ['mouse', 'touch']) {
   assert.deepEqual(camera.position, position, 'Turning must keep the eye fixed');
   assert.ok(Math.abs(new Euler().setFromQuaternion(camera.quaternion, 'YXZ').z) < 1e-12, 'No camera roll');
   assert.equal(camera.fov, 43);
-  send('pointerup', { pointerId: 1 });
+  canvas.dispatchEvent(Object.assign(new Event('pointerup'), { pointerId: 1 }));
+  if (pointerType === 'touch') {
+    // A quick touch release glides on in the same direction, then comes to rest.
+    const glide = camera.getWorldDirection(new Vector3());
+    for (let i = 0; i < 6; i++) controls.update(1 / 60);
+    assert.ok(camera.getWorldDirection(new Vector3()).x > glide.x, 'Touch flick carries the turn on');
+    for (let i = 0; i < 600; i++) controls.update(1 / 60);
+    direction.copy(camera.getWorldDirection(new Vector3()));
+    controls.update(1);
+    assert.ok(camera.getWorldDirection(new Vector3()).distanceTo(direction) < 1e-8, 'The glide stops');
+  } else controls.update(1);
   send('pointermove', { pointerId: 1, clientX: 400, clientY: 400 });
-  assert.ok(camera.getWorldDirection(new Vector3()).distanceTo(direction) < 1e-8);
+  assert.ok(camera.getWorldDirection(new Vector3()).distanceTo(direction) < 1e-8, 'Moves after release are ignored');
   controls.move(1);
   controls.update(1);
   assert.ok(camera.position.clone().sub(position).distanceTo(direction) < 1e-8, 'Move follows the view');
