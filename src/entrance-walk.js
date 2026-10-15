@@ -35,9 +35,12 @@ const seminarSurrounds = [
 // The classroom route is a direct entry; the stair route connects every landing.
 const classroomRoute = [
   { at: 0, x: -2.4, y: classroom.landing + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Upstairs classroom-wing entrance' },
-  { at: .10, x: -4.6, y: classroom.floor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Classroom wing' },
+  { at: .065, x: -3.98, y: classroom.landing + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Classroom entrance steps' },
+  { at: .10, x: -4.62, y: classroom.floor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Classroom wing' },
   { at: .42, x: -16, y: classroom.floor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Classroom corridor' },
   { at: .52, x: -20.7, y: classroom.floor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Classroom passage steps' },
+  { at: .53, x: -20.89, y: classroom.floor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Three classroom passage steps' },
+  { at: .58, x: -21.64, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Classroom lower landing' },
   { at: .60, x: -22, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Class Room III approach' },
   { at: .70, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Class Room III' },
   { at: .76, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: 0, name: 'Classroom side passage' },

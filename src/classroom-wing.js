@@ -1,13 +1,15 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { groundSpine } from './footprint.js';
 
-// Route proportions are interpreted from the five clips; see docs/classroom-wing.md.
-export const classroom = { floor: 4.264, landing: 4.044, lowerFloor: 4.064, ceiling: 7.78, originX: -4, originZ: 2.166667, length: 20.3 };
+// Heights are reference-based estimates; the entrance and junction both descend into the wing.
+const flightRise = groundSpine.rightFloor - groundSpine.hallFloor;
+export const classroom = { floor: 4.044 - flightRise, landing: 4.044, lowerFloor: 4.044 - 2 * flightRise, stepRise: flightRise / 3, ceiling: 7.78, originX: -4, originZ: 2.166667, length: 20.3 };
 
 export function buildClassroomWing(parent, m) {
   const group = new T.Group(); group.name = 'Upstairs classroom wing';
   group.position.set(classroom.originX, 0, classroom.originZ); group.rotation.y = Math.PI / 2;
-  group.userData = { reference: '20260928_103154.mp4', entry: 'right turn upstairs', ...classroom }; parent.add(group);
+  group.userData = { reference: '20261013_130612.mp4', entry: 'right turn upstairs', ...classroom }; parent.add(group);
   const batches = new Map();
   function add(g, material) { if (!batches.has(material)) batches.set(material, []); batches.get(material).push(g.index ? g.toNonIndexed() : g); }
   function box(x, y, z, w, h, d, mat) {
@@ -50,18 +52,9 @@ export function buildClassroomWing(parent, m) {
   const aluminium = new T.MeshStandardMaterial({ color: '#c0bfae', metalness: .65, roughness: .36 });
   const wood = m.entranceWood.clone(); wood.color.set('#b47a4c'); wood.roughness = .57; // medium brown, as photographed (renders darker in the dim corridor)
   const plaster = m.wall.clone(); plaster.name = 'Weathered classroom plaster';
-  // Through the sliding glass the photos show the facade's cream concrete lattice with daylit lens-shaped holes
-  // (not printed film). Holes glow via the emissive map; the concrete stays matte.
-  const lattice = (glow) => texture((c, w, h) => {
-    c.fillStyle = glow ? '#4a463c' : '#d9d2bf'; c.fillRect(0, 0, w, h); // backlit cream concrete
-    for (let row = 0; row < 9; row++) for (let col = 0; col < 7; col++) {
-      const x = col * w / 7 + (row % 2) * w / 14 + w / 14, yy = row * h / 9 + h / 18, rx = w / 32, ry = h / 22;
-      c.fillStyle = glow ? '#fff' : '#f4f2ea'; c.beginPath(); c.moveTo(x, yy - ry); c.quadraticCurveTo(x + rx * 1.6, yy, x, yy + ry); c.quadraticCurveTo(x - rx * 1.6, yy, x, yy - ry); c.fill();
-      if (!glow) { c.strokeStyle = '#8f8775'; c.lineWidth = 2; c.stroke(); }
-    }
-  });
-  const patternedGlass = new T.MeshStandardMaterial({ name: 'Facade lattice seen through windows', map: lattice(false), emissive: '#fffaf0', emissiveMap: lattice(true), emissiveIntensity: .9, roughness: .9 });
-  const clearGlass = new T.MeshStandardMaterial({ color: '#c5d9d5', transparent: true, opacity: .20, roughness: .2, depthWrite: false });
+  const screenMaterial = plaster.clone(); screenMaterial.name = 'Pierced classroom concrete screens'; screenMaterial.roughness = .95;
+  const screens = new Map();
+  const clearGlass = new T.MeshStandardMaterial({ name: 'Classroom sliding glass', color: '#729b9a', transparent: true, opacity: .24, roughness: .07, depthWrite: false });
   const doorGlass = new T.MeshStandardMaterial({ color: '#899d97', roughness: .27, metalness: .1, envMapIntensity: .5 });
   function floor(x, z, w, d, y, material = stone) {
     const g = new T.PlaneGeometry(w, d); g.rotateX(-Math.PI / 2); g.translate(x, y, z);
@@ -106,25 +99,52 @@ export function buildClassroomWing(parent, m) {
       const g = new T.BoxGeometry(w, h, depth); g.translate(px, py, pz); g.applyMatrix4(transform); add(g, material);
     }
     const height = 1.48;
+    // One continuous pierced screen behind the tracks, not a pattern repeated on each glass pane.
+    if (!screens.has(width)) {
+      const shape = new T.Shape();
+      shape.moveTo(-width / 2, -height / 2); shape.lineTo(width / 2, -height / 2);
+      shape.lineTo(width / 2, height / 2); shape.lineTo(-width / 2, height / 2); shape.closePath();
+      const cols = 18, rows = 9, dx = width / cols, dy = height / rows;
+      for (let row = 0; row < rows; row++) for (let col = 0; col < cols - (row % 2); col++) {
+        const cx = -width / 2 + (col + .5 + (row % 2) / 2) * dx, cy = -height / 2 + (row + .5) * dy;
+        const hole = new T.Path();
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI / 2 - i * Math.PI / 3, px = cx + Math.cos(a) * dx * .34, py = cy + Math.sin(a) * dy * .39;
+          if (i) hole.lineTo(px, py); else hole.moveTo(px, py);
+        }
+        hole.closePath(); shape.holes.push(hole);
+      }
+      const screen = new T.ExtrudeGeometry(shape, { depth: .075, bevelEnabled: true, bevelSize: .004, bevelThickness: .004, bevelSegments: 1, steps: 1 });
+      screen.translate(0, 0, -.15); screens.set(width, screen);
+    }
+    add(screens.get(width).clone().applyMatrix4(transform), screenMaterial);
     for (const s of [-1, 1]) { part(s * width / 2, 0, .035, height + .07, aluminium); part(0, s * height / 2, width, .035, aluminium); }
+    for (const track of [-.025, .025]) for (const s of [-1, 1]) part(0, s * (height / 2 - .027), width, .014, aluminium, track, .012);
     for (let i = 0; i < 4; i++) {
-      const px = -width / 2 + (i + .5) * width / 4;
-      part(px, 0, width / 4 - .024, height - .04, patternedGlass, -.07, .008); // lattice beyond the glass
-      part(px, 0, width / 4 - .024, height - .04, clearGlass, -.02, .006);
-      part(px - width / 8, 0, .023, height, aluminium, .015);
+      const paneWidth = width / 4, px = -width / 2 + (i + .5) * paneWidth + (i === 1 ? -.65 * paneWidth : i === 2 ? .65 * paneWidth : 0);
+      const track = i % 2 ? .025 : -.025;
+      part(px, 0, paneWidth - .024, height - .07, clearGlass, track, .006);
+      for (const s of [-1, 1]) { part(px + s * paneWidth / 2, 0, .023, height - .03, aluminium, track); part(px, s * (height / 2 - .04), paneWidth, .02, aluminium, track); }
+      part(px + paneWidth / 2 - .04, -.12, .018, .13, dark, track + .025, .02);
     }
   }
   const { floor: y, ceiling } = classroom;
   const W = -.985, inner = W + .08; // window-wall centre and its corridor face
-  floor(0, -8.45, 2.17, 16.9, y);
-  floor(0, -18.85, 2.17, 2.9, classroom.lowerFloor);
-  // Two shallow steps, seen clearly on the return clip 103849 at 0-9s.
-  box(0, y - .05, -17.05, 2.17, .10, .30, stone); box(0, y - .15, -17.35, 2.17, .10, .30, stone);
+  floor(0, -8.75, 2.17, 16.3, y); // -.6 to -16.9
+  floor(0, -18.96, 2.17, 2.68, classroom.lowerFloor); // -17.62 to -20.3
+  // Three full-width risers, two treads, then the lower junction landing (photo 1 / return clip 0s).
+  for (let i = 0; i < 2; i++) {
+    const h = (2 - i) * classroom.stepRise;
+    box(0, classroom.lowerFloor + h / 2, -17.08 - i * .36, 2.17, h, .36, stone);
+  }
+  box(0, y - (flightRise + .02) / 2, -8.75, 2.17, flightRise - .02, 16.3, plaster);
+  box(0, y - classroom.stepRise / 2, -16.91, 2.17, classroom.stepRise, .02, stone);
   const sideCeiling = 7.22; // just below the west wing roof slab (7.29), whose dark underside otherwise covers it
   // Ceilings read bright white in every reference (daylight bounce off the floor and walls); a faint emissive term stands in.
   const ceilingPlaster = plaster.clone(); ceilingPlaster.name = 'Classroom ceiling plaster'; ceilingPlaster.emissive.set('#bdbab0'); ceilingPlaster.emissiveIntensity = .45;
   box(0, ceiling, -8.5, 2.35, .12, 17, ceilingPlaster);
   box(0, sideCeiling, -18.65, 2.35, .12, 3.3, ceilingPlaster);
+  box(0, (ceiling + sideCeiling) / 2, -17, 2.35, ceiling - sideCeiling, .12, ceilingPlaster);
   floor(0, 1.1, 2.17, 2.2, classroom.landing);
   // Library is beside the classroom entrance on the upper landing (094920, 12s).
   const libraryStart = new Map([...batches].map(([material, gs]) => [material, gs.length]));
@@ -136,20 +156,25 @@ export function buildClassroomWing(parent, m) {
   for (const child of group.children) if (!libraryChildren.has(child)) child.applyMatrix4(libraryTransform);
   for (const z of [.57, 2.33]) box(-1.33, (classroom.landing + ceiling) / 2, z, .14, ceiling - classroom.landing, .64, plaster);
   box(-1.33, (classroom.landing + 2.5 + ceiling) / 2, 1.45, .14, ceiling - classroom.landing - 2.5, 1.12, plaster);
-  box(0, classroom.landing + .055, .30, 2.17, .11, .3, stone); box(0, classroom.landing + .165, 0, 2.17, .11, .3, stone);
+  for (let i = 0; i < 2; i++) {
+    const h = (2 - i) * classroom.stepRise;
+    box(0, y + h / 2, -.15 - i * .30, 2.17, h, .30, stone);
+  }
+  box(0, y + (flightRise - .02) / 2, 1.1, 2.17, flightRise - .02, 2.2, plaster);
+  box(0, classroom.landing - classroom.stepRise / 2, .01, 2.17, classroom.stepRise, .02, stone);
   // Window wall aligns with the existing five pierced facade bays. It stands just inside the front
   // facade, whose blue pilasters and inner face (to x=-0.915 here) would otherwise poke into the corridor.
-  box(W, y + .63, -8.76, .16, 1.26, 18.48, plaster); // runs up to the entrance posts at z=.47
-  box(W, (y + 2.8 + ceiling) / 2, -8.76, .16, ceiling - y - 2.8, 18.48, plaster);
-  box(W, y + 2.0, .3, .16, 1.55, .34, plaster);
-  for (let i = 0; i <= 5; i++) box(W, y + 2.0, -i * 3.6, .16, 1.55, .60, plaster);
-  for (let i = 0; i < 5; i++) window(W + .085, y + 2.02, -1.8 - i * 3.6, 2.96, Math.PI / 2);
+  box(W, (classroom.lowerFloor + y + 1.08) / 2, -8.76, .16, y + 1.08 - classroom.lowerFloor, 18.48, plaster);
+  box(W, (y + 2.56 + ceiling) / 2, -8.76, .16, ceiling - y - 2.56, 18.48, plaster);
+  box(W, y + 1.82, .3, .16, 1.48, .34, plaster);
+  for (let i = 0; i <= 5; i++) box(W, y + 1.82, -i * 3.6, .16, 1.48, .64, plaster);
+  for (let i = 0; i < 5; i++) window(W + .085, y + 1.82, -1.8 - i * 3.6, 2.96, Math.PI / 2);
   const roomDark = new T.MeshStandardMaterial({ name: 'Unlit room interior', color: '#191714', roughness: 1 });
   const openings = [2.3, 5.8, 9.2, 12.6];
   let previous = 0;
   for (const u of openings) {
     const start = u - .58;
-    box(1.10, (y + ceiling) / 2, -(previous + start) / 2, .16, ceiling - y, start - previous, plaster);
+    box(1.10, (classroom.lowerFloor + ceiling) / 2, -(previous + start) / 2, .16, ceiling - classroom.lowerFloor, start - previous, plaster);
     box(1.10, (y + 2.4 + ceiling) / 2, -u, .16, ceiling - y - 2.4, 1.16, plaster);
     // Each door is a closed room front; the films do not establish the room interiors.
     const before = new Set(group.children), first = new Map([...batches].map(([m, a]) => [m, a.length]));
@@ -160,23 +185,30 @@ export function buildClassroomWing(parent, m) {
     for (const child of group.children) if (!before.has(child)) child.applyMatrix4(matrix);
     previous = u + .58;
   }
-  box(1.10, (y + ceiling) / 2, -(previous + 18) / 2, .16, ceiling - y, 18 - previous, plaster);
+  box(1.10, (classroom.lowerFloor + ceiling) / 2, -(previous + 18) / 2, .16, ceiling - classroom.lowerFloor, 18 - previous, plaster);
   // Far door and the perpendicular, lower side passage are both visible in 103154.
-  box(-1.10, (classroom.lowerFloor + sideCeiling) / 2, -19.15, .16, sideCeiling - classroom.lowerFloor, 2.3, plaster);
+  // Class Room II is beside III at the foot of the steps (new video 31-56s).
+  for (const z of [-18.285, -20.015]) box(-1.10, (classroom.lowerFloor + sideCeiling) / 2, z, .16, sideCeiling - classroom.lowerFloor, .57, plaster);
+  box(-1.10, (classroom.lowerFloor + 2.42 + sideCeiling) / 2, -19.15, .16, sideCeiling - classroom.lowerFloor - 2.42, 1.16, plaster);
+  const iiStart = new Map([...batches].map(([material, gs]) => [material, gs.length])), iiChildren = new Set(group.children);
+  door(0, classroom.lowerFloor, 0, 1.02, 'CLASS ROOM - II');
+  const iiTransform = new T.Matrix4().makeRotationY(Math.PI / 2); iiTransform.setPosition(-1.04, 0, -19.15);
+  for (const [material, gs] of batches) for (let j = iiStart.get(material) || 0; j < gs.length; j++) gs[j].applyMatrix4(iiTransform);
+  for (const child of group.children) if (!iiChildren.has(child)) child.applyMatrix4(iiTransform);
   for (const x of [-.84, .84]) box(x, (classroom.lowerFloor + sideCeiling) / 2, -20.35, .49, sideCeiling - classroom.lowerFloor, .16, plaster);
   box(0, (classroom.lowerFloor + 2.42 + sideCeiling) / 2, -20.35, 1.2, sideCeiling - classroom.lowerFloor - 2.42, .16, plaster);
   door(0, classroom.lowerFloor, -20.24, 1.08, 'CLASS ROOM - III');
-  floor(6.0, -19.15, 9.8, 2.3, classroom.lowerFloor);
+  floor(5.9925, -19.15, 9.815, 2.3, classroom.lowerFloor);
   box(6.0, sideCeiling, -19.15, 9.8, .12, 2.5, ceilingPlaster);
   box(6.0, (classroom.lowerFloor + sideCeiling) / 2, -20.4, 9.8, sideCeiling - classroom.lowerFloor, .18, plaster);
   // Window wall sits 0.3 m inside the west wing's east face, whose wall and blue pilasters otherwise show through.
   const SW = -18.27;
-  box(6.0, classroom.lowerFloor + .65, SW, 9.8, 1.3, .16, plaster);
-  box(6.0, (classroom.lowerFloor + 2.8 + sideCeiling) / 2, SW, 9.8, sideCeiling - classroom.lowerFloor - 2.8, .16, plaster);
-  for (const x of [1.2, 4.4, 7.6, 10.8]) box(x, classroom.lowerFloor + 2.03, SW, .3, 1.46, .16, plaster);
-  for (const x of [2.8, 6, 9.2]) window(x, classroom.lowerFloor + 2.03, SW - .08, 2.85, Math.PI);
+  box(6.0, classroom.lowerFloor + .54, SW, 9.8, 1.08, .16, plaster);
+  box(6.0, (classroom.lowerFloor + 2.56 + sideCeiling) / 2, SW, 9.8, sideCeiling - classroom.lowerFloor - 2.56, .16, plaster);
+  for (const x of [1.2, 4.4, 7.6, 10.8]) box(x, classroom.lowerFloor + 1.82, SW, .35, 1.48, .16, plaster);
+  for (const x of [2.8, 6, 9.2]) window(x, classroom.lowerFloor + 1.82, SW - .08, 2.85, Math.PI);
   for (const x of [2.5, 5.8, 8.9]) {
-    door(x, classroom.lowerFloor, -20.28, .96);
+    door(x, classroom.lowerFloor, -20.28, .96, x === 8.9 ? 'CLASS ROOM - I' : '', x === 8.9);
     floor(x, -19.15, .48, 2.3, classroom.lowerFloor + .002, m.tread);
   }
   // Uneven lower-wall staining is visible in the side passage; keep it flush to the plaster.
@@ -253,14 +285,14 @@ export function buildClassroomWing(parent, m) {
     tube([[.945, ceiling - .44, -u - .52], [.945, ceiling - .44, -u + .52]], .016, lamp);
   }
   // Classroom-wing entry transom and open slim-framed leaves.
-  const posts = [inner + .025, .995]; // each post sits on its wall face, never inside it
-  for (const x of posts) box(x, y + 1.35, .47, .05, 2.7, .07, dark);
+  const posts = [inner + .025, .995], entryY = classroom.landing; // entry is above the corridor
+  for (const x of posts) box(x, entryY + 1.35, .47, .05, 2.7, .07, dark);
   // Transom: black steel frame, a white panel on the left and the CLASSROOM WING board (094701 0 s, 094920 15.8 s).
-  box(0, y + 2.8, .47, 2.16, .47, .035, dark);
-  box(-.74, y + 2.8, .49, .52, .37, .01, new T.MeshStandardMaterial({ color: '#efeee6', roughness: .8 }));
-  box(-.46, y + 2.8, .48, .04, .47, .05, dark);
-  label('CLASSROOM WING', .28, y + 2.8, .50, 1.36, .36);
-  box(0, y + 2.55, .47, 2.16, .05, .07, dark);
+  box(0, entryY + 2.8, .47, 2.16, .47, .035, dark);
+  box(-.74, entryY + 2.8, .49, .52, .37, .01, new T.MeshStandardMaterial({ color: '#efeee6', roughness: .8 }));
+  box(-.46, entryY + 2.8, .48, .04, .47, .05, dark);
+  label('CLASSROOM WING', .28, entryY + 2.8, .50, 1.36, .36);
+  box(0, entryY + 2.55, .47, 2.16, .05, .07, dark);
   const leafGlass = new T.MeshStandardMaterial({ name: 'Entrance door glass', color: '#b9cbc6', transparent: true, opacity: .22, roughness: .1, depthWrite: false });
   const cream = new T.MeshStandardMaterial({ name: 'Cream door panels', color: '#dcd8c4', roughness: .7, side: T.DoubleSide });
   const panelFrame = (parent, cx, w) => { // glass above, cream panel below, in slim black steel
@@ -270,15 +302,16 @@ export function buildClassroomWing(parent, m) {
     const lower = new T.Mesh(new T.PlaneGeometry(w - .05, .88), cream); lower.position.set(cx, .5, 0); parent.add(lower);
     const upper = new T.Mesh(new T.PlaneGeometry(w - .05, 1.5), leafGlass); upper.position.set(cx, 1.72, 0); parent.add(upper);
   };
-  const sidelight = new T.Group(); sidelight.name = 'Fixed classroom entrance sidelight'; sidelight.position.set(0, y, .47); group.add(sidelight);
+  const sidelight = new T.Group(); sidelight.name = 'Fixed classroom entrance sidelight'; sidelight.position.set(0, entryY, .47); group.add(sidelight);
   panelFrame(sidelight, posts[0] + .38, .72);
   const leafWidth = posts[1] - (posts[0] + .74) - .02;
-  const leaf = new T.Group(); leaf.name = 'Open classroom entrance leaf'; leaf.position.set(posts[1], y, .46); leaf.rotation.y = -Math.PI * .49; group.add(leaf);
+  const leaf = new T.Group(); leaf.name = 'Open classroom entrance leaf'; leaf.position.set(posts[1], entryY, .46); leaf.rotation.y = -Math.PI * .49; group.add(leaf);
   panelFrame(leaf, -leafWidth / 2, leafWidth);
   const push = label('PUSH', -.12, 1.08, .03, .16, .07, '#f5f5f0', '#111'); leaf.attach(push); push.position.set(-.12, 1.08, .03); push.rotation.set(0, 0, 0);
   for (const [material, geometries] of batches) {
     const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = mesh.receiveShadow = true; group.add(mesh); geometries.forEach(g => g.dispose());
   }
+  screens.forEach(g => g.dispose());
   group.traverse(o => { if (o.isMesh) o.layers.enable(1); });
   return group;
 }

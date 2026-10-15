@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import { buildArchitecture } from '../src/architecture.js';
 import { stairs, stairFlights, terraceCovers, terraceLevels } from '../src/stair-layout.js';
+import { classroom } from '../src/classroom-wing.js';
 
 // Only texture painting is stubbed; rays inspect the complete production geometry.
 const context = new Proxy({}, { get: (_, key) => key.startsWith('create') ? () => ({ addColorStop() {} }) : () => {} });
@@ -12,6 +13,34 @@ globalThis.document = {
 const scene = new T.Scene();
 const { group, materials } = buildArchitecture(scene); scene.updateMatrixWorld(true);
 const hits = (eye, direction, far = 10) => new T.Raycaster(new T.Vector3(...eye), new T.Vector3(...direction), 0, far).intersectObject(group, true);
+const wing = scene.getObjectByName('Upstairs classroom wing');
+const wingHits = (eye, direction, far = 2) => hits(wing.localToWorld(new T.Vector3(...eye)).toArray(), new T.Vector3(...direction).transformDirection(wing.matrixWorld).toArray(), far);
+const rise = classroom.stepRise;
+assert.ok(Math.abs(rise - .18) < 1e-9, 'Both classroom flights match the user-confirmed ground-floor right-wing rise');
+for (const [z, expected] of [[1, classroom.landing], [-.15, classroom.floor + 2 * rise], [-.45, classroom.floor + rise], [-1, classroom.floor], [-16.8, classroom.floor], [-17.08, classroom.lowerFloor + 2 * rise], [-17.44, classroom.lowerFloor + rise], [-18.5, classroom.lowerFloor]]) {
+  for (const x of [-.82, 0, .86]) {
+    const hit = wingHits([x, 4.8, z], [0, -1, 0])[0];
+    assert.ok(hit && Math.abs(hit.point.y - expected) < .001, `Classroom floor/step at ${x}, ${z} is unobstructed and at ${expected}`);
+  }
+}
+for (const x of [1.084, 1.086, 1.095, 2, 6, 10]) {
+  const hit = wingHits([x, 4.8, -19.15], [0, -1, 0])[0];
+  assert.ok(hit && Math.abs(hit.point.y - classroom.lowerFloor) < .005, 'Side-passage floor has no legacy slab cutting across it');
+}
+for (let z = -17.63; z > -20.1; z -= .025) {
+  const hit = wingHits([0, classroom.lowerFloor + 1.65, z], [0, -1, 0])[0];
+  assert.ok(hit && Math.abs(hit.point.y - classroom.lowerFloor) < .005, `No shell lintel crosses the lower junction at ${z}`);
+}
+for (const [z, bottom, top] of [[0, classroom.floor + 2 * rise, classroom.landing], [-.30, classroom.floor + rise, classroom.floor + 2 * rise], [-.60, classroom.floor, classroom.floor + rise], [-16.9, classroom.lowerFloor + 2 * rise, classroom.floor], [-17.26, classroom.lowerFloor + rise, classroom.lowerFloor + 2 * rise], [-17.62, classroom.lowerFloor, classroom.lowerFloor + rise]]) {
+  for (const x of [-.82, 0, .86]) assert.ok(wingHits([x, (bottom + top) / 2, z - .025], [0, 0, 1], .05).length, `Closed classroom riser at ${z}`);
+}
+const opaque = found => found.filter(h => !h.object.material.transparent);
+assert.ok(wingHits([0, 7.5, -16.8], [0, 0, -1], .3).some(h => h.object.material.name === 'Classroom ceiling plaster'), 'Ceiling transition has a closed vertical soffit');
+assert.equal(wingHits([0, 3.9, -8], [-1, 0, 0], 1)[0]?.object.material.name, 'Weathered classroom plaster', 'Old exterior blue trim does not protrude through the corridor wall');
+assert.equal(opaque(wingHits([0, classroom.floor + 1.82, -1.8 - 2.96 / 36], [-1, 0, 0], 1.4)).length, 0, 'Main screen hole really opens outdoors');
+assert.ok(opaque(wingHits([0, classroom.floor + 1.82, -1.8], [-1, 0, 0], 1.4)).some(h => h.object.material.name === 'Pierced classroom concrete screens'), 'Concrete remains between the openings');
+assert.equal(opaque(wingHits([6 + 2.85 / 36, classroom.lowerFloor + 1.82, -19.15], [0, 0, 1], 1.4)).length, 0, 'Return-passage screen hole really opens outdoors');
+assert.ok(!scene.getObjectsByProperty('isMesh', true).some(o => o.material.name === 'Facade lattice seen through windows'), 'No glowing opaque lattice image remains');
 for (const x of [-2.3, 2.3]) {
   const glassHits = (z, direction) => hits([x, 2.3, z], [0, 0, direction], 3).filter(hit => [materials.entranceReflectiveGlass, materials.entranceTintedGlass].includes(hit.object.material));
   assert.deepEqual(glassHits(9, -1).map(hit => hit.object.material), [materials.entranceReflectiveGlass], 'Outside sees only the reflective face');

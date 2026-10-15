@@ -2,7 +2,7 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint, groundSpine, seminarPassage, hallWindows } from './footprint.js';
 import { buildEntranceHall } from './entrance-hall.js';
-import { buildClassroomWing } from './classroom-wing.js';
+import { buildClassroomWing, classroom } from './classroom-wing.js';
 import { buildTerraces } from './terraces.js';
 import { stairs, terraceLevels } from './stair-layout.js';
 
@@ -186,14 +186,20 @@ export function buildArchitecture(scene) {
   }
   function face(cx, cz, rotation, width, height, bays, type, closedGround = false, openGround = false, onlyFloor = null) {
     const transform = new T.Matrix4().compose(new T.Vector3(cx, 0, cz), quaternion.setFromAxisAngle(new T.Vector3(0, 1, 0), rotation), new T.Vector3(1, 1, 1));
-    let facade = true;
+    let facade = true, belowClassroomJunction = false;
     const b = (x, y, z, w, h, d, material) => {
       const emit = (left, right, top = Infinity) => {
         const bottom = y - h / 2, clippedTop = Math.min(y + h / 2, top);
         if (clippedTop > bottom && right > left) box((left + right) / 2, (bottom + clippedTop) / 2, z, right - left, clippedTop - bottom, d, material, transform);
       };
+      // Close the wall below the lower classroom landing, never across its walking space.
+      if (belowClassroomJunction && x - w / 2 < cz - 1.083333) {
+        const split = Math.min(x + w / 2, cz - 1.083333);
+        emit(x - w / 2, split, classroom.lowerFloor - .06);
+        emit(split, x + w / 2);
+      }
       // The lowered classroom roof must not expose the old storey's piers or lintels.
-      if (facade && height === 9.4 && Math.abs(cx) >= 22) emit(x - w / 2, x + w / 2, terraceLevels.leftWing - .12);
+      else if (facade && height === 9.4 && Math.abs(cx) >= 22) emit(x - w / 2, x + w / 2, terraceLevels.leftWing - .12);
       else if (facade && type === 'low-corridor' && rotation === 0 && x - w / 2 < -21.05 - cx) {
         const split = Math.min(x + w / 2, -21.05 - cx);
         emit(x - w / 2, split, terraceLevels.leftWing - .12); emit(split, x + w / 2);
@@ -206,6 +212,14 @@ export function buildArchitecture(scene) {
     const corridor = type === 'corridor' || type === 'gate-return';
     for (let f = 0; f < floors; f++) {
       if (onlyFloor !== null && f !== onlyFloor) continue;
+      belowClassroomJunction = f === 0 && type === 'room' && cx < 0 && rotation === Math.PI / 2;
+      if (f === 1 && type === 'low-corridor' && rotation === 0) {
+        // The interior owns the actual openings and pierced screens, including their exterior faces.
+        // Keep the blue structural strips; a second generic facade would obstruct the new windows.
+        for (let j = 0; j <= bays; j++) b(-width / 2 + j * bay, 5.7, .05, .3, 3.4, .45, m.blue);
+        b(0, 7.9, .1, width + .24, .19, .63, m.trim);
+        continue;
+      }
       // The filmed upstairs classroom passage supplies the west tower opening and return windows.
       if (type === 'tower-side' && (f === 1 && cx < 0 || f === 2)) {
         const bottom = f * floorH, top = (f + 1) * floorH;
@@ -224,7 +238,7 @@ export function buildArchitecture(scene) {
           face(cx, (a + c) / 2, rotation, c - a, height, Math.max(1, Math.round((c - a) / 3.5)), type, closedGround, openGround, 1);
         }
         // Continue the opening through the corridor junction, not just the window band.
-        box(cx, 4.032, -2.781667, .32, .064, 12.063333, m.wall);
+        box(cx, classroom.lowerFloor - .032, -2.781667, .32, .064, 12.063333, m.wall);
         box(cx, 7.45, -2.781667, .32, .10, 12.063333, m.wall);
         continue;
       }
@@ -331,17 +345,20 @@ export function buildArchitecture(scene) {
       }
       b(width / 2, y + floorH / 2, 0, .6, floorH, .32, m.wall);
       b(width / 2, y + floorH / 2, .05, .3, floorH, .45, m.blue);
-      if (f !== 0 || type !== 'west' && type !== 'east-wing') b(0, y + floorH - .1, .1, width + .24, .19, .63, m.trim);
+      if (f === 0 && type === 'low-corridor' && rotation === 0) {
+        // Keep the exterior trim's outer edge, but not its old intrusion into the lowered corridor.
+        b(0, y + floorH - .1, .175, width + .24, .19, .48, m.trim);
+      } else if (f !== 0 || type !== 'west' && type !== 'east-wing') b(0, y + floorH - .1, .1, width + .24, .19, .63, m.trim);
       if (f === 0 && !westOuter) {
         if (type === 'room' && cx < 0 && rotation === Math.PI / 2) {
           const rear = cz - width / 2, junction = 1.083333;
-          box(cx + .19, y + floorH + .45, (rear + junction) / 2, .075, .35, junction - rear, m.blue);
-        } else b(0, y + floorH + .45, .19, width, .35, .075, m.blue);
+          box(cx + .19, classroom.lowerFloor + .45, (rear + junction) / 2, .075, .35, junction - rear, m.blue);
+        } else b(0, type === 'low-corridor' && rotation === 0 ? classroom.floor + .45 : y + floorH + .45, .19, width, .35, .075, m.blue);
       }
       if (f === 0 && (westWindow || type === 'east-wing')) b(0, 3.15, .38, width + .25, .14, 1.05, m.trim);
     }
     if (onlyFloor !== null) return;
-    facade = false;
+    facade = false; belowClassroomJunction = false;
     const roofY = type.startsWith('tower') ? stairs.top : height === 9.4
       ? (Math.abs(cx) >= 22 ? terraceLevels.leftWing : terraceLevels.leftStrip)
       : height === 13.4 ? (cx > 4 && cx < 22 ? terraceLevels.rightStrip : terraceLevels.rightWing) : height - 1.4;
@@ -413,10 +430,13 @@ export function buildArchitecture(scene) {
             box(sx, 2, (win.z1 + 7) / 2, .32, 4, 7 - win.z1, m.wall);
             box(sx, win.y0 / 2, wz, .32, win.y0, ww, m.wall);
             box(sx, (win.y1 + 4) / 2, wz, .32, 4 - win.y1, ww, m.wall);
-            box(x + side * w / 2, 3.8, groundSpine.corridorCenter, .32, .4, groundSpine.corridorDepth, m.wall);
+            const passageLintelTop = side < 0 ? classroom.floor - .05 : 4;
+            box(x + side * w / 2, passageLintelTop - .2, groundSpine.corridorCenter, .32, .4, groundSpine.corridorDepth, m.wall);
             // Tower storeys are 4.2 high; join the 4.0-high entrance shell to the upper facade.
             const storey = (h - 1.4) / Math.round((h - 1.4) / 4);
-            box(x + side * w / 2, (4 + storey) / 2, z, .32, storey - 4, d, m.wall);
+            if (side < 0) {
+              for (const [a, b] of [[z - d / 2, 1.083333], [3.25, z + d / 2]]) box(x + side * w / 2, (4 + storey) / 2, (a + b) / 2, .32, storey - 4, b - a, m.wall);
+            } else box(x + side * w / 2, (4 + storey) / 2, z, .32, storey - 4, d, m.wall);
           }
         }
       }
@@ -426,7 +446,16 @@ export function buildArchitecture(scene) {
     for (let y = 4; y < roofBase - .001; y += 4) {
       // Every stair level needs an opening, including the final roof return.
       if (type === 'tower') box(x, y - .07, 4.15, w, .2, 5.7, m.roof);
-      else box(x, y - .07, z, w, .2, d, m.roof);
+      else if (type === 'low-corridor' && y === 4) {
+        // The classroom floor descends below this legacy slab. Retain it only behind the room wall.
+        box(x, y - .07, (-d / 2 + 1.08) / 2, w, .2, 1.08 + d / 2, m.roof);
+      } else if (type === 'west' && y === 4) {
+        const left = x - w / 2, right = x + w / 2, passageLeft = -24.5, rear = -8.85, front = 3.25;
+        box((left + passageLeft) / 2, y - .07, z, passageLeft - left, .2, d, m.roof);
+        box((passageLeft + right) / 2, y - .07, (-d / 2 + rear) / 2, right - passageLeft, .2, rear + d / 2, m.roof);
+        box((passageLeft + right) / 2, y - .07, (front + d / 2) / 2, right - passageLeft, .2, d / 2 - front, m.roof);
+        box((passageLeft + right) / 2, classroom.lowerFloor - .12, (rear + front) / 2, right - passageLeft, .16, front - rear, m.roof);
+      } else box(x, y - .07, z, w, .2, d, m.roof);
     }
     if (type === 'tower') box(x, stairs.top - .22, 4.15, w + .35, .2, 5.7, m.roof);
     else if (type === 'low-corridor') box(-12.4375, terraceLevels.leftStrip - .22, z, 17.225, .2, d + .35, m.roof);

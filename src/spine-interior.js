@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint, groundSpine as layout, seminarPassage as passage } from './footprint.js';
+import { classroom } from './classroom-wing.js';
 
 // Visible circulation and closed room fronts only. Dimensions remain interpreted.
 export function buildSpineInterior(parent, m) {
@@ -155,7 +156,13 @@ export function buildSpineInterior(parent, m) {
     let from = wallStart;
     for (const x of right ? doorCenters : []) { box((from + x - .67) / 2, y + .09, front + .019, x - .67 - from, .18, .036, skirting); from = x + .67; }
     box((from + wallEnd) / 2, y + .09, front + .019, wallEnd - from, .18, .036, skirting);
-    box((start + end) / 2, 3.86, layout.corridorCenter, end - start, .16, layout.corridorDepth, m.wall);
+    if (right) box((start + end) / 2, 3.86, layout.corridorCenter, end - start, .16, layout.corridorDepth, m.wall);
+    else {
+      // Follow the upstairs classroom levels instead of leaving the old ceiling through its floor.
+      const stepStart = classroom.originX - 16.9;
+      box((start + stepStart) / 2, classroom.lowerFloor - .24, layout.corridorCenter, stepStart - start, .16, layout.corridorDepth, m.wall);
+      box((stepStart + end) / 2, classroom.floor - .24, layout.corridorCenter, end - stepStart, .16, layout.corridorDepth, m.wall);
+    }
   }
   box(13, base + .10, layout.front - .17, 18, .20, .035, skirting);
   box(13, layout.screenBottom - .025, layout.front - .06, 18, .05, .35, skirting);

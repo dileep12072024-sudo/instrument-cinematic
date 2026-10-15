@@ -1,6 +1,32 @@
 # Agent Handoff
 
-Updated: 2026-10-12. Read this before changing the project.
+Updated: 2026-10-15. Read this before changing the project.
+
+## Classroom Correction (2026-10-15)
+
+- New video: `Pictures/Internal_2/20261013_130612.mp4`; seven Downloads corridor photos.
+  Timestamp observations and limitations are in `docs/classroom-wing.md` (October 15).
+- User confirmed the classroom entrance and Class II/III junction flights must match the
+  ground-floor right-wing count and height: **three 18 cm rises, 54 cm per flight**.
+  From the entrance, descend to the main corridor, then descend to the junction:
+  Class Room II left, III straight ahead, side passage to the right.
+- `src/classroom-wing.js`: landing 4.044, corridor 3.504, lower junction/side passage 2.964.
+  Preserve those relationships, not the obsolete 4.264/4.064 values. Heights derive from
+  `groundSpine`; `entrance-walk.js` follows them without changing panorama input behavior.
+- The old first-floor slabs, west ground-passage ceiling and tower lintel intersected these
+  levels. Scoped changes in `architecture.js` / `spine-interior.js` clear those intersections.
+- Windows now have actual pierced concrete screens, recessed behind aluminium sliding frames
+  and partly open tinted glass. Do not restore the old glowing opaque lattice textures or
+  duplicate generic exterior screens across these openings. The classroom owns these bands.
+- Added Class Room II at the left of the junction; III stays ahead. Keep current no-debris,
+  no-unseen-room-interiors policy. Blender terrain/environment and raw media are untouched.
+- Geometry regressions are in `scripts/check-building-clearances.mjs`; focused browser check
+  is `scripts/check-classroom-browser.mjs`. Software WebGL screenshots are visual checks,
+  not real-GPU performance measurements. Both pass, including 501 walking-route positions,
+  desktop/mobile canvas checks and no runtime/shader errors. `npm run build`,
+  `npm run test:geometry`, `npm run test:interaction` and `check-hall-side-walls.mjs` pass.
+- Closed the ceiling step and the floor seam at the junction; kept the exterior blue trim
+  outside the interior wall. Do not move the entrance or flatten either stair flight.
 
 ## Hall Side Walls From Photographs (2026-10-14, latest, awaiting user approval)
 
