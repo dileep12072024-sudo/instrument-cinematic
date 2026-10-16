@@ -233,8 +233,10 @@ export function buildArchitecture(scene) {
       }
       if (f === 2 && type === 'corridor' && rotation === 0) continue;
       if (f === 1 && onlyFloor === null && type === 'room' && cx < 0 && rotation === Math.PI / 2) {
-        // The classroom return owns the whole inner facade up to the rear shell, not a short inset room.
-        const rear = cz - width / 2, front = 3.25;
+        // The original end partition separates the corridor from the owner-confirmed rear room.
+        const rear = classroom.originZ - classroomPassage.end + .02, front = 3.25;
+        const roomRear = cz - width / 2;
+        face(cx, (roomRear + rear) / 2, rotation, rear - roomRear, height, Math.max(1, Math.round((rear - roomRear) / 3.5)), type, closedGround, openGround, 1);
         box(cx, classroom.lowerFloor - .032, (rear + front) / 2, .32, .064, front - rear, m.wall);
         box(cx, 7.45, (rear + front) / 2, .32, .10, front - rear, m.wall);
         continue;

@@ -192,3 +192,34 @@ Regression checks cover the rear-shell alignment, blank wall before the windows,
 full-height corner closure, and uninterrupted floor through the extended return.
 Windows Chrome/Intel UHD checks pass all 501 route positions and seven desktop
 plus two phone views, with nonblank canvas pixels and no runtime/shader errors.
+
+## October 16 Owner Clarification: Restore the Rear Room
+
+This supersedes the previous rear-shell extension. The owner confirmed that a
+small room does exist behind the passage end. Restored the partition to local
+x=11 (world z=-8.833333), with its own room slab and exterior facade windows
+behind it. The walk route and corridor surfaces stop before the partition.
+The sealed corner, three-riser flights, plaque and quieter plaster are retained.
+The temporary ceiling changes in the separately untracked ground-floor west
+wing were undone: its original rear room/ceiling arrangement now fits again.
+
+Reviewed `Videos/Class III/Class III.mp4` (47.12 s) first at 24 chronological
+timestamps, then all three photos in the same folder. This is frame-based
+review. The clip primarily shows the classroom interior, not the Class IV end
+of the corridor. Photos 112037 and 112042 show two timber windows between the
+Class III entrance and a plain side door. The owner's circled false doorway
+is replaced by a window; two window centres are now x=2.5 and 4.6, followed by
+the plain door at x=6.5. Class IV returns near the original end, at x=8.9.
+Timber sash crosspieces reproduce the three-pane-high framing in these photos.
+
+The opposite sliding bays fit the restored shorter corridor while retaining a
+plain wall after the turn. Exact spacing is estimated, not surveyed. The older
+October 13 footage appears to show a narrow grille beyond Class IV; the new
+folder does not resolve the owner's uncertainty about this opening. It is
+retained pending clarification rather than silently treating an inference as fact.
+Stored panels and debris remain omitted. New reference files are not published.
+
+Regression rays verify the restored partition and separate rear room floor,
+two window sills instead of the false door, closed corner and unobstructed steps.
+The browser check adds a reverse view toward Class III for inspecting the
+corrected window from the owner's screenshot direction.

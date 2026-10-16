@@ -1,15 +1,14 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { footprint, groundSpine } from './footprint.js';
+import { groundSpine } from './footprint.js';
 
 // Heights are reference-based estimates; the entrance and junction both descend into the wing.
 const flightRise = groundSpine.rightFloor - groundSpine.hallFloor;
 export const classroom = { floor: 4.044 - flightRise, landing: 4.044, lowerFloor: 4.044 - 2 * flightRise, stepRise: flightRise / 3, ceiling: 7.78, originX: -4, originZ: 2.166667, length: 20.3 };
-const west = footprint.find(part => part.type === 'west');
 export const classroomPassage = {
-  start: 1.085, end: classroom.originZ - (west.z - west.depth / 2 + .16),
-  windowWall: -18.27, windowWidth: 3, windows: [8.2, 11.6, 15],
-  doors: [2.5, 8.3, 13.8], grilles: [5.3, 10.9, 15.5],
+  start: 1.085, end: 11, // owner confirmed the small room behind this original partition
+  windowWall: -18.27, windowWidth: 1.95, windows: [4.8, 7.1, 9.4],
+  doors: [6.5, 8.9], grilles: [2.5, 4.6, 10.1],
 };
 
 export function buildClassroomWing(parent, m) {
@@ -56,7 +55,7 @@ export function buildClassroomWing(parent, m) {
   const stone = new T.MeshStandardMaterial({ name: 'Classroom veined stone tiles', map: stoneMap, roughness: .32, envMapIntensity: .22 });
   const dark = new T.MeshStandardMaterial({ color: '#242b29', roughness: .48, metalness: .35 });
   const aluminium = new T.MeshStandardMaterial({ color: '#c0bfae', metalness: .65, roughness: .36 });
-  const wood = m.entranceWood.clone(); wood.color.set('#b47a4c'); wood.roughness = .57; // medium brown, as photographed (renders darker in the dim corridor)
+  const wood = m.entranceWood.clone(); wood.name = 'Classroom timber frames and doors'; wood.color.set('#b47a4c'); wood.roughness = .57; // medium brown, as photographed (renders darker in the dim corridor)
   const plasterMap = texture((c, w, h) => {
     c.fillStyle = '#deddd2'; c.fillRect(0, 0, w, h);
     for (let i = 0; i < 7000; i++) {
@@ -293,19 +292,20 @@ export function buildClassroomWing(parent, m) {
     box(c, mid, wz + .004, w - .06, h - .06, .008, curtain);
     for (const dx of [-w / 2, -w / 6, w / 6, w / 2]) box(c + dx, mid, wz + .03, .07, h, .06, wood);
     for (const dy of [-h / 2, h / 2]) box(c, mid + dy, wz + .03, w + .07, .07, .06, wood);
+    for (const dy of [-h / 6, h / 6]) box(c, mid + dy, wz + .015, w - .07, .035, .025, wood);
     for (let dx = -w / 2 + .1; dx < w / 2 - .05; dx += .1) box(c + dx, mid, wz + .045, .012, h - .07, .012, brass);
     for (let dy = -h / 2 + .16; dy < h / 2 - .05; dy += .16) box(c, mid + dy, wz + .045, w - .07, .012, .012, brass);
     for (const s of [-1, 1]) { box(c + s * .26, sideCeiling - .7, wz + .012, .05, .40, .024, plaster); box(c, sideCeiling - .7 + s * .2, wz + .012, .52, .05, .024, plaster); }
   }
-  for (const c of [7, 14.6]) {
+  for (const c of [5.65, 9.7]) {
     box(c, lf + 2.75, wz + .08, .42, .55, .16, panelGrey);
     box(c, lf + 2.2, wz + .07, .30, .36, .14, panelWhite);
     tube([[c, lf + 3.02, wz + .05], [c, sideCeiling - .28, wz + .05]], .014, aluminium);
   }
   const lightTile = new T.MeshStandardMaterial({ name: 'Light grey square floor tiles', color: '#b9b6ae', roughness: .35 });
   const darkBand = stone.clone(); darkBand.color.set('#55524d');
-  for (const x of [5, 9.2, 13.2]) floor(x, -19.15, .48, 2.25, lf + .002, lightTile);
-  floor(9.9, -19.15, .9, 2.25, lf + .002, darkBand);
+  for (const x of [4.9, 7.4, 10.2]) floor(x, -19.15, .48, 2.25, lf + .002, lightTile);
+  floor(6.1, -19.15, .9, 2.25, lf + .002, darkBand);
   const board = texture((c, w, h) => { c.fillStyle = '#f2f1ea'; c.fillRect(0, 0, w, h); c.fillStyle = '#28324a'; c.fillRect(12, h * .2, w * .55, h * .16); c.fillStyle = '#5b6274'; c.fillRect(12, h * .52, w * .72, h * .1); c.fillRect(12, h * .7, w * .4, h * .1); }, 256, 96);
   const boardMat = new T.MeshStandardMaterial({ map: board, roughness: .7 });
   const face = 1.02; // room-side wall face (local x)
@@ -343,7 +343,7 @@ export function buildClassroomWing(parent, m) {
   for (const u of [0, 7.1, 14.8, 18.8]) box(0, (u < 18 ? ceiling : sideCeiling) - .14, -u, 2.16, .30, .22, plaster);
   const lamp = new T.MeshStandardMaterial({ color: '#e9eee5', emissive: '#dceada', emissiveIntensity: 1.4 });
   for (let j = 0; j < 3; j++) tube([[start, sideCeiling - .28 - j * .045, wz + .04], [end - .1, sideCeiling - .28 - j * .045, wz + .04]], .012, aluminium);
-  for (const x of [5.3, 10.9]) {
+  for (const x of [4.6, 8.1]) {
     box(x, sideCeiling - .48, wz + .055, 1.14, .075, .07, aluminium);
     tube([[x - .52, sideCeiling - .50, wz + .11], [x + .52, sideCeiling - .50, wz + .11]], .016, lamp);
   }

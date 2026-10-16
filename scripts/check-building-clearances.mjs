@@ -44,10 +44,18 @@ for (const [z, expected] of [[1, classroom.landing], [-.15, classroom.floor + 2 
   }
 }
 const west = footprint.find(part => part.type === 'west');
-assert.ok(Math.abs(classroom.originZ - classroomPassage.end - (west.z - west.depth / 2 + .16)) < .001, 'Passage reaches the rear shell with no extra room behind its end wall');
-for (const x of [1.084, 1.086, 1.095, 2, 6, 10, 12, 15, 16.8]) {
+assert.equal(classroomPassage.end, 11, 'Owner-confirmed rear room retains the original corridor partition');
+assert.ok(classroom.originZ - classroomPassage.end - (west.z - west.depth / 2) > 6, 'Small rear room remains between the partition and rear shell');
+for (const x of [1.084, 1.086, 1.095, 2, 6, 10, 10.8]) {
   const hit = wingHits([x, 4.8, -19.15], [0, -1, 0])[0];
   assert.ok(hit && Math.abs(hit.point.y - classroom.lowerFloor) < .005, 'Side-passage floor has no legacy slab cutting across it');
+}
+const rearRoomFloor = wingHits([13, 5.7, -19.15], [0, -1, 0], 3)[0];
+assert.ok(rearRoomFloor && Math.abs(rearRoomFloor.point.y - 4.03) < .005, 'The rear room retains its own upper slab, not an extension of the corridor');
+assert.deepEqual(classroomPassage.grilles.filter(x => x < classroomPassage.doors[0]), [2.5, 4.6], 'Two Class III windows precede its plain side door');
+for (const x of [2.5, 4.6]) {
+  assert.equal(wingHits([x, classroom.lowerFloor + .5, -19.15], [0, 0, -1], 1.5)[0]?.object.material.name, 'Weathered classroom plaster', 'Solid sill replaces the false full-height doorway');
+  assert.equal(wingHits([x, classroom.lowerFloor + 1.66, -19.15], [0, 0, -1], 1.5)[0]?.object.material.name, 'Maroon room curtains behind grilles', 'Timber/grille window occupies the corrected opening');
 }
 for (let z = -17.63; z > -20.1; z -= .025) {
   const hit = wingHits([0, classroom.lowerFloor + 1.65, z], [0, -1, 0])[0];
@@ -62,7 +70,7 @@ assert.equal(wingHits([0, 3.9, -8], [-1, 0, 0], 1)[0]?.object.material.name, 'We
 assert.equal(opaque(wingHits([0, classroom.floor + 1.82, -1.8 - 2.96 / 36], [-1, 0, 0], 1.4)).length, 0, 'Main screen hole really opens outdoors');
 assert.ok(opaque(wingHits([0, classroom.floor + 1.82, -1.8], [-1, 0, 0], 1.4)).some(h => h.object.material.name === 'Pierced classroom concrete screens'), 'Concrete remains between the openings');
 assert.equal(opaque(wingHits([classroomPassage.windows[1] + classroomPassage.windowWidth / 36, classroom.lowerFloor + 1.82, -19.15], [0, 0, 1], 1.4)).length, 0, 'Return-passage screen hole really opens outdoors');
-for (const x of [1.2, 2, 4, 6.5]) {
+for (const x of [1.2, 2, 3, 3.7]) {
   assert.equal(wingHits([x, classroom.lowerFloor + 1.82, -19.15], [0, 0, 1], 1.4)[0]?.object.material.name, 'Weathered classroom plaster', 'Plain wall precedes the first return window');
 }
 for (const z of [-18.05, -18.15, -18.25]) for (const height of [.3, 1.5, 2.8]) {
