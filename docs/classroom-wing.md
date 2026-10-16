@@ -167,3 +167,28 @@ errors. The production build passes (existing large-chunk warning remains). Init
 software-rendered attempts hit the test memory cap or were interrupted by live-source reloads;
 the final run used an isolated release snapshot. This validates rendering, not a frame-rate
 guarantee or exact surveyed dimensions.
+
+## October 16: Extend the Return to the Rear Shell
+
+Rechecked October 13 frames at 58-64s and 80-96s against the owner's two screenshots.
+The previous return stopped near world z=-8.83, leaving an unintended compartment
+between it and the rear shell. Its solid end now reaches the rear inner boundary
+at z=-14.84. The floor, ceiling, walls and walk route extend together; the old
+4 m slab and generic facade are removed only within this passage footprint.
+
+The window run now follows a plain wall after the turn. Three sliding bays are
+centred at local x=8.2, 11.6 and 15; room fronts and grilles are spaced along the
+extended run. These positions remain proportional estimates from the footage.
+The main room wall continues through the return-wall thickness, closing the
+corner slit. Both three-riser flights and the entrance position remain unchanged.
+
+Added the observed high screened end-wall recess and upper conduit/tube-light
+runs. Lower-wall wear stays below the windows; classroom plaster uses a quieter
+procedural off-white finish. No reference photographs or videos are shipped.
+The separately in-progress west-wing model's rear ceiling/beam was lowered to
+the underside of the extended classroom slab to prevent it penetrating upstairs.
+
+Regression checks cover the rear-shell alignment, blank wall before the windows,
+full-height corner closure, and uninterrupted floor through the extended return.
+Windows Chrome/Intel UHD checks pass all 501 route positions and seven desktop
+plus two phone views, with nonblank canvas pixels and no runtime/shader errors.

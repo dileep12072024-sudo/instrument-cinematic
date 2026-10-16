@@ -50,7 +50,7 @@ try {
   });
   await writeFile('artifacts/classroom-review/route.json', JSON.stringify(failures, null, 2));
   assert.deepEqual(failures, [], 'Camera must remain at walking height across both stair transitions');
-  for (const [progress, name, reverse] of [[0, 'entry', false], [350, 'main', false], [630, 'three-steps', true], [700, 'junction', false], [860, 'side', false], [1000, 'end-wall', false]]) {
+  for (const [progress, name, reverse] of [[0, 'entry', false], [350, 'main', false], [630, 'three-steps', true], [700, 'junction', false], [780, 'corner', false], [860, 'side', false], [1000, 'end-wall', false]]) {
     await page.locator('#walk-progress').evaluate((e, p) => { e.value = p; e.dispatchEvent(new Event('input')); }, progress);
     const colors = await page.evaluate(reverse => {
       __advance(); const { renderer, scene, camera } = __portrait;

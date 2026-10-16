@@ -2,7 +2,7 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint, groundSpine, seminarPassage, hallWindows } from './footprint.js';
 import { buildEntranceHall } from './entrance-hall.js';
-import { buildClassroomWing, classroom } from './classroom-wing.js';
+import { buildClassroomWing, classroom, classroomPassage } from './classroom-wing.js';
 import { buildTerraces } from './terraces.js';
 import { stairs, terraceLevels } from './stair-layout.js';
 
@@ -233,13 +233,10 @@ export function buildArchitecture(scene) {
       }
       if (f === 2 && type === 'corridor' && rotation === 0) continue;
       if (f === 1 && onlyFloor === null && type === 'room' && cx < 0 && rotation === Math.PI / 2) {
-        // Preserve the original facade outside the filmed side-passage window band.
-        for (const [a, c] of [[cz - width / 2, -8.813333]]) {
-          face(cx, (a + c) / 2, rotation, c - a, height, Math.max(1, Math.round((c - a) / 3.5)), type, closedGround, openGround, 1);
-        }
-        // Continue the opening through the corridor junction, not just the window band.
-        box(cx, classroom.lowerFloor - .032, -2.781667, .32, .064, 12.063333, m.wall);
-        box(cx, 7.45, -2.781667, .32, .10, 12.063333, m.wall);
+        // The classroom return owns the whole inner facade up to the rear shell, not a short inset room.
+        const rear = cz - width / 2, front = 3.25;
+        box(cx, classroom.lowerFloor - .032, (rear + front) / 2, .32, .064, front - rear, m.wall);
+        box(cx, 7.45, (rear + front) / 2, .32, .10, front - rear, m.wall);
         continue;
       }
       // The entrance is an actual opening, not doors placed over a solid ground-floor wall.
@@ -450,7 +447,7 @@ export function buildArchitecture(scene) {
         // The classroom floor descends below this legacy slab. Retain it only behind the room wall.
         box(x, y - .07, (-d / 2 + 1.08) / 2, w, .2, 1.08 + d / 2, m.roof);
       } else if (type === 'west' && y === 4) {
-        const left = x - w / 2, right = x + w / 2, passageLeft = -24.5, rear = -8.85, front = 3.25;
+        const left = x - w / 2, right = x + w / 2, passageLeft = -24.5, rear = classroom.originZ - classroomPassage.end, front = 3.25;
         box((left + passageLeft) / 2, y - .07, z, passageLeft - left, .2, d, m.roof);
         box((passageLeft + right) / 2, y - .07, (-d / 2 + rear) / 2, right - passageLeft, .2, rear + d / 2, m.roof);
         box((passageLeft + right) / 2, y - .07, (front + d / 2) / 2, right - passageLeft, .2, d / 2 - front, m.roof);

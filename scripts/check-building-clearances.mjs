@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import * as T from 'three';
 import { buildArchitecture } from '../src/architecture.js';
 import { stairs, stairFlights, terraceCovers, terraceLevels } from '../src/stair-layout.js';
-import { classroom } from '../src/classroom-wing.js';
+import { classroom, classroomPassage } from '../src/classroom-wing.js';
+import { footprint } from '../src/footprint.js';
 
 // Only texture painting is stubbed; rays inspect the complete production geometry.
 const context = new Proxy({}, { get: (_, key) => key.startsWith('create') ? () => ({ addColorStop() {} }) : () => {} });
@@ -30,9 +31,9 @@ for (const x of [-1, .27, .65, 1.04]) {
 }
 for (const height of [.15, 1, 1.8, 2.4]) {
   for (const z of [-19.8, -19.15, -18.6]) {
-    const hit = wingHits([8.8, classroom.lowerFloor + height, z], [1, 0, 0], 3)[0];
+    const hit = wingHits([classroomPassage.end - 2.2, classroom.lowerFloor + height, z], [1, 0, 0], 3)[0];
     assert.equal(hit?.object.material.name, 'Weathered classroom plaster', 'No stored panel, false doorway or debris blocks the passage end');
-    assert.ok(Math.abs(hit.distance - 2.125) < .001, 'The passage ends at its solid wall, not an invented room recess');
+    assert.ok(Math.abs(hit.distance - 2.12) < .001, 'The passage ends at its solid wall, not an invented room recess');
   }
 }
 assert.ok(Math.abs(rise - .18) < 1e-9, 'Both classroom flights match the user-confirmed ground-floor right-wing rise');
@@ -42,7 +43,9 @@ for (const [z, expected] of [[1, classroom.landing], [-.15, classroom.floor + 2 
     assert.ok(hit && Math.abs(hit.point.y - expected) < .001, `Classroom floor/step at ${x}, ${z} is unobstructed and at ${expected}`);
   }
 }
-for (const x of [1.084, 1.086, 1.095, 2, 6, 10]) {
+const west = footprint.find(part => part.type === 'west');
+assert.ok(Math.abs(classroom.originZ - classroomPassage.end - (west.z - west.depth / 2 + .16)) < .001, 'Passage reaches the rear shell with no extra room behind its end wall');
+for (const x of [1.084, 1.086, 1.095, 2, 6, 10, 12, 15, 16.8]) {
   const hit = wingHits([x, 4.8, -19.15], [0, -1, 0])[0];
   assert.ok(hit && Math.abs(hit.point.y - classroom.lowerFloor) < .005, 'Side-passage floor has no legacy slab cutting across it');
 }
@@ -58,7 +61,13 @@ assert.ok(wingHits([0, 7.5, -16.8], [0, 0, -1], .3).some(h => h.object.material.
 assert.equal(wingHits([0, 3.9, -8], [-1, 0, 0], 1)[0]?.object.material.name, 'Weathered classroom plaster', 'Old exterior blue trim does not protrude through the corridor wall');
 assert.equal(opaque(wingHits([0, classroom.floor + 1.82, -1.8 - 2.96 / 36], [-1, 0, 0], 1.4)).length, 0, 'Main screen hole really opens outdoors');
 assert.ok(opaque(wingHits([0, classroom.floor + 1.82, -1.8], [-1, 0, 0], 1.4)).some(h => h.object.material.name === 'Pierced classroom concrete screens'), 'Concrete remains between the openings');
-assert.equal(opaque(wingHits([6 + 2.85 / 36, classroom.lowerFloor + 1.82, -19.15], [0, 0, 1], 1.4)).length, 0, 'Return-passage screen hole really opens outdoors');
+assert.equal(opaque(wingHits([classroomPassage.windows[1] + classroomPassage.windowWidth / 36, classroom.lowerFloor + 1.82, -19.15], [0, 0, 1], 1.4)).length, 0, 'Return-passage screen hole really opens outdoors');
+for (const x of [1.2, 2, 4, 6.5]) {
+  assert.equal(wingHits([x, classroom.lowerFloor + 1.82, -19.15], [0, 0, 1], 1.4)[0]?.object.material.name, 'Weathered classroom plaster', 'Plain wall precedes the first return window');
+}
+for (const z of [-18.05, -18.15, -18.25]) for (const height of [.3, 1.5, 2.8]) {
+  assert.equal(wingHits([.8, classroom.lowerFloor + height, z], [1, 0, 0], .5)[0]?.object.material.name, 'Weathered classroom plaster', 'Corner wall joint is closed through its full height');
+}
 assert.ok(!scene.getObjectsByProperty('isMesh', true).some(o => o.material.name === 'Facade lattice seen through windows'), 'No glowing opaque lattice image remains');
 for (const x of [-2.3, 2.3]) {
   const glassHits = (z, direction) => hits([x, 2.3, z], [0, 0, direction], 3).filter(hit => [materials.entranceReflectiveGlass, materials.entranceTintedGlass].includes(hit.object.material));

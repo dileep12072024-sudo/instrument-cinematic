@@ -1,7 +1,7 @@
 import * as T from 'three';
 import { bindDragLook } from './drag-look.js';
 import { groundSpine, seminarPassage as passage } from './footprint.js';
-import { classroom } from './classroom-wing.js';
+import { classroom, classroomPassage } from './classroom-wing.js';
 import { stairs, stairFlights, terraceLevels as levels } from './stair-layout.js';
 
 const stops = [
@@ -44,7 +44,7 @@ const classroomRoute = [
   { at: .60, x: -22, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Class Room III approach' },
   { at: .70, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: -Math.PI / 2, name: 'Class Room III' },
   { at: .76, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: 0, name: 'Classroom side passage' },
-  { at: 1, x: -23.15, y: classroom.lowerFloor + 1.65, z: -6.6, yaw: 0, name: 'Classroom side-passage end' },
+  { at: 1, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ - classroomPassage.end + 1.25, yaw: 0, name: 'Classroom side-passage end' },
 ];
 
 function walkingRoute(points) {
