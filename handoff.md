@@ -209,3 +209,12 @@ Measured on the owner's Intel UHD (real off-screen Chrome, see memory "real-gpu-
 8. Switchboards in the right places; everything functional (the site becomes a game: avatars interact).
 Context: two layers planned - portfolio layer (motion graphics) and virtual exploration (game, user avatars);
 building the exploration layer now.
+
+## Progress, 2026-10-17 evening (section 3)
+- f6f2d61 library-wall granite plaques (three.js, exact text), landing tiles, conduits, DEPARTMENT/LIBRARY notice.
+- 0ebaaec hall boards drawn in src/hall-boards.js (photo atlases removed except the anti-ragging poster's printed photos).
+  Hidden letters left out; list in docs/entrance-video.md. Owner to supply the missing names.
+- 456790e Divi's water cooler panels: real lettering + printed pictures (calendar = the landmark near it; its face is never visible).
+- 3ffae80 side-passage end door, Class IV IV YEAR paper + STRONG ROOM board, wall phones, faculty blade signs (real names).
+- Open for owner: Class II/III doors are open in the model, closed in the 130612 video; stored furniture before the end door omitted;
+  the washing-bay "AquaPure" RO unit carries invented branding (no source to read it from).
