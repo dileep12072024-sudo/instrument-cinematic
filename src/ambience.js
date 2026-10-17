@@ -1,8 +1,28 @@
 export function createAmbience() {
+  let humGain = null;
   let context, master, birds, birdPromise, enabled = false, muted = false, volume = .4;
   let rainGain, rainFilter, windGain, birdGain, insectGain, lastMix = '';
-  let weather = { rainFactor: 0, windSpeed: 0 }, indoors = false, windSpeed = 0, daylight = 0;
+  let weather = { rainFactor: 0, windSpeed: 0 }, indoors = false, windSpeed = 0, daylight = 0, altitude = 0, birdTimer, birdPan;
   const birdLevel = () => .85 * daylight * (1 - Math.max(0, Math.min(1, weather.rainFactor || 0)) * .95) * (indoors ? .35 : 1);
+  // How often birds call (0..1): a dawn and dusk chorus while the sun is low, sparse calls at midday, fewer in wind.
+  const birdActivity = () => {
+    const low = 1 - Math.max(0, Math.min(1, (altitude - 18) / 30)); // 1 below ~18 degrees, .0 above ~48
+    return (birdLevel() / .85) * (.35 + .65 * low) * (1 - Math.min(1, windSpeed / 45) * .6);
+  };
+  // Birds sing in phrases with silences between, each from its own direction, not as a continuous loop.
+  function scheduleBirds() {
+    clearTimeout(birdTimer);
+    if (!context || !birdGain) return;
+    const activity = birdActivity(), now = context.currentTime;
+    if (activity < .03) { birdGain.gain.setTargetAtTime(0, now, .8); birdTimer = setTimeout(scheduleBirds, 12000); return; }
+    const length = 1.5 + Math.random() * (2 + 6 * activity), peak = birdLevel() * (.45 + Math.random() * .55);
+    birdPan?.pan.setTargetAtTime(Math.random() * 1.4 - .7, now, .05);
+    birdGain.gain.cancelScheduledValues(now);
+    birdGain.gain.setTargetAtTime(peak, now, .3);
+    birdGain.gain.setTargetAtTime(0, now + length, .5);
+    const gap = (3 + Math.random() * 25) * (1.6 - activity);
+    birdTimer = setTimeout(scheduleBirds, (length + gap) * 1000);
+  }
 
   function mixWeather() {
     if (!context || !rainGain) return;
@@ -16,7 +36,7 @@ export function createAmbience() {
     rainGain.gain.setTargetAtTime(heard * (indoors ? .2 : .95), now, .7);
     rainFilter.frequency.setTargetAtTime(indoors ? 950 : 4200 + rain * 3200, now, .7);
     windGain.gain.setTargetAtTime((.015 + wind * .5) * (indoors ? .2 : 1), now, .7);
-    birdGain?.gain.setTargetAtTime(birdLevel(), now, .7);
+    if (birdGain && birdLevel() < .01) birdGain.gain.setTargetAtTime(0, now, .7); // rain or night silences calls at once
     // Night insects around the building; rain and indoors quieten them.
     insectGain?.gain.setTargetAtTime(.32 * (1 - daylight) * (1 - rain * .85) * (indoors ? .3 : 1), now, 1.5);
   }
@@ -109,7 +129,8 @@ export function createAmbience() {
     }
     birds = context.createBufferSource(); birds.buffer = loop; birds.loop = true;
     birdGain = context.createGain(); birdGain.gain.value = 0;
-    birds.connect(birdGain).connect(master); birds.start(); mixWeather();
+    birdPan = context.createStereoPanner();
+    birds.connect(birdPan).connect(birdGain).connect(master); birds.start(); mixWeather(); scheduleBirds();
   }
 
   async function sync() {
@@ -126,7 +147,8 @@ export function createAmbience() {
   }
 
   const api = {
-    setDaylight(value) { daylight = Math.max(0, Math.min(1, value)); mixWeather(); },
+    setDaylight(value, sunAltitude = altitude) { daylight = Math.max(0, Math.min(1, value)); altitude = sunAltitude; mixWeather(); },
+    get birdActivity() { return birdActivity(); },
     get birdLevel() { return birdLevel(); },
     setWeather(value, sheltered = false, speed = value.windSpeed || 0) {
       weather = value; indoors = sheltered; windSpeed = speed; mixWeather();
@@ -168,6 +190,25 @@ export function createAmbience() {
       const filter = context.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 180 + 400 / (1 + delay);
       const gain = context.createGain(); gain.gain.value = (indoors ? .35 : .85) * Math.min(1, 2.2 / (1 + delay));
       source.connect(filter).connect(gain).connect(master); source.start(context.currentTime + delay);
+    },
+    // Water poured from a dispenser tap: a bright, bubbling noise that swells and stops (synthesised, no recording).
+    pour(seconds = 3) {
+      if (!context || !enabled || muted) return;
+      const rate = context.sampleRate, n = Math.ceil(rate * seconds), buffer = context.createBuffer(1, n, rate), d = buffer.getChannelData(0);
+      for (let i = 0, b = 0; i < n; i++) { const t = i / rate; b += (Math.random() * 2 - 1 - b) * .35; d[i] = b * (.6 + .4 * Math.sin(t * 37 + Math.sin(t * 5) * 3)) * Math.min(1, t * 8, (seconds - t) * 6); }
+      const source = context.createBufferSource(); source.buffer = buffer;
+      const band = context.createBiquadFilter(); band.type = 'bandpass'; band.frequency.value = 1800; band.Q.value = .8;
+      const gain = context.createGain(); gain.gain.value = .5;
+      source.connect(band).connect(gain).connect(master); source.start();
+    },
+    // A machine's low hum (cooler compressor, purifier pump) at the given level, 0 = silent; created on first use.
+    machine(level) {
+      if (!context || !enabled) return;
+      if (!humGain) {
+        humGain = context.createGain(); humGain.gain.value = 0; humGain.connect(master);
+        for (const [f, g] of [[100, .5], [200, .25], [300, .08]]) { const o = context.createOscillator(); o.frequency.value = f; const og = context.createGain(); og.gain.value = g; o.connect(og).connect(humGain); o.start(); }
+      }
+      humGain.gain.setTargetAtTime(muted ? 0 : level * .05, context.currentTime, .4);
     },
     get weatherMix() { return { rain: rainGain?.gain.value || 0, wind: windGain?.gain.value || 0, insects: insectGain?.gain.value || 0, indoors, rainCutoff: rainFilter?.frequency.value || 0 }; },
   };

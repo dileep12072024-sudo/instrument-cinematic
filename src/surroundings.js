@@ -49,7 +49,7 @@ function crossedCards(width, height) {
 
 function treeBelt(scene, landscape, renderer, views) {
   const named = re => { const out = []; landscape.group.traverse(o => { if (o.isMesh && re.test(o.userData.sourceObject || '')) out.push(o); }); return out; };
-  const terrain = named(/Editable verges|Entrance concrete apron|Lower side courtyard/);
+  const terrain = named(/Editable verges|Entrance concrete apron|Lower side courtyard|Distant ground continuation/);
   const hard = named(/Road|driveway|edge paint|kerb|paving|apron/i);
   const blocked = environmentObstacles(scene).map(b => b.clone().expandByScalar(4));
   const existing = landscape.trees.map(t => new T.Box3().setFromObject(t).getCenter(new T.Vector3()));
@@ -201,14 +201,20 @@ export function buildSurroundings(scene, landscape, renderer, views = []) {
 // porch stands about one bay out and right beside the wall, a slender one further left, and a multi-stem tree right
 // of the porch behind the parked bikes. Distances from the wall (~1.6 m) are estimates. Runs before foliage
 // trimming, so canopies are still cut back from the building.
+const ENTRANCE_DOOR_Z = 7.06; // plane of the entrance's wooden doors and glazing
+const PLANTER = { width: 1.7, depth: 1.7, height: .5, cap: .08, hole: .4, soil: .4 };
+const PLANTER_TRUNK = [-.1, 0]; // trunk offset from the planter centre (towards the porch), from the photos
+const SHRUB_BOX = { width: 1.4, depth: 1.4, height: .38, cap: .07, hole: .5, soil: .3 }; // square, low; size estimated from the kerb beside it
 const facadeTrees = [
+  // Owner, 2026-10-15: back in the corner beside the porch, with its edged bed.
   { source: 'Forked tree beside main entrance', base: [-8.4, 4.9], bed: true },
   { source: 'Slender tree beside left facade', base: [-17.6, 5.0] },
   // Right of the porch: rises from a raised square brick planter with a cracked concrete cap (photos 2026-10-13).
-  { source: 'Forked tree beside main entrance', base: [7.2, 5.0], clone: 'Multi-stem tree right of entrance (video-guided)', turn: Math.PI * .85, planter: true },
+  // The owner confirmed (2026-10-15) that the planter's centre line is in line with the entrance's wooden doors.
+  { source: 'Forked tree beside main entrance', base: [7.2 + PLANTER_TRUNK[0], ENTRANCE_DOOR_Z + PLANTER_TRUNK[1]], clone: 'Multi-stem tree right of entrance (video-guided)', turn: Math.PI * .85, planter: true },
 ];
 
-const PLANTER = { size: 1.7, height: .5, cap: .08, hole: .4, soil: .4 };
+// Square (owner, 2026-10-15); about 1.7 m a side, estimated against the scooters parked beside it.
 const brickTexture = () => {
   const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d');
   g.fillStyle = '#b9ab95'; g.fillRect(0, 0, 256, 128); // mortar
@@ -219,9 +225,9 @@ const brickTexture = () => {
   const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 8; return t;
 };
 // Raised square planter: brick sides under a concrete cap with a round opening and cracks (no debris).
-function raisedPlanter(x, y, z, soilMaterial) {
-  const { size, height, cap, hole } = PLANTER, group = new T.Group(); group.name = 'Raised brick planter (right facade tree)';
-  const brickMap = brickTexture(); brickMap.repeat.set(size / .9, height / .45);
+function raisedPlanter(x, y, z, soilMaterial, dims = PLANTER, trunk = PLANTER_TRUNK, name = 'Raised brick planter (right facade tree)') {
+  const { width, depth, height, cap, hole } = dims, group = new T.Group(); group.name = name;
+  const brickMap = brickTexture(); brickMap.repeat.set(width / .9, height / .45);
   const brick = new T.MeshStandardMaterial({ name: 'Planter brick', map: brickMap, roughness: .95 });
   const capC = document.createElement('canvas'); capC.width = capC.height = 256; const g = capC.getContext('2d');
   g.fillStyle = '#a9a69c'; g.fillRect(0, 0, 256, 256);
@@ -229,18 +235,18 @@ function raisedPlanter(x, y, z, soilMaterial) {
   g.strokeStyle = '#4c4a44'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, 70); g.lineTo(60, 92); g.lineTo(96, 88); g.moveTo(256, 150); g.lineTo(205, 168); g.lineTo(190, 210); g.lineTo(200, 256); g.stroke();
   const capMap = new T.CanvasTexture(capC); capMap.colorSpace = T.SRGBColorSpace;
   const concrete = new T.MeshStandardMaterial({ name: 'Planter concrete cap', map: capMap, roughness: .9 });
-  const wall = new T.Mesh(new T.BoxGeometry(size - .06, height - cap + .08, size - .06), brick);
+  const wall = new T.Mesh(new T.BoxGeometry(width - .06, height - cap + .08, depth - .06), brick);
   wall.position.y = (height - cap) / 2 - .04;
-  const shape = new T.Shape(); shape.moveTo(-size / 2, -size / 2); shape.lineTo(size / 2, -size / 2); shape.lineTo(size / 2, size / 2); shape.lineTo(-size / 2, size / 2); shape.closePath();
-  const opening = new T.Path(); opening.absarc(.08, -.05, hole, 0, Math.PI * 2, true); shape.holes.push(opening);
+  const shape = new T.Shape(); shape.moveTo(-width / 2, -depth / 2); shape.lineTo(width / 2, -depth / 2); shape.lineTo(width / 2, depth / 2); shape.lineTo(-width / 2, depth / 2); shape.closePath();
+  const [tx, tz] = trunk, opening = new T.Path(); opening.absarc(tx, -tz, hole, 0, Math.PI * 2, true); shape.holes.push(opening); // shape y becomes -z
   const top = new T.ExtrudeGeometry(shape, { depth: cap, bevelEnabled: true, bevelSize: .012, bevelThickness: .012, bevelSegments: 1, curveSegments: 28 });
   top.rotateX(-Math.PI / 2); top.translate(0, height - cap, 0);
-  const uv = top.attributes.uv, pos = top.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / size + .5, pos.getZ(i) / size + .5);
+  const uv = top.attributes.uv, pos = top.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / width + .5, pos.getZ(i) / depth + .5);
   const capMesh = new T.Mesh(top, concrete);
-  const fill = new T.Mesh(new T.CircleGeometry(hole + .01, 28), soilMaterial); fill.rotation.x = -Math.PI / 2; fill.position.set(.08, height - .07, .05);
+  const fill = new T.Mesh(new T.CircleGeometry(hole + .01, 28), soilMaterial); fill.rotation.x = -Math.PI / 2; fill.position.set(tx, height - .07, tz);
   group.add(wall, capMesh, fill);
   group.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
-  group.position.set(x - .08, y, z + .05);
+  group.position.set(x - tx, y, z - tz);
   return group;
 }
 
@@ -268,7 +274,7 @@ export function placeFacadeTrees(group) {
     }
     const ground0 = height(...spec.base);
     const to = new T.Vector3(spec.base[0], ground0 + (spec.planter ? PLANTER.soil : -.04), spec.base[1]); // in the planter's soil, or sunk slightly into the bed
-    const shift = new T.Matrix4().makeTranslation(to.x, to.y, to.z).multiply(new T.Matrix4().makeRotationY(spec.turn || 0)).multiply(new T.Matrix4().makeTranslation(-from.x, -from.y, -from.z));
+    const shift = new T.Matrix4().makeTranslation(to.x, to.y, to.z).multiply(new T.Matrix4().makeRotationY(spec.turn || 0)).multiply(new T.Matrix4().makeScale(spec.scale || 1, spec.scale || 1, spec.scale || 1)).multiply(new T.Matrix4().makeTranslation(-from.x, -from.y, -from.z));
     const apply = o => { o.updateMatrixWorld(true); const world = shift.clone().multiply(o.matrixWorld); o.parent.updateMatrixWorld(true); o.matrix.copy(o.parent.matrixWorld.clone().invert().multiply(world)); o.matrix.decompose(o.position, o.quaternion, o.scale); };
     apply(tree);
     if (spec.bed) for (const o of group.children.filter(o => /^Low entrance tree-bed edging/.test(o.userData.source_object || ''))) apply(o);
@@ -279,6 +285,46 @@ export function placeFacadeTrees(group) {
       patch.position.set(to.x, to.y + .06, to.z); patch.receiveShadow = true; patch.name = 'Earth around facade tree'; group.add(patch);
     }
     moved.push({ name: tree.userData.source_object, from: from.toArray().map(v => +v.toFixed(2)), to: to.toArray().map(v => +v.toFixed(2)) });
+  }
+  // The large pink-flowering shrub beside the east kerb grows from a raised brick box like the right tree's (owner,
+  // 2026-10-15; photo from the drive looking east). Lift its foliage, stems and bracts onto the box's soil.
+  const shrub = group.children.filter(o => /^(Pink flowering shrub|Supporting shrub stems|Pink bloom clusters) 01\b/.test(o.userData.source_object || ''));
+  if (shrub.length) {
+    const box = new T.Box3(); shrub.forEach(o => box.expandByObject(o)); const c = box.getCenter(new T.Vector3()), y0 = height(c.x, c.z);
+    for (const o of shrub) { o.position.y += SHRUB_BOX.soil; o.updateMatrix(); }
+    group.add(raisedPlanter(c.x, y0, c.z, soil[0], SHRUB_BOX, [0, 0], 'Raised brick box (pink flowering shrub)'));
+    moved.push({ name: 'Pink flowering shrub 01', raised: SHRUB_BOX.soil, box: [+c.x.toFixed(2), +c.z.toFixed(2)] });
+  }
+  // Right bank toward the gate (owner's photo 2026-10-15, looking east from the porch): the planting continues along the
+  // kerb past the pink shrubs. Copies of the exported shrubs; positions are estimates from that photo.
+  const copyPlant = (number, x, z, turn, scale = 1) => {
+    const parts = group.children.filter(o => new RegExp(`^(Pink flowering shrub|Bright green understory|Supporting shrub stems|Pink bloom clusters) ${number}\\b`).test(o.userData.source_object || ''));
+    if (!parts.length) return;
+    const box = new T.Box3(); parts.forEach(o => box.expandByObject(o)); const c = box.getCenter(new T.Vector3());
+    const from = new T.Vector3(c.x, height(c.x, c.z), c.z), to = new T.Vector3(x, height(x, z) - .03, z);
+    const shift = new T.Matrix4().makeTranslation(to.x, to.y, to.z).multiply(new T.Matrix4().makeRotationY(turn)).multiply(new T.Matrix4().makeScale(scale, scale, scale)).multiply(new T.Matrix4().makeTranslation(-from.x, -from.y, -from.z));
+    for (const o of parts) {
+      const copy = o.clone(); copy.userData = { ...o.userData, source_object: `${o.userData.source_object} (bank copy ${x},${z})` };
+      o.updateMatrixWorld(true); copy.matrix.copy(group.matrixWorld.clone().invert().multiply(shift).multiply(o.matrixWorld)); copy.matrix.decompose(copy.position, copy.quaternion, copy.scale);
+      group.add(copy);
+    }
+    moved.push({ name: `shrub copy ${number}`, to: [x, z] });
+  };
+  for (const [number, x, z, turn, scale] of [['03', 4.9, 25.4, 1.1, 1.1], ['01', 5.4, 27.6, 2.3, .85], ['04', 4.7, 30.0, .4, 1.15], ['03', 5.1, 32.6, 2.9, .95]]) copyPlant(number, x, z, turn, scale);
+  // Beside the right porch pier: a small concrete-edged earth bed with a sapling (photos 2026-10-13 and 2026-10-15).
+  if (soil[0]) {
+    const bed = new T.Group(); bed.name = 'Sapling bed beside right porch pier';
+    const kerb = new T.MeshStandardMaterial({ name: 'Bed concrete edging', color: '#a9a69c', roughness: .9 });
+    const corners = [[5.15, 8.7], [6.55, 8.7], [6.75, 10.6], [5.15, 10.6]], y0 = height(5.9, 9.6);
+    for (let i = 0; i < 4; i++) {
+      const [ax, az] = corners[i], [bx, bz] = corners[(i + 1) % 4], length = Math.hypot(bx - ax, bz - az);
+      const edge = new T.Mesh(new T.BoxGeometry(length + .1, .14, .1), kerb);
+      edge.position.set((ax + bx) / 2, y0 + .05, (az + bz) / 2); edge.rotation.y = -Math.atan2(bz - az, bx - ax); bed.add(edge);
+    }
+    const fill = new T.Shape(corners.map(([x, z]) => new T.Vector2(x, -z)));
+    const earth = new T.Mesh(new T.ShapeGeometry(fill), soil[0]); earth.rotation.x = -Math.PI / 2; earth.position.y = y0 + .05; bed.add(earth);
+    bed.traverse(o => { if (o.isMesh) o.receiveShadow = o.castShadow = true; }); group.add(bed);
+    copyPlant('05', 5.9, 9.7, .7, 1.1);
   }
   group.updateMatrixWorld(true);
   group.userData.facadeTrees = moved;

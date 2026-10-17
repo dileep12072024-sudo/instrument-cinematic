@@ -100,8 +100,7 @@ export function createLiveSky(scene, camera) {
       moonUniforms.opacity.value = moonOpacity;
       moonlight.position.copy(moonDirection).multiplyScalar(80);
       moonlight.intensity = .14 * Math.pow(illumination, 1.4) * moonOpacity;
-      // A light that is off still costs every lit pixel on integrated GPUs; only include it while it shines.
-      moonlight.visible = moonlight.intensity > .001;
+      // Never hidden: a hidden light changes the light count and rebuilds every material's shader (see main.js).
       // Lightning is handled in main.js, synchronised with thunder (this used to flash independently).
     }
   };

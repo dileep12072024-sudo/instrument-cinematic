@@ -5,13 +5,15 @@ import { createIcons, PersonStanding, Eye, Copy, ArrowUpRight, ArrowLeft, ArrowR
 import { buildArchitecture, buildEntranceApron } from './architecture.js';
 import { loadBlenderEnvironment, prefetchEnvironment } from './blender-environment.js';
 import { buildSurroundings, placeFacadeTrees } from './surroundings.js';
-import { mergeStaticDetail, mergeGateParts } from './batching.js';
+import { mergeStaticDetail, mergeGateParts, mergeByMaterialName, mergeStatic, resolveCoplanar } from './batching.js';
 import { createAvatar } from './avatar.js';
 import { footprint } from './footprint.js';
 import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
 import { createRain, rainfall, updateWind, isSheltered } from './weather-effects.js';
 import { createPuddles } from './puddles.js';
+import { campusMonth, leafLitter } from './seasons.js';
+import { regradeGround, rectangularAprons } from './regrade.js';
 import { createEntranceWalk } from './entrance-walk.js';
 import { createPanoramaLook } from './panorama-look.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
@@ -68,7 +70,7 @@ $('#app').innerHTML = `
     <div id="loader" class="loader"><span class="loading-mark">IT</span><p>A place comes into focus.</p><span class="load-track"><span></span></span><small id="loading-status">Preparing the campus</small></div>
     <div id="toast" role="status" hidden></div>
   </main>
-  <dialog id="about-dialog" class="about-dialog"><div class="dialog-top"><span class="eyebrow">ABOUT THE PORTRAIT</span><button class="icon-btn close-dialog" aria-label="Close about">${icon('x')}</button></div><h2>Built around<br><em>a real place.</em></h2><p>Department of Instrument Technology.<br>Andhra University, Visakhapatnam.</p><p>This independent architectural portrait is reconstructed from the supplied campus photographs, video, and footprint. The blue structural frame, open corridors, entrance, and different wing heights follow those references.</p><p>Geometry is constructed directly in Three.js. Dimensions, hidden elevations, planting, and materials are interpreted; this is not a measured survey or a photogrammetric scan.</p><a href="https://www.google.com/maps/search/?api=1&query=Andhra+University+Department+of+Instrument+Technology" target="_blank" rel="noopener" class="text-btn">Find the department ${icon('arrow-up-right')}</a><div class="credits">Original photographs & footage supplied by the project owner. Sky lighting: <a href="https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky" target="_blank" rel="noopener">Poly Haven / CC0</a>.</div></dialog>`;
+  <dialog id="about-dialog" class="about-dialog"><div class="dialog-top"><span class="eyebrow">ABOUT THE PORTRAIT</span><button class="icon-btn close-dialog" aria-label="Close about">${icon('x')}</button></div><h2>Built around<br><em>a real place.</em></h2><p>Department of Instrument Technology.<br>Andhra University, Visakhapatnam.</p><p>This independent architectural portrait is reconstructed from the supplied campus photographs, video, and footprint. The blue structural frame, open corridors, entrance, and different wing heights follow those references.</p><p>Geometry is constructed directly in Three.js. Dimensions, hidden elevations, planting, and materials are interpreted; this is not a measured survey or a photogrammetric scan.</p><a href="https://www.google.com/maps/search/?api=1&query=Andhra+University+Department+of+Instrument+Technology" target="_blank" rel="noopener" class="text-btn">Find the department ${icon('arrow-up-right')}</a><div class="credits">Original photographs & footage supplied by the project owner. Sky lighting: <a href="https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky" target="_blank" rel="noopener">Poly Haven / CC0</a>.<br>This site keeps anonymous visit statistics (device type, browser, approximate city, visit times). No names or IP addresses are stored.</div></dialog>`;
 $('#about').insertAdjacentHTML('afterend', `<button id="sound" class="icon-btn" aria-label="Mute ambient sound" aria-pressed="true" data-tip="Mute ambient sound">${icon('volume-2')}</button>`);
 $('#walk-location').insertAdjacentHTML('beforebegin', '<select id="walk-route" aria-label="Interior route"><option value="hall">Central hall</option><option value="right">Ground-floor right wing</option><option value="seminar">Seminar Hall surrounds</option><option value="classroom">Upstairs classroom wing</option></select>');
 $('#walk-route').insertAdjacentHTML('beforeend', '<option value="stairs">Stairs: ground to roof</option><option value="terraceLeft">Classroom-wing terrace</option><option value="upperCorridor">Second-floor right corridor</option><option value="terraceRight">Upper right terrace</option>');
@@ -142,7 +144,9 @@ sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -55; sun.shadow.cam
 sun.shadow.normalBias = .05; sun.shadow.bias = -.00015; sun.shadow.radius = 3; scene.add(sun);
 const ambient = new THREE.HemisphereLight('#e4eff7', '#77654c', 1.25); scene.add(ambient);
 // Lightning: a cool sky-wide flash during live thunderstorm weather (never for reduced-motion users).
-const lightning = new THREE.DirectionalLight('#dce6ff', 0); lightning.position.set(-30, 90, -60); lightning.visible = false; scene.add(lightning);
+const lightning = new THREE.DirectionalLight('#dce6ff', 0); lightning.position.set(-30, 90, -60); scene.add(lightning);
+// Lights are never hidden, only dimmed to 0: hiding or showing one changes the light count, which rebuilds every lit
+// material's shader at once (an 8 s freeze on the owner's laptop). A dark light costs about 2 ms per frame there.
 let skyBase = .95, nextStrike = 0, strike = null;
 const shadowSun = new THREE.Vector3();
 const entranceLight = new THREE.PointLight('#fff0cc', 0, 14, 2);
@@ -183,7 +187,9 @@ function adaptResolution(interval, now) {
     if (cadence < 2) { cadence = cadenceFloor = 2; return change(); }
     // Phones have few CSS pixels; below ~1.1 they turn visibly soft, so they shed frames before sharpness.
     const floor = small() ? Math.min(1.1, best) : .8;
-    if (ratio > floor + .01) { resolutionCap = Math.max(floor, ratio * .88); setRatio(resolutionCap); return change(); }
+    // One step straight to the estimated ratio: every resize stalls ~0.15 s here, and four small steps in a row read
+    // as stutter right after the scene appears (cost ~ pixels, so scale the pixel ratio by the square root).
+    if (ratio > floor + .01) { resolutionCap = Math.max(floor, Math.min(ratio * .88, ratio * Math.sqrt(budget / average) * .95)); setRatio(resolutionCap); return change(); }
     if (cadence < 3) { cadence = cadenceFloor = 3; return change(); }
   } else if (now - lastResolutionChange > 20000) {
     const up = Math.min(best, resolutionCap, ratio / .88);
@@ -298,7 +304,7 @@ async function loadWeather() {
 
 function updateLighting(h) {
   sunlight = solarState(liveClock ? new Date() : campusDate(h), LOCATION);
-  sound.setDaylight(THREE.MathUtils.smoothstep(sunlight.altitude, 0, 6));
+  sound.setDaylight(THREE.MathUtils.smoothstep(sunlight.altitude, 0, 6), sunlight.altitude);
   const evening = sunlight.night;
   const golden = 1 - THREE.MathUtils.smoothstep(sunlight.altitude, 0, 25);
   const wet = weatherState.rainFactor;
@@ -312,7 +318,7 @@ function updateLighting(h) {
   scene.fog.color.set('#b6c5c9').lerp(new THREE.Color('#182336'), evening).lerp(new THREE.Color('#64757b'), wet * .6);
   if (scene.background?.isColor) scene.background.copy(scene.fog.color);
   surroundings?.update(scene.fog.color);
-  entranceLight.intensity = evening * 40; entranceLight.visible = evening > .001; // off lights still cost every lit pixel
+  entranceLight.intensity = evening * 40;
   warm.opacity = evening * .6; warm.emissiveIntensity = evening * 1.4;
   if (architecture) {
     for (const material of [architecture.materials.glass, architecture.materials.rearGlass]) material.envMapIntensity = THREE.MathUtils.lerp(1.4, .22, evening);
@@ -442,22 +448,45 @@ async function boot() {
   await new Promise(resolve => requestAnimationFrame(resolve));
   architecture = buildArchitecture(scene);
   architecture.mergedDrawCalls = mergeStaticDetail(architecture.group); // ~400 fewer draw calls
-  architecture.interior.lights.forEach(light => { light.visible = false; }); // switched on inside the hall only
+  westFittings = architecture.group.getObjectByName('West wing fittings');
+  dispensers = architecture.group.getObjectByName('West wing ground floor (video-built)')?.userData.dispensers || [];
+  { // A tap or click (not a drag) on a water machine within reach starts it pouring.
+    const canvas = renderer.domElement, ray = new THREE.Raycaster(), at = new THREE.Vector2(); let down = null;
+    canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+    canvas.addEventListener('pointerup', e => {
+      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8 || performance.now() - down.t > 500) return;
+      const r = canvas.getBoundingClientRect(); at.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+      ray.setFromCamera(at, camera); ray.far = 8;
+      const hit = ray.intersectObjects(dispensers.map(d => d.hit), false)[0];
+      if (hit && dispensers.find(d => d.hit === hit.object).start(sound)) needsRender = true;
+    });
+  }
+  // Small building parts (signs, latches, fans, props): bounds once; skipped while they would cover under ~8 pixels.
+  architecture.group.updateMatrixWorld(true);
+  architecture.group.traverse(o => { if (!o.isMesh || o.isInstancedMesh || !o.visible) return; o.geometry.computeBoundingSphere(); const s = o.geometry.boundingSphere.clone().applyMatrix4(o.matrixWorld); if (s.radius < 1.2) smallParts.push([o, s]); });
+  resolveCoplanar(architecture.group); // no flicker where two surfaces share a plane
+  architecture.interior.lights.forEach(light => { light.userData.on = light.intensity; light.intensity = 0; }); // lit inside the hall only
   $('#loading-status').textContent = 'Finding the light';
   await new Promise(resolve => requestAnimationFrame(resolve));
   $('#loading-status').textContent = 'Growing the Blender landscape';
   performance.mark('architecture-built');
-  landscape = await loadBlenderEnvironment(scene, placeFacadeTrees, environmentDownload);
+  landscape = await loadBlenderEnvironment(scene, group => { rectangularAprons(group); regradeGround(group); placeFacadeTrees(group); }, environmentDownload);
   const breathe = () => new Promise(resolve => requestAnimationFrame(resolve)); // let the loader paint between stages
   await breathe();
   buildEntranceApron(landscape.group);
   puddles = createPuddles(landscape); puddles.attach(); rain.ground = (x, z) => puddles.heightAt(x, z);
   if (weatherState.rainHistory) { puddles.history(weatherState.rainHistory); puddles.warmed = true; }
   mergeGateParts(landscape.group);
+  mergeByMaterialName(landscape.group, (o, name) => /gate iron/i.test(name)); // ~40 gate parts, one cloned material each
   surroundings = buildSurroundings(scene, landscape, renderer, chapters.flatMap(c => [[c.eye, c.target], [new THREE.Vector3(...c.eye).sub(new THREE.Vector3(...c.target)).multiplyScalar(2.4).add(new THREE.Vector3(...c.target)).toArray(), c.target]]));
   performance.mark('surroundings-built');
   await breathe();
+  landscape.month = campusMonth();
+  leafLitter(scene, landscape.trees, (x, z) => puddles.heightAt(x, z), { time: landscape.wind, strength: landscape.windStrength, direction: landscape.windDirection }, landscape.month);
   landscape.batchTrees(); // after the impostor belt captured the individual trees
+  mergeStatic(surroundings.sheds); // 24 separate shed parts
+  for (const root of [landscape.group, surroundings.sheds]) root.traverse(o => { // small scenery joins the far-away skip
+    if (!o.isMesh || o.isInstancedMesh || o.isBatchedMesh || !o.visible) return; o.geometry.computeBoundingSphere(); const sphere = o.geometry.boundingSphere.clone().applyMatrix4(o.matrixWorld); if (sphere.radius < 1.2) smallParts.push([o, sphere]); });
   // Static scenery: compute matrices once instead of every frame (wind runs in the vertex shader).
   for (const root of [landscape.group, surroundings.belt.group, surroundings.ridge]) root.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });
   // Full anisotropic filtering keeps road lines, paving and soil crisp at grazing angles.
@@ -511,10 +540,18 @@ async function boot() {
   performance.mark('reflections-captured');
   await renderer.compileAsync(scene, camera);
   performance.mark('shaders-compiled');
+  // Upload every texture now: three uploads a texture the first time its object is drawn, so turning the view in the
+  // panorama stalled ~0.1 s whenever something new came into sight (measured mid-drag on the owner's laptop).
+  { const seen = new Set(); scene.traverse(o => { for (const m of [o.material].flat()) if (m) for (const v of Object.values(m)) if (v?.isTexture && !v.isRenderTargetTexture && !seen.has(v)) { seen.add(v); renderer.initTexture(v); } }); }
   // Walkable guide: collides with the building and ground, never with foliage or effects.
   avatar = createAvatar({ scene, camera, canvas: renderer.domElement, changed: () => { needsRender = true; }, collidables: (() => {
     let list; return () => list ||= (() => { const out = []; const add = root => root?.traverse(o => { if (o.isMesh && o.visible !== false && !o.isInstancedMesh && !o.userData.windHeight && !/Batched trees|Live rain|sky|cloud|moon|horizon|Distant/i.test(o.name + (o.parent?.name || ''))) out.push(o); });
       add(architecture.group); add(landscape.group); add(surroundings.sheds); return out; })(); })() });
+  // Warm-up while the loader still covers the page: draw the scene once in six directions. ANGLE (D3D11) finishes each
+  // shader the first time it draws on screen, so the first turn of the panorama stalled 0.1-0.6 s per new view.
+  { const facing = camera.quaternion.clone(), ahead = new THREE.Vector3();
+    for (const d of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, .01], [0, -1, .01]]) { camera.lookAt(ahead.copy(camera.position).add(new THREE.Vector3(...d))); renderer.render(scene, camera); }
+    camera.quaternion.copy(facing); }
   ready = true; window.__portrait.ready = true; readyAt = performance.now();
   renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
   loadWeather();
@@ -541,7 +578,8 @@ async function compileShadowShaders() {
     finally { scene.fog = fog; for (const [o, m] of swapped) o.material = m; }
   }
 }
-let previous = performance.now(), frames = 0;
+let previous = performance.now(), frames = 0, hallLit = false;
+let westFittings = null, dispensers = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
 function animate(now) {
   requestAnimationFrame(animate);
   const frameDuration = now - previous;
@@ -600,10 +638,9 @@ function animate(now) {
   if (!reduced && entranceWalk?.active) for (const fan of architecture.classroomFans) fan.rotation.y += dt * 4;
   rain.update(dt, weatherState, reduced, windSpeed);
   puddles?.update(dt, weatherState, reduced);
-  lightning.visible = weatherState.storm && !reduced;
   // Hall lights only while the camera is inside the entrance hall; elsewhere they cost every lit pixel for nothing.
   const inHall = entranceWalk?.active || Math.abs(camera.position.x) < 4.2 && camera.position.z > -7.2 && camera.position.z < 7.6 && camera.position.y < 4.4;
-  if (architecture.interior.lights[0].visible !== inHall) { architecture.interior.lights.forEach(light => { light.visible = inHall; light.shadow.needsUpdate = true; }); renderer.shadowMap.needsUpdate = true; needsRender = true; }
+  if (hallLit !== inHall) { hallLit = inHall; architecture.interior.lights.forEach(light => { light.intensity = inHall ? light.userData.on : 0; light.shadow.needsUpdate = true; }); renderer.shadowMap.needsUpdate = true; needsRender = true; }
   if (weatherState.storm && !reduced) {
     nextStrike ||= now + 5000 + Math.random() * 15000;
     if (now > nextStrike) {
@@ -623,18 +660,39 @@ function animate(now) {
   const haze = 1 - .55 * rain.current;
   scene.fog.near = (small() ? 160 : 80) * haze; scene.fog.far = (small() ? 450 : 300) * (1 - .45 * rain.current);
   sound.setWeather(weatherState, isSheltered(camera.position.x, camera.position.y, camera.position.z), windSpeed);
+  if (dispensers.length && frames % 15 === 0) { // compressor and pump hum, heard within a few metres
+    const near = Math.min(...dispensers.map(d => d.centre.distanceTo(camera.position)));
+    sound.machine(Math.max(0, 1 - near / 5) * (dispensers.some(d => d.pouring) ? 1.6 : 1));
+  }
   sky.update(now / 1000, sunlight.night, weatherState, reduced);
   // Even pacing: draw every Nth display frame so motion advances in equal steps.
   // While a finger or mouse is dragging the view, draw every frame the display offers: input must track the hand.
   if ((needsRender || !reduced) && !(quality === 'auto' && !dragging && now - lastRendered < cadence * 1000 / 60 - 4)) {
     const interval = now - lastRendered;
+    landscape.updateTreeDetail?.(camera);
+    for (const d of dispensers) d.update(now, Math.min(interval / 1000, .1));
+    if (westFittings) westFittings.visible = westBox.distanceToPoint(camera.position) < 30; // far away they are sub-pixel
+    // Every draw call costs CPU and GPU-process time on ANGLE: ~170 tiny ones made every few frames late (p90 50 ms).
+    for (const [o, s] of smallParts) o.visible = s.radius > .005 * s.center.distanceTo(camera.position);
     renderer.render(scene, camera);
     if (++frames % 60 === 0) drawPlan();
     if (quality === 'auto' && !reduced && frames > 12 && interval < 250) adaptResolution(interval, now);
     needsRender = false; lastRendered = now;
   }
 }
-performance.mark = (m => (name, ...a) => { const r = m.call(performance, name, ...a); try { if (renderer) console.log('TMP', name, renderer.info.programs.length, renderer.info.programs.map(q => q.name || q.cacheKey.split(',')[0]).slice(window.__tmpN || 0).join('|').slice(0, 400)); window.__tmpN = renderer.info.programs.length; } catch {} return r; })(performance.mark);
+// Anonymous visit log (functions/api/visit.js): one random ID per browser, one per tab session, a heartbeat while visible.
+(() => {
+  if (!/^https:/.test(location.protocol) || navigator.webdriver) return; // not from local development or automated tests
+  const rid = () => crypto.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36);
+  let device, visit;
+  try { device = localStorage.getItem('visitor-id') || (localStorage.setItem('visitor-id', device = rid()), device); } catch { device = rid(); }
+  try { visit = sessionStorage.getItem('visit-id') || (sessionStorage.setItem('visit-id', visit = rid()), visit); } catch { visit = rid(); }
+  const send = () => fetch('/api/visit', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+    d: device, v: visit, p: location.pathname, r: document.referrer ? new URL(document.referrer).host : '', s: `${screen.width}x${screen.height}`,
+    l: navigator.language, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }) }).catch(() => {});
+  send(); setInterval(() => { if (!document.hidden) send(); }, 30000); // keeps 'online now' current on the dashboard
+  addEventListener('pagehide', send);
+})();
 window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } } };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 

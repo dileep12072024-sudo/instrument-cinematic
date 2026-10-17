@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./dist/**)",
+      "Read(./.wrangler/**)",
+      "Read(./blender/*.blend1)",
+      "Read(./**/*.log)",
+      "Read(./**/.DS_Store)",
+      "Read(./**/Thumbs.db)"
+    ]
+  }
+}

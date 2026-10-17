@@ -50,7 +50,7 @@ try {
     apron.traverse(o => { if (o.isMesh) paving.push(o); });
     const pavingBounds = new T.Box3().setFromObject(apron);
     const point = new T.Vector3();
-    const flowers = nodes.filter(o => o.userData.source_object?.startsWith('Pink flowering shrub')).map(o => new T.Box3().setFromObject(o).getCenter(new T.Vector3()).toArray());
+    const flowers = nodes.filter(o => o.userData.source_object?.startsWith('Pink flowering shrub') && !o.userData.source_object.includes('bank copy')).map(o => new T.Box3().setFromObject(o).getCenter(new T.Vector3()).toArray());
     let rootWeight = 0;
     for (const o of vegetation) {
       const p = o.geometry.attributes.position, w = o.geometry.attributes._wind;
@@ -69,7 +69,9 @@ try {
       approachFlare: !!sample(road, 4.7, 10.8) && !sample(road, 4.7, 28),
       pavingTextured: paving.every(o => !!o.material.map), pavingTop: pavingBounds.max.y,
       noPavingAcrossDrive: !sample(apron, 0, 9),
-      leftReturnInsideWing: sample(nodes.find(o => o.userData.source_object === 'Lower side courtyard paving'), -19, 18)?.point.y };
+      // Owner, 2026-10-15: one rectangle each side, from the screen wall to the pink tiles' front edge, porch to wing.
+      slabs: [[-13, 7], [13, 7], [-21.5, 4], [21.5, 10.5], [-13, 12], [-20, 15], [13, 15], [-5.2, 8]].map(([x, z]) => !!sample(apron, x, z)),
+      levels: [[-13, 7], [13, 7]].map(([x, z]) => +sample(apron, x, z).point.y.toFixed(2)) };
   });
   assert.equal(model.name, 'Blender campus environment');
   assert.equal(model.trees, 24); // 23 exported + the video-guided tree right of the entrance
@@ -86,8 +88,9 @@ try {
   assert.ok(model.flowers.every(p => p[0] < 6 && p[2] > 18 && p[2] < 24), 'Flowers follow the near right kerbed strip, not the distant lawn');
   assert.deepEqual(model.bareCourts, ['Exposed red earth', 'Exposed red earth']);
   assert.ok(model.approachFlare, 'Drive widens at the entrance, not only at the campus road');
-  assert.ok(model.pavingTextured && model.pavingTop < 0 && model.noPavingAcrossDrive, 'No bright continuous draft sheet across the porch');
-  assert.ok(Number.isFinite(model.leftReturnInsideWing), 'Left courtyard paving is inside the wing');
+  assert.ok(model.pavingTextured && Math.abs(model.pavingTop - .16) < .01 && model.noPavingAcrossDrive, 'Right slab level with the pink porch floor; no sheet across the drive');
+  assert.deepEqual(model.slabs, [true, true, true, true, false, false, false, false], 'Concrete aprons are plain rectangles, no L-shaped returns; the left one stops short of the porch');
+  assert.ok(model.levels[0] < model.levels[1] - .2, 'Left slab lies lower than the right');
   console.log('PASS exported Blender environment', { ...model, sources: model.sources.length });
   await mkdir('artifacts/environment', { recursive: true });
   for (const [name, eye, target] of [

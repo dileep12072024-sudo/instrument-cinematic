@@ -279,7 +279,7 @@ export function buildArchitecture(scene) {
       const y = f * floorH, openingH = raisedScreen ? 2.04 : f === 0 ? 2.15 : 1.9;
       // The west wing's ground storey is sunk with its floor (owner, 2026-10-16): its walls, screens, windows and gate
       // start at the wing floor; the storey above stays where it is.
-      const sunk = f === 0 && (westOuter || type === 'west') ? westWing.floor : 0, y0 = y + sunk;
+      const sunk = f === 0 && (westOuter || type === 'west') ? westWing.floor : f === 0 && type === 'low-corridor' && rotation === 0 ? westWing.corridor : 0, y0 = y + sunk; // front of the west corridor: with its floor
       const openingY = raisedScreen ? groundSpine.screenBottom + openingH / 2 : y0 + (f === 0 ? 1.9 : 2.55);
       const hasGate = (type === 'gate-return' || type === 'west-end') && f === 0;
       const gateMaterial = type === 'west-end' ? m.westGate : m.gate;
@@ -505,7 +505,10 @@ export function buildArchitecture(scene) {
       const cut = westWing.stepsTop - (x - w / 2), x0 = x - w / 2 + cut, x1 = x + w / 2 + .01, rooms = groundSpine.roomFront, front = z + d / 2;
       box((x0 + x1) / 2, -.4, (z - d / 2 - .01 + rooms) / 2, x1 - x0, .8, rooms - (z - d / 2 - .01), m.plinth);
       box((x0 + x1) / 2, (westWing.corridor - .02 - .8) / 2, (rooms + front - .15) / 2, x1 - x0, westWing.corridor - .02 + .8, front - .15 - rooms, m.plinth);
-      box((x0 + x1) / 2, -.4, front, x1 - x0, .8, .3, m.plinth);
+      // Below the sunk facade: its plaster wall continues down to the low left slab, the plinth below that.
+      const slab = westWing.ground + .1;
+      box((x0 + x1) / 2, (slab - .03 + westWing.corridor - .02) / 2, front, x1 - x0, westWing.corridor - .02 - slab + .03, .32, m.wall);
+      box((x0 + x1) / 2, (slab - .03 - 1.6) / 2, front, x1 - x0, slab - .03 + 1.6, .3, m.plinth);
     } else box(x, -.4, z, w + .02, .8, d + .02, m.plinth);
     const roofBase = h - 1.4 - (type === 'west' ? .5 : 0);
     for (let y = 4; y < roofBase - .001; y += 4) {
@@ -555,7 +558,7 @@ export function buildArchitecture(scene) {
     }
     box(31.18, y + .5, z + width * .58, .07, 1.1, .055, m.trim);
   }
-  box(0, .04, 8.5, 10, .18, 5.2, m.paving);
+  box(0, -.535, 8.5, 10, 1.33, 5.2, m.paving); // porch base: down to the low left plain, no gap under its edge
   box(0, 3.55, 8.8, 10, .24, 4, m.wall);
   box(0, 3.7, 10.8, 10.1, .48, .18, mat('#1287b7'));
   // Cantilevered rear canopy: half the front canopy's depth, with no freestanding posts.

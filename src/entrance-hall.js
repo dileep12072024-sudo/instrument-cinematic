@@ -79,7 +79,8 @@ export function buildEntranceHall(parent, exterior) {
     box(x - side * .07, .26, 4.55, .07, .2, 4.3, tread);
     box(x - side * .07, .26, -3.74, .07, .2, 6.12, tread);
     // The camera shows the passage mouth, not the rooms beyond it.
-    box(side * 4.7, .125, corridorCenter, 1.75, .07, corridorDepth, tread);
+    if (side > 0) box(side * 4.7, .125, corridorCenter, 1.75, .07, corridorDepth, tread);
+    else box(-3.9125, .125, corridorCenter, .175, .07, corridorDepth, tread); // west: threshold only, the steps down follow (spine-interior.js)
     for (const z of [roomFront + .04, front - .04]) box(x, (.164 + grilleTop) / 2, z, .16, grilleTop - .164, .07, trim);
     box(x, gateHead, corridorCenter, .16, .07, corridorDepth, trim);
     box(x, grilleTop - .02, corridorCenter, .16, .05, corridorDepth, trim);
@@ -243,21 +244,27 @@ export function buildEntranceHall(parent, exterior) {
       [6.453, 6.684, 1.218, 1.344, .05, 'white', 992, 569, 120, 66], // switch box
     ]],
   };
+  // Phones keep the lighter atlas; larger screens get the 2x crops, where the lettering stays readable up close.
+  const lean = globalThis.matchMedia?.('(pointer: coarse)').matches || globalThis.innerWidth < 700;
+  // Finish by board type: laminated flex and posters have a soft sheen, varnished wood a little, the granite is polished.
+  const finish = { flex: .42, poster: .42, plaque: .42, board: .42, wood: .55, case: .55, cabinet: .55, stone: .25, red: .6, grey: .6, white: .6, panel: .6, box: .6 };
   for (const side of [-1, 1]) {
-    const [file, aw, ah, items] = wallItems[side], faces = [];
+    const [file, aw, ah, items] = wallItems[side], faces = new Map();
     for (const [z0, z1, y0, y1, depth, edge, u, v, w, h, bottom = y0] of items) {
       const zc = (z0 + z1) / 2, face = 3.73 - depth; // side walls' inner face is at 3.73
       box(side * (3.73 - depth / 2), (bottom + y1) / 2, zc, depth, y1 - bottom, z1 - z0, fittings[edge]);
       const g = new T.PlaneGeometry(z1 - z0, y1 - y0); g.rotateY(-side * Math.PI / 2); g.translate(side * (face - .002), (y0 + y1) / 2, zc);
       const uv = g.attributes.uv;
       for (let i = 0; i < uv.count; i++) uv.setXY(i, (u + uv.getX(i) * w) / aw, 1 - (v + (1 - uv.getY(i)) * h) / ah);
-      faces.push(g);
+      const rough = finish[edge] ?? .5; if (!faces.has(rough)) faces.set(rough, []); faces.get(rough).push(g);
     }
-    const map = loader.load(`/media/entrance-hall/${file}.webp`); map.colorSpace = T.SRGBColorSpace; map.anisotropy = 8;
-    const boards = new T.Mesh(mergeGeometries(faces), new T.MeshStandardMaterial({ name: 'Photographed hall boards', map, roughness: .8, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .12 }));
-    // A trace of their own photographed light keeps high boards legible in the dim hall.
-    boards.name = `${side < 0 ? 'West' : 'East'} hall boards and notices`; boards.receiveShadow = true; group.add(boards);
-    faces.forEach(g => g.dispose());
+    const map = loader.load(`/media/entrance-hall/${file}${lean ? '-mobile' : ''}.webp`); map.colorSpace = T.SRGBColorSpace; map.anisotropy = 16;
+    for (const [roughness, list] of faces) {
+      // A trace of their own photographed light keeps high boards legible in the dim hall.
+      const boards = new T.Mesh(mergeGeometries(list), new T.MeshStandardMaterial({ name: 'Photographed hall boards', map, roughness, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .12 }));
+      boards.name = `${side < 0 ? 'West' : 'East'} hall boards and notices`; boards.receiveShadow = true; group.add(boards);
+      list.forEach(g => g.dispose());
+    }
     // Grey steel window: frame, mullions roughly every half metre, close horizontal bars, clear glazing.
     const { z0, z1, y0, y1 } = hallWindows[side], wx = side * 3.80, ww = z1 - z0, wh = y1 - y0, wz = (z0 + z1) / 2, steel = fittings.steel;
     for (const z of [z0 + .025, z1 - .025]) box(wx, (y0 + y1) / 2, z, .06, wh, .05, steel);

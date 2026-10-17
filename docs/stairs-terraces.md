@@ -62,3 +62,5 @@ Stair heights match the existing model's storeys. Counts, widths, run lengths, r
 The Strong Room approach is lengthened by one model unit inside the existing right-wing footprint; the building's outer length is unchanged. Rain shelter covers the enclosed stair head and the terrace canopy, but not the open roof surfaces.
 
 `scripts/check-stairs-terraces.mjs` checks camera support, gate recess depth, the exterior-facing lock, roof shelter classification, desktop/mobile rendering, indoor panorama and field-of-view controls. `scripts/check-entrance-look.mjs` checks pointer direction and retention of the viewing angle while moving.
+
+October 15 (owner screenshot): the left junction's capped slope is kept. The front face beside the steps had a 0.7 x 0.3 slot below the parapet (x -21.75..-21.05, y 7.7..8.2) where the corridor's front wall stops at the classroom roof level; it is closed with terrace concrete flush with the face at z = 3.25.

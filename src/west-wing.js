@@ -17,7 +17,7 @@ export const westWing = {
   corridor: groundSpine.hallFloor - flightRise,
   floor: groundSpine.hallFloor - 2 * flightRise,
   west: -24.5, east: -22, north: -15, south: 15,
-  ground: groundSpine.hallFloor - 2 * flightRise - .03, // earth outside: level with the wing floor all round, the gate at ground level (owner)
+  ground: groundSpine.hallFloor - 2 * flightRise - .16, // earth outside: just below the wing floor; a ramp runs down from the gate (owner)
   stepsTop: -21.56, // corridor floor ends here; three risers of .18 descend westward, the last flush with the screened wall (owner)
   classroomSlab: -8.85, // upstairs passage floor covers the junction and the first stretch north (ceiling 2.764)
   endBay: -13.5, // the washing bay's ceiling is a storey higher behind a beam
@@ -502,7 +502,16 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   box((inW + inE) / 2, F / 2 + .41, inN - .08, inE - inW, -F + .82, .16, plaster);
   // The front passage's east wall (the building's screened face) starts at the old floor datum: close the strip below it.
   box(XE, F / 2 - .01, (corridorSouth + .2 + inS) / 2, .34, -F + .02, inS - corridorSouth - .2, plaster);
-  // The folding gate reaches the floor (architecture.js): no wall under it (owner, 2026-10-16). Across its lower part a
+  // The folding gate reaches the floor (architecture.js): no wall under it (owner, 2026-10-16). Outside it a concrete
+  // ramp slopes from the threshold down to the earth, the full width of the gate bay.
+  { const x0 = -24.7, x1 = -22.3, z0 = ZS + .16, z1 = z0 + 1.2, top = F + .005, bot = westWing.ground - .02;
+    const v = [[x0, top, z0], [x1, top, z0], [x0, bot, z1], [x1, bot, z1], [x0, bot, z0], [x1, bot, z0]];
+    const tri = [[0, 2, 1], [1, 2, 3], [0, 4, 2], [1, 3, 5], [0, 1, 4], [1, 5, 4], [2, 4, 3], [3, 4, 5]], pos = [];
+    for (const t of tri) for (const k of t) pos.push(...v[k]);
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+    const p = g.attributes.position, uv = new Float32Array(p.count * 2); for (let i = 0; i < p.count; i++) { uv[i * 2] = p.getX(i) / 1.5; uv[i * 2 + 1] = p.getZ(i) / 1.5; }
+    g.setAttribute('uv', new T.BufferAttribute(uv, 2)); add(g, m.paving ?? concrete); }
+  // Across the gate's lower part a
   // white sheet stands propped against the inside (photo 40, frame 57), grimy and splashed, a little bowed and leaning.
   { const sheetMap = canvasMap(512, 128, (g, w, h) => {
       g.fillStyle = '#d9d6cc'; g.fillRect(0, 0, w, h);
@@ -576,7 +585,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   }
   for (const s of signs) box(inW + .03, at(s.h + .14), s.u, .06, .03, .03, steel); // bracket
 
-  const structure = new Set([plaster, tiles, stepStone, m.screen, m.blue, m.wall, m.trim, concrete, ceilingMat, grille, doorWood, greyDoor, dark, glassDark]);
+  const structure = new Set([plaster, tiles, stepStone, m.screen, m.blue, m.wall, m.trim, m.paving, concrete, ceilingMat, grille, doorWood, greyDoor, dark, glassDark]);
   // Bake walls and screens with world-scale UVs (grime band at the floor), then merge everything by material.
   for (const g of walls) { const p = g.attributes.position, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + p.getZ(i)) / 2.2, (p.getY(i) - F) / 3.3); add(g, plaster); }
   for (const [material, list] of batches) {

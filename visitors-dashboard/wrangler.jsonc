@@ -1,0 +1,9 @@
+{
+  // Private visitor dashboard for the campus site; reads the same D1 database the site writes to.
+  "name": "instrument-visitors",
+  "pages_build_output_dir": "./public",
+  "compatibility_date": "2026-09-20",
+  "d1_databases": [
+    { "binding": "VISITS", "database_name": "instrument-visits", "database_id": "0fe6f85c-c6b7-447c-9420-e604a4b3cdcf" }
+  ]
+}

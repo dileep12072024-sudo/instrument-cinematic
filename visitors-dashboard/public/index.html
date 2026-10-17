@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Campus Visitors</title>
+<style>
+:root{--bg:#f4f3ee;--card:#ffffff;--ink:#1c2220;--muted:#66706b;--line:#e3e1d9;--accent:#2f6b57;--accent-soft:#e3efe9;--warn:#a5532d;--bar:#3d7f68}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111413;--card:#1a1e1d;--ink:#e6ebe8;--muted:#98a29d;--line:#2a302e;--accent:#8cc7ae;--accent-soft:#1f3029;--warn:#e19a76;--bar:#6fb397}}
+:root[data-theme="dark"]{--bg:#111413;--card:#1a1e1d;--ink:#e6ebe8;--muted:#98a29d;--line:#2a302e;--accent:#8cc7ae;--accent-soft:#1f3029;--warn:#e19a76;--bar:#6fb397}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1080px;margin:0 auto;padding:20px 16px 48px}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+h1{font-size:20px;margin:0;font-weight:650}.sub{color:var(--muted);font-size:13px}
+button,input,select{font:inherit;color:inherit}
+.btn{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat b{display:block;font-size:24px;font-weight:650;font-variant-numeric:tabular-nums}.stat span{color:var(--muted);font-size:12px}
+.live b{color:var(--accent)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.panel h2{font-size:14px;margin:0 0 10px;font-weight:600}
+#chart svg{width:100%;height:120px;display:block}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.filters input,.filters select{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:0}
+.filters input{flex:1 1 220px}
+.device{border:1px solid var(--line);border-radius:10px;background:var(--card);margin-bottom:8px;overflow:hidden}
+.device summary{list-style:none;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;align-items:center}
+.device summary::-webkit-details-marker{display:none}
+.icon{width:34px;height:34px;border-radius:8px;background:var(--accent-soft);display:grid;place-items:center;grid-row:span 2}
+.icon svg{width:18px;height:18px;stroke:var(--accent);fill:none;stroke-width:1.8}
+.name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.name .tag{font-weight:500;font-size:11px;border-radius:10px;padding:1px 7px;margin-left:6px;background:var(--accent-soft);color:var(--accent)}
+.name .tag.online{background:var(--accent);color:var(--bg)}
+@keyframes arrive{from{background:var(--accent-soft)}to{background:var(--card)}}.device.fresh{animation:arrive 4s ease-out}
+.meta{color:var(--muted);font-size:12.5px;grid-column:2}
+.count{text-align:right;grid-row:span 2;font-variant-numeric:tabular-nums}.count b{display:block;font-size:18px}.count span{color:var(--muted);font-size:11.5px}
+.body{border-top:1px solid var(--line);padding:10px 14px 12px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px 16px;margin-bottom:10px;font-size:13px}
+.facts div span{color:var(--muted);display:block;font-size:11.5px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-weight:500;font-size:12px}
+td.num{font-variant-numeric:tabular-nums}
+.label-row{display:flex;gap:6px;margin-top:10px}.label-row input{flex:1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.empty{color:var(--muted);text-align:center;padding:30px}
+#login{max-width:380px;margin:12vh auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px}
+#login h1{margin-bottom:6px}#login p{color:var(--muted);margin:0 0 14px}#login input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 12px;margin-bottom:10px}
+#login .err{color:var(--warn);font-size:13px;min-height:18px}
+@media (max-width:560px){.device summary{grid-template-columns:auto 1fr}.count{grid-row:auto;grid-column:2;text-align:left}.count b{display:inline;font-size:14px;margin-right:4px}}
+</style>
+</head>
+<body>
+<form id="login" hidden>
+  <h1>Campus Visitors</h1>
+  <p>Enter your private key to see who visited the campus site.</p>
+  <input id="key" type="password" autocomplete="current-password" placeholder="Private key" required>
+  <div class="err" id="err"></div>
+  <button class="btn primary" type="submit">Open dashboard</button>
+</form>
+<main id="app" hidden>
+  <header class="top">
+    <div><h1>Campus Visitors</h1><div class="sub" id="updated">Loading…</div></div>
+    <div><button class="btn" id="refresh">Refresh</button> <button class="btn" id="signout">Sign out</button></div>
+  </header>
+  <section class="stats" id="stats"></section>
+  <section class="panel"><h2>Visits per day (last 30 days)</h2><div id="chart"></div></section>
+  <section class="panel">
+    <h2>Devices</h2>
+    <div class="filters">
+      <input id="q" type="search" placeholder="Search name, city, phone model, browser…">
+      <select id="type"><option value="">All devices</option><option>Phone</option><option>Tablet</option><option>Computer</option></select>
+      <select id="range"><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="0" selected>All time</option></select>
+      <label class="sub" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="hideMine"> Hide my devices</label>
+    </div>
+    <div id="list"></div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const store = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} } };
+const IST = { timeZone: 'Asia/Kolkata' };
+const when = t => new Date(t).toLocaleString('en-IN', { ...IST, day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const day = t => new Date(t).toLocaleDateString('en-CA', IST);
+const span = ms => ms < 60000 ? `${Math.max(1, Math.round(ms / 1000))} s` : ms < 3600000 ? `${Math.round(ms / 60000)} min` : `${(ms / 3600000).toFixed(1)} h`;
+const ago = ms => ms < 120000 ? 'just now' : ms < 3600000 ? `${Math.round(ms / 60000)} min ago` : ms < 864e5 ? `${Math.round(ms / 3600000)} h ago` : `${Math.round(ms / 864e5)} d ago`;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const icons = { Phone: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>', Tablet: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M11 18h2"/>', Computer: '<rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/>' };
+let key = store.get('visitors-key'), data = null, timer, seen = null;
+
+async function api(path, options = {}) {
+  const r = await fetch(path, { ...options, headers: { ...(options.headers || {}), authorization: `Bearer ${key}`, 'content-type': 'application/json' } });
+  if (r.status === 401) throw Object.assign(new Error('Wrong key'), { auth: true });
+  if (!r.ok) throw new Error(`Server error ${r.status}`);
+  return r.json();
+}
+async function load() {
+  try { data = await api('/api/data'); const latest = new Map(data.devices.map(d => [d.id, d.last_seen])), arrived = seen ? data.devices.filter(d => !seen.has(d.id) || latest.get(d.id) - seen.get(d.id) > 60000).map(d => d.id) : []; seen = latest; render(new Set(arrived));
+    const online = data.devices.filter(d => data.now - d.last_seen < 75000).length; document.title = online ? `(${online} online) Campus Visitors` : 'Campus Visitors'; $('#updated').textContent = `Updated ${new Date().toLocaleTimeString('en-IN', IST)} IST · live, updates every 10 s`; }
+  catch (e) { if (e.auth) return signOut('That key did not work.'); $('#updated').textContent = `Could not refresh: ${e.message}`; }
+}
+function show(app) { $('#login').hidden = app; $('#app').hidden = !app; }
+function signOut(message = '') { store.set('visitors-key', null); key = null; clearInterval(timer); show(false); $('#err').textContent = message; $('#key').value = ''; $('#key').focus(); }
+$('#login').addEventListener('submit', e => { e.preventDefault(); key = $('#key').value.trim(); store.set('visitors-key', key); start(); });
+$('#signout').onclick = () => signOut();
+$('#refresh').onclick = load;
+for (const id of ['#q', '#type', '#range', '#hideMine']) $(id).addEventListener('input', () => render());
+function start() { show(true); load(); clearInterval(timer); timer = setInterval(() => { if (!document.hidden) load(); }, 10000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); }); }
+
+function render(arrived = new Set()) {
+  if (!data) return;
+  const now = data.now, mine = new Set(JSON.parse(store.get('visitors-mine') || '[]'));
+  const visitsBy = new Map(); for (const v of data.visits) { if (!visitsBy.has(v.device_id)) visitsBy.set(v.device_id, []); visitsBy.get(v.device_id).push(v); }
+  const others = data.devices.filter(d => !mine.has(d.id));
+  const online = data.devices.filter(d => now - d.last_seen < 75000).length;
+  const todayVisits = data.visits.filter(v => day(v.started) === day(now)).length;
+  const avg = data.visits.length ? data.visits.reduce((s, v) => s + (v.last_active - v.started), 0) / data.visits.length : 0;
+  $('#stats').innerHTML = [
+    ['live', online, 'online now'], ['', others.length, 'devices (excluding yours)'], ['', data.devices.reduce((s, d) => s + d.visits, 0), 'visits in total'],
+    ['', todayVisits, 'visits today (IST)'], ['', span(avg), 'average visit length'],
+  ].map(([c, n, t]) => `<div class="stat ${c}"><b>${n}</b><span>${t}</span></div>`).join('');
+  // Visits per day, last 30 days (inline SVG bars).
+  const days = Array.from({ length: 30 }, (_, i) => day(now - (29 - i) * 864e5)), counts = days.map(d => data.visits.filter(v => day(v.started) === d).length), max = Math.max(1, ...counts);
+  const bw = 100 / 30;
+  $('#chart').innerHTML = `<svg viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="Visits per day">${counts.map((c, i) => `<rect x="${i * bw + .3}" y="${38 - c / max * 34}" width="${bw - .6}" height="${Math.max(.4, c / max * 34)}" fill="var(--bar)" rx=".4"><title>${days[i]}: ${c} visit${c === 1 ? '' : 's'}</title></rect>`).join('')}</svg><div class="sub" style="display:flex;justify-content:space-between"><span>${days[0]}</span><span>${Math.max(...counts) ? `busiest day: ${Math.max(...counts)} visit${Math.max(...counts) === 1 ? '' : 's'}` : 'no visits in the last 30 days yet'}</span><span>today</span></div>`;
+  // Device list with filters.
+  const q = $('#q').value.trim().toLowerCase(), type = $('#type').value, range = Number($('#range').value), hide = $('#hideMine').checked;
+  const list = data.devices.filter(d => (!hide || !mine.has(d.id)) && (!type || (d.device || '').startsWith(type)) && (!range || now - d.last_seen < range * 864e5)
+    && (!q || [d.label, d.device, d.os, d.browser, d.city, d.region, d.country, d.screen].join(' ').toLowerCase().includes(q)));
+  $('#list').innerHTML = list.length ? list.map(d => {
+    const vs = visitsBy.get(d.id) || [], kind = (d.device || 'Computer').split(' ')[0], isOnline = now - d.last_seen < 75000;
+    const place = [d.city, d.region, d.country].filter(Boolean).join(', ') || 'Location unknown';
+    const title = d.label || `${d.device || 'Device'} · ${d.os || ''}`;
+    return `<details class="device" data-id="${esc(d.id)}"><summary>
+      <div class="icon"><svg viewBox="0 0 24 24">${icons[kind] || icons.Computer}</svg></div>
+      <div class="name">${esc(title)}${isOnline ? '<span class="tag online">online</span>' : ''}${mine.has(d.id) ? '<span class="tag">you</span>' : ''}</div>
+      <div class="count"><b>${d.visits}</b><span>visit${d.visits === 1 ? '' : 's'}</span></div>
+      <div class="meta">${esc(place)} · last seen ${esc(ago(now - d.last_seen))} (${esc(when(d.last_seen))})</div></summary>
+      <div class="body"><div class="facts">
+        <div><span>Device</span>${esc(d.device)}</div><div><span>System</span>${esc(d.os)}</div><div><span>Browser</span>${esc(d.browser)}</div>
+        <div><span>Screen</span>${esc(d.screen)}</div><div><span>Language · time zone</span>${esc(d.language)} · ${esc(d.timezone)}</div>
+        <div><span>Approximate location</span>${esc(place)}</div><div><span>First visit</span>${esc(when(d.first_seen))}</div><div><span>Total time</span>${esc(span(vs.reduce((s, v) => s + (v.last_active - v.started), 0)))}</div>
+      </div>
+      <table><thead><tr><th>Visit started (IST)</th><th>Stayed</th><th>Page</th><th>Came from</th></tr></thead><tbody>${vs.slice(0, 25).map(v => `<tr><td>${esc(when(v.started))}</td><td class="num">${esc(span(v.last_active - v.started))}</td><td>${esc((v.host || '').replace('.instrument-cinematic.pages.dev', '') || '')}${esc(v.path)}</td><td>${esc(v.referrer || 'direct link')}</td></tr>`).join('')}</tbody></table>
+      <div class="label-row"><input placeholder="Name this device (e.g. Ravi's phone)" value="${esc(d.label || '')}" maxlength="60"><button class="btn save">Save name</button><button class="btn mine">${mine.has(d.id) ? 'Not mine' : 'This is mine'}</button></div>
+    </div></details>`;
+  }).join('') : '<div class="empty">No visitors match yet. Visits appear here a few seconds after someone opens the site.</div>';
+  const open = new Set(JSON.parse(store.get('visitors-open') || '[]'));
+  for (const el of document.querySelectorAll('.device')) {
+    if (open.has(el.dataset.id)) el.open = true;
+    if (arrived.has(el.dataset.id)) el.classList.add('fresh');
+    el.addEventListener('toggle', () => { const s = new Set(JSON.parse(store.get('visitors-open') || '[]')); el.open ? s.add(el.dataset.id) : s.delete(el.dataset.id); store.set('visitors-open', JSON.stringify([...s])); });
+    el.querySelector('.save').onclick = async () => { await api('/api/label', { method: 'POST', body: JSON.stringify({ id: el.dataset.id, label: el.querySelector('.label-row input').value }) }); load(); };
+    el.querySelector('.mine').onclick = () => { const s = new Set(JSON.parse(store.get('visitors-mine') || '[]')); s.has(el.dataset.id) ? s.delete(el.dataset.id) : s.add(el.dataset.id); store.set('visitors-mine', JSON.stringify([...s])); render(); };
+  }
+}
+if (key) start(); else show(false);
+</script>
+</body>
+</html>

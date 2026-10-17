@@ -1,6 +1,8 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint, groundSpine as layout, seminarPassage as passage } from './footprint.js';
+import { westWing } from './west-wing.js';
+const WEST_STEPS_END = 4.6; // the west corridor floor starts here, below the two treads after the hall gate
 import { classroom } from './classroom-wing.js';
 
 // Visible circulation and closed room fronts only. Dimensions remain interpreted.
@@ -143,9 +145,11 @@ export function buildSpineInterior(parent, m) {
   }
 
   for (const part of footprint.filter(p => p.type.includes('corridor'))) {
-    const right = part.x > 0, y = right ? base : layout.hallFloor;
+    const right = part.x > 0, y = right ? base : westWing.corridor; // west: three steps below the hall (owner, 2026-10-16)
     const start = part.x - part.width / 2 + (right ? .7 : 0), end = right ? passage.terminalX : part.x + part.width / 2;
-    floor((start + end) / 2, layout.corridorCenter, end - start, layout.corridorDepth, y);
+    const floorStart = right ? start : westWing.stepsTop; // the west end steps down into the wing (west-wing.js)
+    const floorEnd = right ? end : -WEST_STEPS_END; // and its east end steps up into the hall
+    floor((floorStart + floorEnd) / 2, layout.corridorCenter, floorEnd - floorStart, layout.corridorDepth, y);
     const wallStart = part.x - part.width / 2, wallEnd = right ? passage.x - passage.width / 2 : end, cx = (wallStart + wallEnd) / 2;
     const openings = right ? [
       ...doorCenters.map((x, i) => ({ x: x - cx, y: base + 1.08, w: i ? 1.18 : 1.08, h: 2.16 })),
@@ -153,9 +157,14 @@ export function buildSpineInterior(parent, m) {
       ...vents.map(x => ({ x: x - cx, y: 3.47, w: .96, h: .39 })),
     ] : [];
     wall(cx, front, 0, wallEnd - wallStart, y, 3.8, openings);
-    let from = wallStart;
+    let from = right ? wallStart : westWing.stepsTop; // the west skirting stops at the top step down into the wing
     for (const x of right ? doorCenters : []) { box((from + x - .67) / 2, y + .09, front + .019, x - .67 - from, .18, .036, skirting); from = x + .67; }
-    box((from + wallEnd) / 2, y + .09, front + .019, wallEnd - from, .18, .036, skirting);
+    const skirtEnd = right ? wallEnd : -WEST_STEPS_END;
+    box((from + skirtEnd) / 2, y + .09, front + .019, skirtEnd - from, .18, .036, skirting);
+    if (!right) { // front wall: plaster from the lowered floor up to the facade's base (y = 0), with its skirting
+      box((from + wallEnd) / 2, y / 2, layout.front - .175, wallEnd - from, -y, .03, m.wall); // to the hall wall, beside the steps too
+      box((from + skirtEnd) / 2, y + .09, layout.front - .2, skirtEnd - from, .18, .036, skirting);
+    }
     if (right) box((start + end) / 2, 3.86, layout.corridorCenter, end - start, .16, layout.corridorDepth, m.wall);
     else {
       // Follow the upstairs classroom levels instead of leaving the old ceiling through its floor.
@@ -167,6 +176,12 @@ export function buildSpineInterior(parent, m) {
   box(13, base + .10, layout.front - .17, 18, .20, .035, skirting);
   box(13, layout.screenBottom - .025, layout.front - .06, 18, .05, .35, skirting);
   group.userData.screenSillAboveFloor = layout.screenBottom - base;
+  // West: through the hall gate the floor drops three steps into the west corridor (mirror of the east flight).
+  for (let i = 0; i < 2; i++) {
+    const top = layout.hallFloor - (i + 1) * (layout.hallFloor - westWing.corridor) / 3, x = -(4 + .15 + i * .3);
+    box(x, (top + westWing.corridor) / 2, layout.corridorCenter, .3, top - westWing.corridor, layout.corridorDepth, m.tread);
+  }
+  box(-4.01, (layout.hallFloor + layout.hallFloor - (layout.hallFloor - westWing.corridor) / 3) / 2, layout.corridorCenter, .02, (layout.hallFloor - westWing.corridor) / 3, layout.corridorDepth, m.tread); // top riser
   for (let i = 0; i < 3; i++) {
     const top = layout.hallFloor + (i + 1) * (base - layout.hallFloor) / 3;
     box(3.95 + i * .30, (top + layout.hallFloor) / 2, layout.corridorCenter, .30, top - layout.hallFloor, layout.corridorDepth - .16, m.tread);

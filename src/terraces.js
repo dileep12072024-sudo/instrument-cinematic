@@ -142,6 +142,9 @@ export function buildTerraces(parent, m) {
   for (const [z, overlap] of [[-3.10, 0], [.675, .18]]) {
     cappedEdge(leftPostX, levels.leftWing, levels.leftStrip, z, leftPostWidth / 2, overlap, .35 * innerSpan / outerSpan, innerSpan);
   }
+  // Close the front face beside the steps (owner screenshot, 2026-10-15): the corridor's front wall stops at the classroom
+  // roof level west of x = -21.05, leaving a slot below the parapet through which the treads showed side-on.
+  box(-21.4, 7.95, 3.175, .7, .5, .15, roof);
   // Square concrete posts frame the ramp ends and the adjacent stair opening (110452).
   for (const z of [-3.25, .825, 3.25]) box(leftPostX, levels.leftWing + .925, z, leftPostWidth, 1.85, leftPostWidth);
   for (const x of [-7, -10, -13, -16, -19]) box(x, levels.leftStrip + .9, 3.25, .52, 1.8, .64);

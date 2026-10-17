@@ -28,6 +28,30 @@ Updated: 2026-10-15. Read this before changing the project.
 - Closed the ceiling step and the floor seam at the junction; kept the exterior blue trim
   outside the interior wall. Do not move the entrance or flatten either stair flight.
 
+## West Wing Ground Floor (2026-10-15, awaiting owner approval)
+
+- Built from the 14 October walkthrough video and nine photos; see `docs/west-wing.md` and `src/west-wing.js`.
+- The wing floor is 0.54 below the hall; the west plinth is hollow and the regrade lowers the earth under it.
+
+## October 15 Pass (awaiting owner approval)
+
+- Ground: regrade (`src/regrade.js`) makes road, slabs and building meet the earth flush; earth is clamped below
+  roads (it poked through as bumps). A near-ground continuation replaces the 2 m drop at the model's edge.
+- Concrete slabs are plain rectangles from the screen wall (z 3.25) to the pink tiles' front edge (z 10.73), porch
+  side to wing wall. Right slab is level with the pink porch floor (0.16); the left ground is lower, so the left
+  slab sits at -0.12 and stops 0.6 m short of the porch (drop is an estimate). Old apron meshes are removed.
+- Trees: left forked tree in the porch corner with its bed; right tree in a square brick planter in line with the
+  doors; pink shrub in a raised box; extra bank shrubs and a sapling bed. Cut branches and their leaves that no
+  longer reach the trunk are pruned (`pruneDetached`).
+- Flicker: `resolveCoplanar` (batching.js) gives each opaque building material a fixed depth priority (smaller
+  detail above larger base), so coplanar faces never z-fight. Guard: `node scripts/check-zfight.mjs --strict`.
+- Seasons (`src/seasons.js`): jacaranda and broadleaf canopies thin by month (estimates for Visakhapatnam),
+  with fallen leaves under crowns that stir in strong gusts. Preview another month with `?month=3`.
+- Wind also roughens and ripples puddles. Birds sing in phrases (dawn/dusk chorus, sparse at noon, fewer in
+  wind, silent at night and in rain).
+- Hall boards: 2x photo crops on desktop (`*-boards.webp`), the earlier ones on phones (`*-boards-mobile.webp`).
+- Terrace: left junction slope kept; a slot in the front face beside the steps is closed.
+
 ## Hall Side Walls From Photographs (2026-10-14, latest, awaiting user approval)
 
 - Three photos of the hall's side walls and the left (west) wing passage were measured with the

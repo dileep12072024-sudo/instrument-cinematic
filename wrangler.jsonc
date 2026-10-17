@@ -2,5 +2,9 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "instrument-cinematic",
   "pages_build_output_dir": "./dist",
-  "compatibility_date": "2026-09-20"
+  "compatibility_date": "2026-09-20",
+  // Anonymous per-device visit log (functions/api/visit.js); the list is at /api/visitors?key=... (VISITOR_KEY secret).
+  "d1_databases": [
+    { "binding": "VISITS", "database_name": "instrument-visits", "database_id": "0fe6f85c-c6b7-447c-9420-e604a4b3cdcf" }
+  ]
 }
