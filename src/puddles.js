@@ -242,6 +242,8 @@ if (sheet > 0.0) { // running film: shallow wavelets travelling downhill
   }
   return {
     uniforms, get state() { return state; },
+    // Ground-level reflection for the wet ground and puddles: they mirror the building and trees, not only the sky.
+    setReflection(texture) { for (const m of materials) { m.envMap = texture; m.needsUpdate = true; } },
     // Ground meshes of the Blender export: paving, asphalt, kerbs and soil, not foliage or the distant plane.
     attach() {
       const meshes = [];
@@ -270,7 +272,9 @@ if (sheet > 0.0) { // running film: shallow wavelets travelling downhill
       if (i < 0 || j < 0 || i >= W || j >= H) return null;
       const y = heights[j * W + i]; return Number.isNaN(y) ? null : y;
     },
-    update(dt, weather, reduced) {
+    update(dt, weather, reduced, envBase = .42) {
+      // Own envMap: follow the scene's environment strength (dimmer at night), stronger as the ground gets wet.
+      for (const m of materials) if (m.envMap) m.envMapIntensity = envBase * (1 + 1.4 * state.film);
       state = waterStep(state, weather.rainRate ?? (weather.rainFactor > 0 ? 1 : 0), dt / 60);
       uniforms.uFill.value.set(state.hard, state.soil); uniforms.uFilm.value = state.film;
       uniforms.uRain.value = reduced ? 0 : Math.min(1, weather.rainFactor * 1.4);

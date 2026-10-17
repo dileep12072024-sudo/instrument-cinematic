@@ -76,7 +76,7 @@ export function buildEntranceHall(parent, exterior) {
     box(x, (.17 + win.y0) / 2, (win.z0 + win.z1) / 2, .12, win.y0 - .17, win.z1 - win.z0, wall);
     box(x, (win.y1 + 3.89) / 2, (win.z0 + win.z1) / 2, .12, 3.89 - win.y1, win.z1 - win.z0, wall);
     box(x, 3.79, corridorCenter, .12, .26, corridorDepth, wall);
-    box(x - side * .07, .26, 4.55, .07, .2, 4.3, tread);
+    box(x - side * .07, .26, (front + 6.7) / 2, .07, .2, 6.7 - front, tread); // skirting stops at the passage mouth
     box(x - side * .07, .26, -3.74, .07, .2, 6.12, tread);
     // The camera shows the passage mouth, not the rooms beyond it.
     if (side > 0) box(side * 4.7, .125, corridorCenter, 1.75, .07, corridorDepth, tread);

@@ -529,6 +529,9 @@ async function boot() {
         probe.dispose();
       }
     }
+    // Ground-level view in front of the building for the puddles (one capture; parallax is not tracked).
+    { const probe = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType }), cam = new THREE.CubeCamera(.1, 200, probe);
+      try { cam.position.set(0, .35, 15); cam.update(renderer, scene); puddles.setReflection(reflectionFilter.fromCubemap(probe.texture).texture); } finally { probe.dispose(); } }
   } finally {
     glass.forEach(material => { material.visible = true; }); reflectionFilter.dispose();
   }
@@ -637,7 +640,7 @@ function animate(now) {
   if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
   if (!reduced && entranceWalk?.active) for (const fan of architecture.classroomFans) fan.rotation.y += dt * 4;
   rain.update(dt, weatherState, reduced, windSpeed);
-  puddles?.update(dt, weatherState, reduced);
+  puddles?.update(dt, weatherState, reduced, scene.environmentIntensity);
   // Hall lights only while the camera is inside the entrance hall; elsewhere they cost every lit pixel for nothing.
   const inHall = entranceWalk?.active || Math.abs(camera.position.x) < 4.2 && camera.position.z > -7.2 && camera.position.z < 7.6 && camera.position.y < 4.4;
   if (hallLit !== inHall) { hallLit = inHall; architecture.interior.lights.forEach(light => { light.intensity = inHall ? light.userData.on : 0; light.shadow.needsUpdate = true; }); renderer.shadowMap.needsUpdate = true; needsRender = true; }
@@ -693,7 +696,7 @@ function animate(now) {
   send(); setInterval(() => { if (!document.hidden) send(); }, 30000); // keeps 'online now' current on the dashboard
   addEventListener('pagehide', send);
 })();
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } } };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;

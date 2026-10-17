@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import * as P from './props.js';
 import { groundSpine } from './footprint.js';
 import { concreteScreenParts } from './architecture.js';
 
@@ -68,9 +69,9 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   }, true);
   const tiles = new T.MeshStandardMaterial({ name: 'Black glazed corridor tiles', map: tileMap, roughness: .16, metalness: .05, envMapIntensity: .55 });
   const stepStone = new T.MeshStandardMaterial({ name: 'Dark polished step stone', color: '#1d2224', roughness: .22, metalness: .05 });
-  const grille = new T.MeshStandardMaterial({ name: 'Dark green painted grille iron', color: '#26403a', roughness: .55, metalness: .45 });
-  const doorWood = new T.MeshStandardMaterial({ name: 'Blue-green painted lab doors', color: '#3a5a58', roughness: .6 });
-  const greyDoor = new T.MeshStandardMaterial({ name: 'Grey-blue painted double door', color: '#5f7880', roughness: .62 });
+  const grille = new T.MeshStandardMaterial({ name: 'Dark green painted grille iron', map: P.paintTexture('#2a4640', { rust: .7, chips: .6, primer: '#7a6e5a' }), roughness: .55, metalness: .35 });
+  const doorWood = new T.MeshStandardMaterial({ name: 'Blue-green painted lab doors', map: P.paintTexture('#3e605e', { rust: 0, chips: .7, primer: '#a08a68' }), roughness: .55 });
+  const greyDoor = new T.MeshStandardMaterial({ name: 'Grey-blue painted double door', map: P.paintTexture('#617a82', { rust: 0, chips: .5, primer: '#b0a088' }), roughness: .58 });
   const dark = new T.MeshBasicMaterial({ name: 'Unlit room beyond', color: '#0b0c0c' });
   const glassDark = new T.MeshStandardMaterial({ name: 'Dusty high window glass', color: '#7d8a86', roughness: .35, metalness: .15 });
   const tube = new T.MeshStandardMaterial({ name: 'Wing tube lights', color: '#ffffff', emissive: '#f4f8ff', emissiveIntensity: 1.4 });
@@ -80,10 +81,14 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   const red = new T.MeshStandardMaterial({ name: 'Red fittings', color: '#b3241e', roughness: .5 });
   const black = new T.MeshStandardMaterial({ name: 'Black rubber and hands', color: '#16181a', roughness: .7 });
   const navy = new T.MeshStandardMaterial({ name: 'Navy clock face', color: '#1f2748', roughness: .45 });
-  const cloth = new T.MeshStandardMaterial({ name: 'Maroon table cloth', color: '#7e1820', roughness: .95 });
-  const table = new T.MeshStandardMaterial({ name: 'Dark stained table wood', color: '#3b2a1f', roughness: .7 });
-  const rawWood = new T.MeshStandardMaterial({ name: 'Unpolished table frame wood', color: '#9a7a55', roughness: .85 });
-  const plastic = new T.MeshStandardMaterial({ name: 'White plastic chairs', color: '#e7e3d6', roughness: .55 });
+  const cloth = new T.MeshStandardMaterial({ name: 'Maroon table cloth', map: P.clothTexture('#7e1820'), roughness: .95, side: T.DoubleSide });
+  const table = new T.MeshStandardMaterial({ name: 'Dark stained table wood', map: P.woodTexture('#4a3322', { worn: 1 }), roughness: .55 });
+  const rawWood = new T.MeshStandardMaterial({ name: 'Unpolished table frame wood', map: P.woodTexture('#a3825c', { worn: 2 }), roughness: .85 });
+  const plastic = new T.MeshStandardMaterial({ name: 'White plastic chairs', map: P.plasticTexture('#ebe9e0'), roughness: .42 });
+  const put = (g, material, x = 0, y = 0, z = 0, ry = 0) => { if (ry) g.rotateY(ry); g.translate(x, y, z); add(g, material); };
+  const kraft = new T.MeshStandardMaterial({ name: 'Cardboard', map: P.kraftTexture(), roughness: .9 }), tape = new T.MeshStandardMaterial({ name: 'Packing tape', color: '#c8a46a', roughness: .3 });
+  const canMat = new T.MeshStandardMaterial({ name: 'Water can', color: '#cfe3ea', roughness: .1, transparent: true, opacity: .45, depthWrite: false }); // plain alpha: transmission re-renders the whole scene
+  const waterCan = () => new T.LatheGeometry([[0, 0], [.12, 0], [.13, .02], [.13, .34], [.1, .39], [.035, .41], [.035, .45], [0, .45]].map(([r, y]) => new T.Vector2(r, y)), 24);
   const concrete = new T.MeshStandardMaterial({ name: 'Plain cast concrete', color: '#a9a49a', roughness: .95 });
   const marigold = new T.MeshStandardMaterial({ name: 'Marigold garlands', color: '#f0a020', roughness: .8 });
   const marigoldRed = new T.MeshStandardMaterial({ name: 'Orange-red marigolds', color: '#e2561c', roughness: .8 });
@@ -109,32 +114,10 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     for (const g of [parts.screen, parts.sill]) if (g.attributes.position) add(g.applyMatrix4(place), m.screen);
     for (const g of parts.letters) add(g.applyMatrix4(place), m.blue);
   }
-  // Leaf of a panelled door, built about its hinge: x runs from the hinge toward the opening's centre (dir = -side).
-  function doorLeaf(side, lw, h, panels, material) {
-    box(-side * lw / 2, h / 2, 0, lw, h, .045, material);
-    const ph = (h - .2 - (panels - 1) * .06) / panels;
-    for (let r = 0; r < panels; r++) for (const z of [-.028, .028]) box(-side * lw / 2, .1 + ph / 2 + r * (ph + .06), z, lw * .72, ph, .012, material);
-    box(-side * (lw - .06), h * .47, .05, .025, .14, .03, steel); // latch
-  }
-  // Iron grille leaf about its hinge: stiles, rails and verticals; an arched head with a fan of arcs, or a plain grid.
-  function grilleLeaf(side, lw, h, arched) {
-    const x = t => -side * lw * t;
-    for (const t of [0, 1]) rod([x(t), .02, 0], [x(t), h, 0], .016, grille);
-    for (const y of [.05, h]) rod([x(0), y, 0], [x(1), y, 0], .015, grille);
-    if (arched) {
-      for (let k = 1; k < 5; k++) rod([x(k / 5), .05, 0], [x(k / 5), h * .68, 0], .007, grille);
-      for (const y of [.55, 1.05]) rod([x(0), y, 0], [x(1), y, 0], .009, grille);
-      rod([x(0), h * .68, 0], [x(1), h * .68, 0], .009, grille);
-      for (const r of [.3, .55, .8]) { // concentric half-arcs over the leaf's centre, as filmed (frames 109-118)
-        const cx = x(.5), pts = Array.from({ length: 13 }, (_, i) => { const a = i * Math.PI / 12; return [cx + Math.cos(a) * r * lw * .5, h * .68 + Math.sin(a) * r * (h * .3), 0]; });
-        for (let i = 1; i < pts.length; i++) rod(pts[i - 1], pts[i], .007, grille, 4);
-      }
-      for (const a of [Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4]) rod([x(.5), h * .68, 0], [x(.5) + Math.cos(a) * lw * .4, h * .68 + Math.sin(a) * h * .24, 0], .006, grille, 4);
-    } else {
-      for (let k = 1; k < 7; k++) rod([x(k / 7), .05, 0], [x(k / 7), h, 0], .007, grille, 4);
-      for (let y = .2; y < h - .05; y += .16) rod([x(0), y, 0], [x(1), y, 0], .007, grille, 4);
-    }
-  }
+  // Leaf of a panelled door, built about its hinge (props.js): stiles, rails, raised panels, hinges, pull and bolt.
+  function doorLeaf(side, lw, h, panels, material) { const { paint, metal } = P.panelLeaf(lw, h, panels, -side); add(paint, material); add(metal, steel); }
+  // Welded iron grille leaf about its hinge (props.js): flat-bar frame, round bars, arched head or grid, padlock.
+  function grilleLeaf(side, lw, h, arched) { const { iron, lock } = P.grilleLeaf(lw, h, -side, arched); add(iron, grille); add(lock, steel); }
   // Wooden double door (panelled) closing an opening at u, optionally behind an iron grille gate. A leaf or gate that is
   // open is folded back flat against the passage wall beside the opening (outward, as the junction lab door is filmed).
   function labDoor(u, w, h, { grilleGate = true, arched = true, gateOpen = false, gateLeaves = 2, open = false, garland = false, panels = 4, material = doorWood } = {}) {
@@ -142,8 +125,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
       const hinge = new T.Matrix4().makeRotationY(open ? side * (Math.PI - .1) : 0).setPosition(u + side * w / 2, F, open ? .07 : -.06);
       placed(hinge, () => doorLeaf(side, w / 2 - .01, h, panels, material));
     }
-    for (const s of [-1, 1]) box(u + s * (w / 2 + .03), at(h / 2), .0, .06, h + .06, .1, material);
-    box(u, at(h + .03), 0, w + .12, .06, .1, material);
+    put(P.doorFrame(w, h, .1), material, u, F, 0);
     if (grilleGate) for (const side of gateLeaves === 2 ? [-1, 1] : [1]) {
       const lw = gateLeaves === 2 ? w / 2 : w;
       const hinge = new T.Matrix4().makeRotationY(gateOpen ? side * (Math.PI - .06) : 0).setPosition(u + side * w / 2, F, gateOpen ? .1 : .075);
@@ -248,7 +230,8 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     rod([x + .14, F + .1, z + .08], [x + .14, F + .01, z + .3], .009, pvc, 6);
     rod([x + .14, F + .3, z + .13], [inE - .03, F + 1.2, z + .3], .004, black, 4); box(inE - .04, F + 1.22, z + .3, .03, .09, .07, metalBox);
   }
-  function darkRoom(u, w, h, v0 = 0) { box(u, at(v0 + h / 2), -.55, w + .1, h + .1, .02, dark); }
+  // Dim room behind an opening, seen from the passage only (one-sided): from inside the room it is not there.
+  function darkRoom(u, w, h, v0 = 0) { const g = new T.PlaneGeometry(w + .1, h + .1); g.translate(u, at(v0 + h / 2), -.55); add(g, dark); }
   // Small dark high window under the ceiling (clerestory), framed, with two mullions.
   function highWindow(w, h, v0) {
     box(0, at(v0 + h / 2), -.06, w, h, .02, glassDark);
@@ -266,13 +249,13 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     return { map, u, h, width };
   }
   const signs = [];
-  function tubeLight(u, h) { box(u, at(h), .05, 1.2, .045, .045, tube); box(u, at(h + .03), .02, 1.26, .035, .05, steel); }
+  function tubeLight(u, h) { const b = P.tubeBatten(); put(b.body, metalBox, u, at(h) + .03, .045); put(b.tube, tube, u, at(h) + .03, .045); }
   function fuseBoxes(u, h, pipe = true) {
-    for (const [du, dh, w, hh] of [[0, 0, .5, .46], [.52, .1, .36, .38], [-.02, -.55, .44, .3], [.46, -.46, .26, .34], [.2, .45, .3, .22]]) box(u + du, at(h + dh), .08, w, hh, .16, metalBox);
+    for (const [du, dh, w, hh] of [[0, 0, .5, .46], [.52, .1, .36, .38], [-.02, -.55, .44, .3], [.46, -.46, .26, .34], [.2, .45, .3, .22]]) { const f = P.fuseBox(w, hh, .16); put(f.body, metalBox, u + du, at(h + dh), .08); put(f.metal, steel, u + du, at(h + dh), .08); }
     for (const du of [-.18, .05, .3]) rod([u + du, at(h + .25), .03], [u + du, at(3.0), .03], .018, pvc, 5);
     if (pipe) rod([u - .3, at(.05), .04], [u - .3, at(h - .7), .04], .022, pvc, 6); // service pipe down to the floor (photo 38)
   }
-  function extinguisher(u, h) { cyl(u, at(h), .1, .075, .075, .46, red); cyl(u, at(h + .27), .1, .025, .03, .07, black, 8); rod([u + .03, at(h + .27), .14], [u + .07, at(h - .12), .16], .012, black, 5); }
+  function extinguisher(u, h) { const e = P.extinguisher(); put(e.shell, red, u, at(h) - .23, .1); put(e.black, black, u, at(h) - .23, .1); put(e.bracket, steel, u, at(h) - .23, .1); }
 
   const { west: XW, east: XE, north: ZN, south: ZS, classroomSlab: ZC, endBay: ZB } = westWing;
   const inW = XW + .1, inE = XE - .16, inN = ZN + .16, inS = ZS - .16, corridorNorth = groundSpine.roomFront, corridorSouth = 3.25;
@@ -297,7 +280,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   box((XE + westWing.stepsTop) / 2, F / 2, corridorSouth - .07, westWing.stepsTop - XE + .02, -F, .18, plaster);
   // East wall (exterior): plain behind the office block, then, from the pilaster, recessed screen panels with a grilled
   // door between a narrow panel (south) and a one-block strip (north), as in photos 33-36 and frames 140-163.
-  const sill = .5, head = 2.6, eastDoor = { u: -8.8, w: 1.0 }; // tall panels, earth visible through the lowest openings (photos 33, 35)
+  const sill = .5, head = 2.95, eastDoor = { u: -8.8, w: 1.0 }; // tall panels, earth visible through the lowest openings (photos 33, 35)
   const eastHoles = [
     { u0: -5.25, u1: -3.8, v0: at(sill), v1: at(head) }, { u0: -7.0, u1: -5.55, v0: at(sill), v1: at(head) },
     { u0: -8.05, u1: -7.3, v0: at(sill), v1: at(head) },
@@ -393,7 +376,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     for (let i = 0; i <= 14; i++) { const g = new T.SphereGeometry(.035, 6, 4); g.translate(-.5 + i / 14, at(2.17), .13); add(g, i % 2 ? marigold : marigoldRed); }
   });
   W(.45, () => { fuseBoxes(0, 1.9); extinguisher(.5, 1.25); }); // meter and fuse boxes at the junction (photo 38)
-  W(14.18, () => { labDoor(0, .96, 2.12, { grilleGate: false, panels: 5, material: greyDoor }); darkRoom(0, .96, 2.12); }); // DCS lab
+  W(14.18, () => { labDoor(0, .96, 2.12, { grilleGate: false, panels: 5, material: greyDoor }); }); // DCS lab (closed: the leaves show from both sides)
   W(11.6, () => { const c = canvasMap(128, 256, (g, w, h) => { g.fillStyle = '#f3efe4'; g.fillRect(0, 0, w, h); g.fillStyle = '#b22a2a'; g.fillRect(8, 8, w - 16, 70); g.fillStyle = '#333'; for (let r = 0; r < 6; r++) for (let k = 0; k < 7; k++) g.fillRect(12 + k * 15, 96 + r * 24, 10, 14); }, false);
     const g = new T.PlaneGeometry(.32, .6); g.translate(0, at(1.55), .012); add(g, new T.MeshStandardMaterial({ name: 'Wall calendar', map: c, roughness: .9 })); }); // calendar (frame 57)
   for (const u of highWindows) W(u, () => highWindow(.72, .4, 2.5));
@@ -404,48 +387,44 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   placed(new T.Matrix4().set(0, 0, -1, inE, 0, 1, 0, 0, 1, 0, 0, eastDoor.u, 0, 0, 0, 1), () => labDoor(0, eastDoor.w, 2.12, { arched: false, gateLeaves: 1, panels: 6, material: greyDoor }));
   // Near the junction: ladder, cardboard box and bucket, table with steel vessels, pink bucket and water can, a leaning
   // plank before the pilaster (photos 36-38).
-  box(inE - .3, at(.78), -2.4, .55, .04, 1.05, table);
-  for (const dx of [-.24, .24]) for (const dz of [-.48, .48]) box(inE - .3 + dx, at(.38), -2.4 + dz, .04, .76, .04, table);
-  box(inE - .3, at(.3), -2.4, .5, .02, .98, table);
-  for (const [dz, r, h] of [[-.3, .09, .12], [-.05, .07, .2], [.2, .1, .08], [.38, .06, .15]]) cyl(inE - .3, at(.8 + h / 2), -2.4 + dz, r, r * .9, h, steel);
-  box(inE - .3, at(.86), -2.75, .3, .12, .22, new T.MeshStandardMaterial({ name: 'Blue lidded box', color: '#2f62c4', roughness: .5 }));
-  cyl(inE - .3, at(.15), -2.2, .16, .13, .3, new T.MeshStandardMaterial({ name: 'Pink bucket', color: '#e59aa8', roughness: .6 }));
-  cyl(inE - .3, at(.21), -2.6, .13, .13, .42, new T.MeshStandardMaterial({ name: 'Water can', color: '#cfe3ea', roughness: .1, transparent: true, opacity: .45, depthWrite: false })); // plain alpha: transmission re-renders the whole scene (~48 ms on the owner's GPU)
-  for (const s of [-1, 1]) rod([inE - .45, F, -.95 + s * .2], [inE - .05, at(2.05), -.95 + s * .2], .02, steel, 4);
-  for (let k = 1; k < 8; k++) { const t = k / 8; rod([inE - .45 + .4 * t, at(2.05 * t), -1.15], [inE - .45 + .4 * t, at(2.05 * t), -.75], .012, steel, 4); }
-  box(inE - .3, at(.22), -.45, .5, .44, .4, new T.MeshStandardMaterial({ name: 'Cardboard box', color: '#b08a5c', roughness: .9 }));
-  cyl(inE - .2, at(.15), -.05, .14, .12, .3, new T.MeshStandardMaterial({ name: 'Green bucket', color: '#2d6b5a', roughness: .6 }));
-  { const g = new T.BoxGeometry(.03, 1.3, .3); g.rotateZ(-.12); g.translate(inE - .1, at(.66), -3.05); add(g, rawWood); }
+  put(P.woodTable(.55, 1.05, .8), table, inE - .3, F, -2.4);
+  put(P.steelPot(.09, .18), steel, inE - .3, at(.8), -2.7); put(P.steelBowl(.08, .05), steel, inE - .32, at(.8), -2.45);
+  put(P.steelPlate(.13), steel, inE - .28, at(.8), -2.2); put(P.steelTumbler(), steel, inE - .25, at(.8), -2.02); put(P.steelBowl(.06, .04), steel, inE - .25, at(.803), -2.2);
+  put(P.rbox(.3, .1, .22, .02, 0, .05, 0), new T.MeshStandardMaterial({ name: 'Blue lidded box', color: '#2f62c4', roughness: .35 }), inE - .32, at(.8), -2.85);
+  { const b = P.bucket(.16, .13, .3); put(b.body, new T.MeshStandardMaterial({ name: 'Pink bucket', color: '#e59aa8', roughness: .45 }), inE - .3, F, -2.2); put(b.handle, black, inE - .3, F, -2.2); }
+  put(waterCan(), canMat, inE - .3, F, -2.6);
+  put(P.stepLadder(2.05), steel, inE - .36, F, -.95, -Math.PI / 2);
+  { const c = P.carton(.5, .44, .4); put(c.box, kraft, inE - .3, F, -.45); put(c.tape, tape, inE - .3, F, -.45); }
+  { const b = P.bucket(.14, .12, .3); put(b.body, new T.MeshStandardMaterial({ name: 'Green bucket', color: '#2d6b5a', roughness: .45 }), inE - .2, F, -.05); put(b.handle, black, inE - .2, F, -.05); }
+  { const g = P.board(.3, 1.3, .03); g.rotateY(Math.PI / 2); g.rotateZ(-.12); g.translate(inE - .1, at(.66), -3.05); add(g, new T.MeshStandardMaterial({ name: 'Leaning plank', map: P.woodTexture('#a3825c', { vertical: true, worn: 2 }), roughness: .85 })); }
   // Washing bay: concrete counter under the corner screens (north wall and east wall), a steel trough with two bowls,
   // a tap stand on the screen, buckets beneath; a water purifier and a raw wooden table frame (photo 33, frames 122-140).
   box((inW + inE) / 2 + .35, at(.8), inN + .28, inE - inW - .7, .07, .56, concrete);
   box(inE - .28, at(.8), (inN + .56 + ZB + .2) / 2, .56, .07, ZB + .2 - inN - .56, concrete);
   for (const x of [inW + .75, (inW + inE) / 2 + .2]) box(x, at(.38), inN + .28, .1, .76, .5, concrete);
   box(inE - .28, at(.38), ZB, .5, .76, .1, concrete);
-  box(inE - .75, at(.74), inN + .3, .62, .1, .42, steel);
-  for (const dx of [-.14, .14]) cyl(inE - .75 + dx, at(.83), inN + .3, .09, .07, .08, steel, 18);
+  { const x = inE - .75, z = inN + .3, y = at(.7); put(P.rbox(.62, .012, .42, .004), steel, x, y, z); for (const s of [-1, 1]) { put(P.rbox(.012, .14, .42, .003), steel, x + s * .31, y + .07, z); put(P.rbox(.62, .14, .012, .003), steel, x, y + .07, z + s * .21); } put(P.rbox(.012, .12, .4, .003), steel, x, y + .06, z); } // two-bowl steel trough
   rod([inE - .75, at(.8), inN + .06], [inE - .75, at(1.55), inN + .06], .014, steel, 6);
   rod([inE - .75, at(1.55), inN + .06], [inE - .75, at(1.48), inN + .2], .012, steel, 6);
-  cyl(inE - .6, at(.16), inN + .35, .17, .14, .32, red); cyl(inE - .6, at(.32), inN + .35, .175, .175, .02, new T.MeshStandardMaterial({ name: 'Blue bucket rim', color: '#2c6fb8', roughness: .5 }));
-  cyl(inW + 1.2, at(.2), inN + .3, .15, .15, .4, plastic);
-  cyl(inE - .3, at(.92), -13.9, .12, .12, .22, new T.MeshStandardMaterial({ name: 'Beige can', color: '#d9c79a', roughness: .5 }));
+  { const b = P.bucket(.17, .14, .32); put(b.body, red, inE - .6, F, inN + .38); put(b.handle, black, inE - .6, F, inN + .38); }
+  { const b = P.bucket(.15, .13, .38); put(b.body, plastic, inW + 1.2, F, inN + .32); put(b.handle, black, inW + 1.2, F, inN + .32); }
+  put(waterCan(), new T.MeshStandardMaterial({ name: 'Beige can', color: '#d9c79a', roughness: .4 }), inE - .3, at(.84), -13.9);
   purifier(inE - .2, ZB + .55);
-  { const x = inW + .35, z = -13.9; box(x, at(.95), z, .6, .04, 1.1, rawWood); box(x, at(.25), z, .55, .03, 1.0, rawWood); for (const dx of [-.27, .27]) for (const dz of [-.52, .52]) box(x + dx, at(.47), z + dz, .05, .95, .05, rawWood); }
+  put(P.woodTable(.6, 1.1, .97), rawWood, inW + .35, F, -13.9);
   // Tables draped in maroon cloth with a white patterned top cloth along the west wall before the bay (frames 118-127).
   const motif = canvasMap(256, 256, (g, w, h) => {
     g.fillStyle = '#efe9dd'; g.fillRect(0, 0, w, h); g.fillStyle = '#8f1d24';
     for (let y = 32; y < h; y += 64) for (let x = 32; x < w; x += 64) { g.save(); g.translate(x, y); g.rotate(Math.PI / 4); g.fillRect(-12, -12, 24, 24); g.restore(); g.fillRect(x - 3, y - 22, 6, 44); g.fillRect(x - 22, y - 3, 44, 6); }
   }, true);
   const topCloth = new T.MeshStandardMaterial({ name: 'Patterned top cloth', map: motif, roughness: .95 });
-  for (const z of [-10.9, -12.1]) { box(inW + .35, at(.55), z, .62, 1.1, 1.0, cloth); const g = new T.BoxGeometry(.66, .03, 1.04); g.translate(inW + .35, at(1.115), z); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * 2); add(g, topCloth); }
+  for (const z of [-10.9, -12.1]) { put(P.woodTable(.6, .98, 1.08, { shelf: false }), table, inW + .35, F, z); put(P.drapedCloth(.62, 1.0, 1.1, 1.06), cloth, inW + .35, F, z); const g = P.drapedCloth(.64, 1.02, 1.115, .18); const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * 2); put(g, topCloth, inW + .35, F, z); }
   // Front passage: stacked white chairs and a wooden chair against the west wall after the toran door, one chair by the
   // screens opposite, a paper lantern overhead (frame 57).
-  const chair = (z, n, material, side, back = .5) => { for (let k = 0; k < n; k++) { // side -1: west wall, 1: east (screens)
-    const y = k * .045, wallX = side < 0 ? inW : inE, seat = wallX - side * (.35 + k * .02), rest = wallX - side * (.14 + k * .02);
-    box(seat, at(.44 + y), z, .44, .035, .44, material); box(rest, at(.44 + back / 2 + y), z, .04, back, .44, material);
-    for (const dx of [-.18, .18]) for (const dz of [-.18, .18]) box(seat + dx, at(.22 + y), z + dz, .03, .44, .03, material);
+  const chair = (z, n, material, side) => { for (let k = 0; k < n; k++) { // side -1: west wall, 1: east (screens); stacks nest
+    const x = (side < 0 ? inW : inE) - side * (.34 + k * .015), ry = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+    put(material === plastic ? P.monoblocChair() : P.woodenChair(), material, x, F + k * .05, z, ry);
   } };
-  chair(5.3, 4, plastic, -1); chair(6.15, 3, plastic, -1); chair(6.9, 1, table, -1, .55); chair(9.4, 1, plastic, 1);
+  chair(5.3, 4, plastic, -1); chair(6.15, 3, plastic, -1); chair(6.9, 1, table, -1); chair(9.4, 1, plastic, 1);
   cyl((inW + inE) / 2, southCeiling - .55, 6.6, .16, .16, .32, new T.MeshStandardMaterial({ name: 'Pink paper lantern', color: '#f0418a', emissive: '#5a0d2a', roughness: .8 }), 12);
   rod([(inW + inE) / 2, southCeiling - .38, 6.6], [(inW + inE) / 2, southCeiling, 6.6], .004, steel, 3);
 
@@ -496,7 +475,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     g.save(); g.translate(w * .42, h * .62); g.rotate(-Math.PI / 2); g.fillStyle = 'rgba(40,28,20,.8)'; g.font = 'italic bold 44px Georgia'; g.fillText('Marine', 0, 0); g.font = 'italic 22px Georgia'; g.fillText('gold', 150, 0); g.restore();
   }, false);
   const plyMat = new T.MeshStandardMaterial({ name: 'Weathered plywood boards', map: ply, roughness: .9 });
-  { const g = new T.BoxGeometry(.9, 1.7, .025); g.rotateX(-.04); g.translate(inE - .5, at(.85), inS - .06); add(g, plyMat); } // leaning on the gate
+  { const g = P.board(.9, 1.7, .018); g.rotateX(-.04); g.translate(inE - .5, at(.85), inS - .06); add(g, plyMat); } // leaning on the gate
   // Below the outside walls (which start at the old floor datum, y = 0) the passage ends need their own plaster down to
   // the lowered floor: the north end under the washing-bay screen.
   box((inW + inE) / 2, F / 2 + .41, inN - .08, inE - inW, -F + .82, .16, plaster);
@@ -550,32 +529,30 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     const lab = new T.Group(); lab.name = 'Lab glimpse beyond the junction door';
     const labH = ceilingLow - .05, cx = XW - .12 - 2.8;
     const labTiles = canvasMap(128, 128, (g, w, h) => { g.fillStyle = '#e9e9e2'; g.fillRect(0, 0, w, h); g.strokeStyle = '#b9bbb4'; g.lineWidth = 3; g.strokeRect(0, 0, w, h); }, true);
-    labTiles.repeat.set(5.58 / .3, 4.18 / .3);
-    const room = new T.Mesh(new T.BoxGeometry(5.6, labH, 4.2), new T.MeshStandardMaterial({ color: '#bcd6dc', roughness: .9, side: T.BackSide })); room.position.set(cx, F + labH / 2, 2.2);
-    const labFloor = new T.Mesh(new T.PlaneGeometry(5.58, 4.18), new T.MeshStandardMaterial({ map: labTiles, roughness: .35 })); labFloor.rotation.x = -Math.PI / 2; labFloor.position.set(cx, F + .004, 2.2);
+    labTiles.repeat.set(5.58 / .3, 3.33 / .3);
+    const room = new T.Mesh(new T.BoxGeometry(5.6, labH, 3.35), new T.MeshStandardMaterial({ color: '#bcd6dc', roughness: .9, side: T.BackSide })); room.position.set(cx, F + labH / 2, 1.775); // fits its room (0.1-3.45)
+    const labFloor = new T.Mesh(new T.PlaneGeometry(5.58, 3.33), new T.MeshStandardMaterial({ map: labTiles, roughness: .35 })); labFloor.rotation.x = -Math.PI / 2; labFloor.position.set(cx, F + .004, 1.775);
     const cream = new T.MeshStandardMaterial({ color: '#d9d4c2', roughness: .6 }), frameMat = new T.MeshStandardMaterial({ color: '#c9c9c4', roughness: .5, metalness: .3 });
-    const cabinet = new T.Mesh(new T.BoxGeometry(.75, .85, .55), cream); cabinet.position.set(XW - 1.0, F + 1.2, 2.6); // panel board on a wheeled frame
+    const cabinet = new T.Mesh(P.rbox(.75, .85, .55, .02), cream); cabinet.position.set(XW - 1.0, F + 1.2, 2.6); // panel board on a wheeled frame
     lab.add(room, labFloor, cabinet);
     for (const dx of [-.34, .34]) for (const dz of [-.24, .24]) { const leg = new T.Mesh(new T.BoxGeometry(.035, .78, .035), frameMat); leg.position.set(XW - 1.0 + dx, F + .41, 2.6 + dz); lab.add(leg); }
     const shelf = new T.Mesh(new T.BoxGeometry(.72, .03, .52), frameMat); shelf.position.set(XW - 1.0, F + .2, 2.6); lab.add(shelf);
     const pump = new T.Mesh(new T.SphereGeometry(.15, 16, 12), new T.MeshStandardMaterial({ color: '#2a52b8', roughness: .4 })); pump.position.set(XW - 1.0, F + .45, 2.6); lab.add(pump);
     const mat = new T.Mesh(new T.BoxGeometry(.4, .012, .62), black); mat.position.set(XW - .45, F + .01, 2.15); lab.add(mat);
-    const legs = new T.MeshStandardMaterial({ color: '#6b4a2f', roughness: .7 });
+    const legs = new T.MeshStandardMaterial({ name: 'Lab stool wood', map: P.woodTexture('#6b4a2f'), roughness: .6 });
     for (const [x, z] of [[XW - 2.6, 1.3], [XW - 2.6, 3.1], [XW - 4.4, 1.3]]) {
-      const top = new T.Mesh(new T.BoxGeometry(1.8, .05, .7), table); top.position.set(x, F + .85, z); lab.add(top);
-      for (const dx of [-.85, .85]) for (const dz of [-.3, .3]) { const l = new T.Mesh(new T.BoxGeometry(.05, .83, .05), legs); l.position.set(x + dx, F + .42, z + dz); lab.add(l); }
-      for (const dx of [-.5, .1, .6]) { const s = new T.Mesh(new T.CylinderGeometry(.14, .14, .04, 10), legs); s.position.set(x + dx, F + .55, z + .55); lab.add(s); const sl = new T.Mesh(new T.BoxGeometry(.2, .53, .2), legs); sl.position.set(x + dx, F + .27, z + .55); lab.add(sl); }
+      const bench = new T.Mesh(P.woodTable(1.8, .7, .85), table); bench.position.set(x, F, z); lab.add(bench);
+      for (const dx of [-.5, .1, .6]) { const st = new T.Mesh(P.stool(.52), legs); st.position.set(x + dx, F, z + .55); lab.add(st); }
     }
     for (const x of [XW - 2.7, XW - 4.7]) {
       const fan = new T.Group(); fan.position.set(x, F + labH - .35, 2.2);
       const hub = new T.Mesh(new T.CylinderGeometry(.09, .09, .12, 12), black); fan.add(hub); const down = new T.Mesh(new T.CylinderGeometry(.015, .015, .4, 6), black); down.position.y = .25; fan.add(down);
-      for (let k = 0; k < 3; k++) { const blade = new T.Mesh(new T.BoxGeometry(.6, .01, .1), black); blade.position.set(Math.cos(k * 2.094) * .35, 0, Math.sin(k * 2.094) * .35); blade.rotation.y = -k * 2.094; fan.add(blade); }
+      for (let k = 0; k < 3; k++) { const blade = new T.Mesh(P.rbox(.6, .012, .11, .005), black); blade.position.set(Math.cos(k * 2.094) * .35, 0, Math.sin(k * 2.094) * .35); blade.rotation.y = -k * 2.094; fan.add(blade); }
       lab.add(fan);
     }
-    const win = new T.Mesh(new T.PlaneGeometry(1.4, 1.0), new T.MeshBasicMaterial({ color: '#f2f7f4' })); win.rotation.y = Math.PI / 2; win.position.set(cx - 2.78, F + 1.6, 2.2); lab.add(win);
-    for (let k = 0; k <= 6; k++) { const bar = new T.Mesh(new T.BoxGeometry(.03, 1.0, .03), grille); bar.position.set(cx - 2.76, F + 1.6, 1.5 + k * 1.4 / 6); lab.add(bar); }
-    const light = new T.Mesh(new T.BoxGeometry(1.2, .05, .05), tube); light.position.set(XW - 3, F + labH - .25, 2.2);
-    lab.add(light); fittings.add(lab);
+    const win = new T.Mesh(new T.PlaneGeometry(1.4, 1.0), new T.MeshBasicMaterial({ color: '#f2f7f4' })); win.rotation.y = Math.PI / 2; win.position.set(cx - 2.78, F + 1.6, 1.775); lab.add(win);
+    for (let k = 0; k <= 6; k++) { const bar = new T.Mesh(new T.CylinderGeometry(.012, .012, 1.0, 8), grille); bar.position.set(cx - 2.76, F + 1.6, 1.075 + k * 1.4 / 6); lab.add(bar); }
+    const tb = P.tubeBatten(), light = new T.Mesh(tb.tube, tube), batten = new T.Mesh(tb.body, metalBox); light.position.set(XW - 3, F + labH - .25, 2.2); batten.position.copy(light.position); lab.add(light, batten); fittings.add(lab);
   }
 
   // Signs (canvas text) projecting from the west wall beside their doors.
@@ -586,6 +563,17 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   for (const s of signs) box(inW + .03, at(s.h + .14), s.u, .06, .03, .03, steel); // bracket
 
   const structure = new Set([plaster, tiles, stepStone, m.screen, m.blue, m.wall, m.trim, m.paving, concrete, ceilingMat, grille, doorWood, greyDoor, dark, glassDark]);
+  // Rooms behind the doors (owner, 2026-10-17): the block is divided between the doors that open off the passage, each
+  // room with whitewashed partitions, a pale tiled floor and a ceiling. Their contents were not filmed, so they are left
+  // empty (the Process Control lab glimpse is the one furnished room). Partitions sit between neighbouring doors.
+  { const x0 = -33.84, x1 = XW - .1, top = F + ceilingHigh, roomWall = new T.MeshStandardMaterial({ name: 'Room whitewash', color: '#e8e6dd', roughness: .92 });
+    for (const z of [9.6, 3.52, 0.03, -1.85, -6.9, -11.3]) box((x0 + x1) / 2, (F + top) / 2, z, x1 - x0, top - F, .12, roomWall);
+    const roomTiles = canvasMap(128, 128, (g, w, h) => { g.fillStyle = '#d8d6cc'; g.fillRect(0, 0, w, h); g.strokeStyle = '#a9a79e'; g.lineWidth = 3; g.strokeRect(0, 0, w, h); }, true);
+    const floorMat = new T.MeshStandardMaterial({ name: 'Room floor tiles', map: roomTiles, roughness: .4 });
+    const strip = (xa, xb, za, zb) => { const g = new T.PlaneGeometry(xb - xa, zb - za); g.rotateX(-Math.PI / 2); g.translate((xa + xb) / 2, F + .002, (za + zb) / 2); const p = g.attributes.position, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / .4, p.getZ(i) / .4); add(g, floorMat); };
+    strip(x0, x1, ZN + .16, .09); strip(x0, x1, 3.46, ZS - .16); strip(x0, -30.24, .09, 3.46); // the lab glimpse has its own floor
+    const ceil = new T.PlaneGeometry(x1 - x0, ZS - ZN - .32); ceil.rotateX(Math.PI / 2); ceil.translate((x0 + x1) / 2, top - .006, 0); add(ceil, ceilingMat);
+    wall('x', XW - .105, ZN + .16, ZS - .16, F, top, westHoles, .01, roomWall); } // the passage wall's room side, whitewashed
   // Bake walls and screens with world-scale UVs (grime band at the floor), then merge everything by material.
   for (const g of walls) { const p = g.attributes.position, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + p.getZ(i)) / 2.2, (p.getY(i) - F) / 3.3); add(g, plaster); }
   for (const [material, list] of batches) {

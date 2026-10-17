@@ -174,7 +174,7 @@ export function buildArchitecture(scene) {
   const screenTemplates = new Map();
   function concreteScreen(x, y, w, h, transform) {
     const key = `${w}:${h}`;
-    if (!screenTemplates.has(key)) screenTemplates.set(key, concreteScreenParts(w, h));
+    if (!screenTemplates.has(key)) screenTemplates.set(key, concreteScreenParts(w, h, 16, Math.max(5, Math.round(h / (2.15 / 11))))); // block size kept
     const parts = screenTemplates.get(key), move = new T.Matrix4().makeTranslation(x, y, 0).premultiply(transform);
     if (!batches.has(m.screen)) batches.set(m.screen, []); if (!batches.has(m.blue)) batches.set(m.blue, []);
     for (const g of [parts.screen, parts.sill]) batches.get(m.screen).push(g.clone().applyMatrix4(move));
@@ -276,14 +276,17 @@ export function buildArchitecture(scene) {
       // The entrance is an actual opening, not doors placed over a solid ground-floor wall.
       if ((openGround || type === 'tower-front' || type === 'tower-side') && f === 0) continue;
       const raisedScreen = type === 'corridor' && cx > 0 && f === 0 && rotation === 0;
-      const y = f * floorH, openingH = raisedScreen ? 2.04 : f === 0 ? 2.15 : 1.9;
+      const y = f * floorH; let openingH = raisedScreen ? 2.04 : f === 0 ? 2.15 : 1.9;
       // The west wing's ground storey is sunk with its floor (owner, 2026-10-16): its walls, screens, windows and gate
       // start at the wing floor; the storey above stays where it is.
       const sunk = f === 0 && (westOuter || type === 'west') ? westWing.floor : f === 0 && type === 'low-corridor' && rotation === 0 ? westWing.corridor : 0, y0 = y + sunk; // front of the west corridor: with its floor
-      const openingY = raisedScreen ? groundSpine.screenBottom + openingH / 2 : y0 + (f === 0 ? 1.9 : 2.55);
+      let openingY = raisedScreen ? groundSpine.screenBottom + openingH / 2 : y0 + (f === 0 ? 1.9 : 2.55);
+      // The sunk storey is taller: its screens rise from 0.85 above the floor to 0.75 below the storey above, as filmed.
+      if (sunk && type === 'west') { const bottom = y0 + .85, top = y + floorH - .75; openingH = top - bottom; openingY = (top + bottom) / 2; }
       const hasGate = (type === 'gate-return' || type === 'west-end') && f === 0;
       const gateMaterial = type === 'west-end' ? m.westGate : m.gate;
       if (!hasGate) b(0, y0 + (openingY - openingH / 2 - y0) / 2, 0, width, openingY - openingH / 2 - y0, .32, m.wall);
+      else if (bays > 1) b(-width / bays / 2, y0 + (openingY - openingH / 2 - y0) / 2, 0, width - width / bays, openingY - openingH / 2 - y0, .32, m.wall); // under the windows beside the gate bay
       const high = openingY + openingH / 2;
       b(0, (high + y + floorH) / 2, 0, width, y + floorH - high, .32, m.wall);
       for (let j = 0; j < bays; j++) {
@@ -402,7 +405,7 @@ export function buildArchitecture(scene) {
           box(cx + .19, classroom.lowerFloor + .45, (rear + junction) / 2, .075, .35, junction - rear, m.blue);
         } else b(0, type === 'low-corridor' && rotation === 0 ? classroom.floor + .45 : y + floorH + .45, .19, width, .35, .075, m.blue);
       }
-      if (f === 0 && (westWindow || type === 'east-wing')) b(0, 3.15 + sunk, .38, width + .25, .14, 1.05, m.trim);
+      if (f === 0 && (westWindow || type === 'east-wing')) b(0, sunk && type === 'west' ? y + floorH - .68 : 3.15 + sunk, .38, width + .25, .14, 1.05, m.trim); // sunshade above the openings
     }
     if (onlyFloor !== null) return;
     facade = false; belowClassroomJunction = false;
@@ -490,7 +493,7 @@ export function buildArchitecture(scene) {
         }
       }
     }
-    if (type === 'low-corridor') box(x + (westWing.stepsTop - x + w / 2) / 2, .02, (z - d / 2 + groundSpine.roomFront) / 2, w - (westWing.stepsTop - x + w / 2), .18, groundSpine.roomFront - (z - d / 2), m.roof); // rooms only: the corridor floor is three steps lower
+    if (type === 'low-corridor') box(x + (westWing.stepsTop - x + w / 2) / 2, .02, (z - d / 2 + groundSpine.roomFront - .2) / 2, w - (westWing.stepsTop - x + w / 2), .18, groundSpine.roomFront - .2 - (z - d / 2), m.roof); // stops inside the corridor wall // rooms only: the corridor floor is three steps lower
     else box(x, type === 'west' ? westWing.floor - .1 : .02, z, w, .18, d, m.roof); // the west wing floor is three steps lower
     // Plinth: the walls continue into the ground (the terrain around the building lies 0.05-0.15 below the floor
     // datum), stained by rain splash as photographed, so the building never shows a gap or the slab edge.
@@ -503,7 +506,7 @@ export function buildArchitecture(scene) {
       // Rooms keep a solid base to y = 0; under the corridor (three steps down) it stops below the floor, with a ring
       // under the facade wall up to its base.
       const cut = westWing.stepsTop - (x - w / 2), x0 = x - w / 2 + cut, x1 = x + w / 2 + .01, rooms = groundSpine.roomFront, front = z + d / 2;
-      box((x0 + x1) / 2, -.4, (z - d / 2 - .01 + rooms) / 2, x1 - x0, .8, rooms - (z - d / 2 - .01), m.plinth);
+      box((x0 + x1) / 2, -.4, (z - d / 2 - .01 + rooms - .2) / 2, x1 - x0, .8, rooms - .2 - (z - d / 2 - .01), m.plinth);
       box((x0 + x1) / 2, (westWing.corridor - .02 - .8) / 2, (rooms + front - .15) / 2, x1 - x0, westWing.corridor - .02 + .8, front - .15 - rooms, m.plinth);
       // Below the sunk facade: its plaster wall continues down to the low left slab, the plinth below that.
       const slab = westWing.ground + .1;
