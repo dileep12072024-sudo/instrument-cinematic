@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { stairs, stairFlights } from './stair-layout.js';
+import { casementCluster } from './openable.js';
 
 export function buildStairways(parent, m) {
   const group = new T.Group(); group.name = 'Connected stairways: ground to roof'; parent.add(group);
@@ -65,6 +66,8 @@ export function buildStairways(parent, m) {
   // Rear windows are openings through the shell, including the three top-landing windows.
   const glass = new T.MeshStandardMaterial({ color: '#dce8e3', transparent: true, opacity: .18, roughness: .12, depthWrite: false });
   const aluminium = new T.MeshStandardMaterial({ color: '#d4d7d0', metalness: .65, roughness: .33 });
+  const casements = casementCluster('Rear stair windows', aluminium, glass, { near: 25 });
+  const rows = [];
   let bottom = 0;
   for (const [sill, height, centres, width] of [[3.95, 1.45, [-2.65, 0, 2.65], 1.35], [6.8, 1.5, [-2.65, 0, 2.65], 1.35], [10.95, 1.65, [-2.65, 0, 2.65], 1.5]]) {
     box(0, (bottom + sill) / 2, -6.9, 8, sill - bottom, .2, m.wall);
@@ -72,26 +75,25 @@ export function buildStairways(parent, m) {
     for (const x of centres) {
       const a = x - width / 2, b = x + width / 2;
       box((left + a) / 2, sill + height / 2, -6.9, a - left, height, .2, m.wall);
-      const window = new T.Group(); window.name = 'Rear window with casement shutters and grille'; group.add(window);
-      for (const side of [-1, 1]) {
-        const sash = new T.Group(); sash.name = 'Glazed opening shutter'; sash.position.set(x + side * width / 2, sill, -6.77); sash.rotation.y = side * .22; window.add(sash);
-        const part = (xx, yy, w, h, material) => { const mesh = new T.Mesh(new T.BoxGeometry(w, h, material === glass ? .012 : .035), material); mesh.position.set(xx, yy, 0); sash.add(mesh); };
-        const centre = -side * width / 4;
-        part(centre, height / 2, width / 2 - .07, height - .07, glass);
-        for (const xx of [0, -side * width / 2]) part(xx, height / 2, .035, height, aluminium);
-        for (const yy of [0, height]) part(centre, yy, width / 2, .035, aluminium);
-        part(-side * (width / 2 - .07), height * .45, .025, .13, m.metal);
-      }
-      for (let dx = -width / 2 + .14; dx < width / 2; dx += .14) box(x + dx, sill + height / 2, -6.94, .014, height, .018, gatePaint);
-      for (let yy = sill + .30; yy < sill + height; yy += .30) box(x, yy, -6.94, width, .014, .018, gatePaint);
-      for (const dx of [-width / 2, 0, width / 2]) box(x + dx, sill + height / 2, -6.77, .045, height, .065, aluminium);
-      for (const y of [sill, sill + height]) box(x, y, -6.77, width, .045, .065, aluminium);
+      // Glazed casements at the outer face, opening outward (owner, 2026-10-17); the grille sits inside them.
+      casements.add(new T.Matrix4().makeRotationY(Math.PI).setPosition(x, sill, -7.0), width, height, { rows: 3, cols: 1 });
+      for (let dx = -width / 2 + .14; dx < width / 2; dx += .14) box(x + dx, sill + height / 2, -6.84, .014, height, .018, gatePaint);
+      for (let yy = sill + .30; yy < sill + height; yy += .30) box(x, yy, -6.84, width, .014, .018, gatePaint);
+      for (const dx of [-width / 2, 0, width / 2]) if (dx !== 0) box(x + dx, sill + height / 2, -6.98, .045, height, .065, aluminium);
+      for (const y of [sill, sill + height]) box(x, y, -6.98, width, .045, .065, aluminium);
       left = b;
     }
     box((left + 4) / 2, sill + height / 2, -6.9, 4 - left, height, .2, m.wall);
-    bottom = sill + height;
+    rows.push(sill); bottom = sill + height;
   }
   box(0, (bottom + 15.5) / 2, -6.9, 8, 15.5 - bottom, .2, m.wall);
+  casements.finish(); group.add(casements.group); group.userData.casements = casements;
+  // Blue corner pilasters and a blue band under each row of windows, as on the tower's front (photo RUIDd8c4...).
+  if (m.blue) {
+    for (const x of [-3.9, 3.9]) box(x, 7.75, -7.06, .3, 15.5, .12, m.blue);
+    for (const sill of rows) box(0, sill - .22, -7.05, 7.5, .28, .1, m.blue);
+    box(0, 15.25, -7.06, 7.5, .3, .12, m.blue);
+  }
   for (const [material, gs] of batches) {
     const mesh = new T.Mesh(mergeGeometries(gs), material); mesh.castShadow = !material.transparent; mesh.receiveShadow = true; mesh.layers.enable(1); group.add(mesh); gs.forEach(g => g.dispose());
   }

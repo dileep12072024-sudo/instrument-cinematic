@@ -7,6 +7,7 @@ import { classThree } from './classroom-three.js';
 import { classTwo } from './classroom-two.js';
 import { buildWestWing, westWing } from './west-wing.js';
 import { buildTerraces } from './terraces.js';
+import { casementCluster } from './openable.js';
 import { stairs, terraceLevels } from './stair-layout.js';
 
 let seed = 1937;
@@ -367,7 +368,7 @@ export function buildArchitecture(scene) {
           const windowFrame = westWindow && f > 0 ? m.entranceWood : m.frame;
           const side = (ow - ww) / 2;
           for (const s of [-1, 1]) b(x + s * (ww + side) / 2, openingY, 0, side, openingH, .32, m.wall);
-          b(x, openingY, -.19, ww, wh, .05, glass);
+          b(x, openingY, .01, ww, wh, .03, glass); // glass at the outer face: the casements open outward (owner)
           for (const s of [-1, 1]) {
             b(x, openingY + s * (wh / 2 + (openingH - wh) / 4), 0, ww, (openingH - wh) / 2, .32, m.wall);
             b(x + s * ww / 2, openingY, .005, .085, wh, .12, windowFrame);
@@ -382,7 +383,7 @@ export function buildArchitecture(scene) {
             b(x, openingY, .015, .065, wh, .13, windowFrame);
             for (const s of type === 'east-wing' ? [-1, 1] : [0]) b(x, openingY + s * wh / 6, .015, ww, .05, .13, windowFrame);
           }
-          const grilleZ = westWindow || type === 'east-wing' ? -.04 : .09;
+          const grilleZ = -.1; // grilles inside the glass, never outside an outward-opening window (owner, 2026-10-17)
           for (let k = -4; k <= 4; k++) b(x + k * ww / 10, openingY, grilleZ, .015, wh, .018, m.metal);
           for (let k = -3; k <= 3; k++) b(x, openingY + k * wh / 8, grilleZ, ww, .014, .018, m.metal);
           b(x, openingY - wh / 2 - .065, .13, ww + .25, .12, .55, m.trim);
@@ -693,16 +694,16 @@ export function buildArchitecture(scene) {
       g.applyMatrix4(turn); g.computeVertexNormals();
       if (!batches.has(m.wall)) batches.set(m.wall, []); batches.get(m.wall).push(g);
     }
+    const outside = casementCluster('Upstairs classroom windows (outside)', m.entranceWood, m.rearGlass, { near: 25 });
     for (const [wx, wz, w, nx, nz] of windows) {
       const t = new T.Matrix4().makeRotationY(Math.atan2(nx, nz)).setPosition(wx, 0, wz); // local +z = outward
       const b = (x, yy, z, bw, bh, bd, material) => box(x, yy, z, bw, bh, bd, material, t);
-      b(0, y, -.005, w, h, .012, m.glass);
-      for (const sx of [-1, 1]) { b(sx * w / 2, y, .01, .085, h, .1, m.entranceWood); b(0, y + sx * h / 2, .01, w + .1, .08, .1, m.entranceWood); }
-      for (const sx of [-1, 1]) { b(sx * w / 6, y, .02, .07, h, .1, m.entranceWood); b(0, y + sx * h / 6, .02, w, .06, .1, m.entranceWood); }
-      for (let k = -4; k <= 4; k++) b(k * w / 10, y, .07, .015, h, .018, m.metal);
-      for (let k = -3; k <= 3; k++) b(0, y + k * h / 8, .07, w, .014, .018, m.metal);
+      // Fixed outer frame; two glazed leaves that open outward (no grille outside: the room has its own inside).
+      for (const sx of [-1, 1]) { b(sx * (w / 2 + .04), y, .02, .08, h + .08, .1, m.entranceWood); b(0, y + sx * (h / 2 + .04), .02, w + .16, .08, .1, m.entranceWood); }
+      outside.add(new T.Matrix4().copy(t).multiply(new T.Matrix4().makeTranslation(0, sill, .11)), w, h, { rows: 3, cols: 2 });
       b(0, sill - .065, .12, w + .25, .12, .3, m.trim);
     }
+    outside.finish(); group.add(outside.group); group.userData.casements = outside;
   }  for (const [material, geometries] of batches) {
     const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = material !== m.weather && material !== m.entranceGlazing; mesh.receiveShadow = true; mesh.layers.enable(1); group.add(mesh);
     geometries.forEach(g => g.dispose());
