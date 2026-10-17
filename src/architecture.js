@@ -661,14 +661,6 @@ export function buildArchitecture(scene) {
     box(x, height / 2, 3.53, .065, height, .08, m.trim);
     box(x + .12, .25, 3.53, .24, .065, .08, m.trim);
   }
-  for (const [material, geometries] of batches) {
-    const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = material !== m.weather && material !== m.entranceGlazing; mesh.receiveShadow = true; mesh.layers.enable(1); group.add(mesh);
-    geometries.forEach(g => g.dispose());
-  }
-  screenTemplates.forEach(parts => [parts.screen, parts.sill, ...parts.letters].forEach(g => g.dispose()));
-  const interior = buildEntranceHall(group, m);
-  buildClassroomWing(group, { ...m, tread: interior.floor.material, fan: interior.fan });
-  buildWestWing(group, m, classroom.lowerFloor - .2);
   // Upstairs over the west block (owner, 2026-10-17): the Class II/III rooms stay exactly as built inside; from outside
   // each of their windows gets the original facade window at the outer face of the wall - maroon frame with glazing bars,
   // glass, grille and a grey concrete sill. Positions are the classrooms' own (classroom-two/three.js), mapped to world.
@@ -681,6 +673,26 @@ export function buildArchitecture(scene) {
       ...[-27.85, -25.05, -22.25, -19.4].map(lz => [...toWorld(-12.65 - .08 - .12, lz), 1.65, 0, 1]), // Class II, south end
       ...[.15, 2.2, 4.25, 6.3].map(lx => [...toWorld(lx, -29.82 - .08 - .16), 1.48, -1, 0]),  // Class III, west side
     ];
+    // The classroom walls are smooth classroom plaster outside too; give their outer faces the facade's own aged plaster
+    // (m.wall), a thin layer with openings at the windows, so the upper floor matches the rest of the building.
+    const base = classroom.lowerFloor, top = terraceLevels.leftWing - .12;
+    const skins = [ // [fixed world coordinate, axis ('x': the face is at world x = c, running along z), from, to, outward sign, window centres along the run, width]
+      [-34.03, 'x', 3.35, 14.82, -1, [-10.4, -6.8, -3.2].map(lx => classroom.originZ - lx), 1.65],
+      [-34.07, 'x', -5.13, 3.25, -1, [.15, 2.2, 4.25, 6.3].map(lx => classroom.originZ - lx), 1.48],
+      [-21.97, 'x', 3.35, 14.82, 1, [-9.8, -6.7, -3.6].map(lx => classroom.originZ - lx), 1.55],
+      [15.03, 'z', -33.82, -22.16, 1, [-27.85, -25.05, -22.25, -19.4].map(lz => classroom.originX + lz), 1.65],
+    ];
+    for (const [c, axis, from, to, sign, centres, w] of skins) {
+      const q = u => axis === 'x' && sign > 0 ? -u : u; // rotated a quarter turn toward +x the plane's local x runs along -z
+      const shape = new T.Shape(); shape.moveTo(q(from), base); shape.lineTo(q(to), base); shape.lineTo(q(to), top); shape.lineTo(q(from), top); shape.closePath();
+      for (const u of centres) { const hole = new T.Path(); hole.moveTo(q(u - w / 2), sill); hole.lineTo(q(u + w / 2), sill); hole.lineTo(q(u + w / 2), head); hole.lineTo(q(u - w / 2), head); hole.closePath(); shape.holes.push(hole); }
+      const g = new T.ShapeGeometry(shape); const p = g.attributes.position, uv = g.attributes.uv;
+      for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 3.4, p.getY(i) / 4); // the facade's scale: about one texture per bay and storey
+      const turn = new T.Matrix4();
+      if (axis === 'x') turn.makeRotationY(sign < 0 ? -Math.PI / 2 : Math.PI / 2).setPosition(c, 0, 0); else turn.makeRotationY(sign < 0 ? Math.PI : 0).setPosition(0, 0, c);
+      g.applyMatrix4(turn); g.computeVertexNormals();
+      if (!batches.has(m.wall)) batches.set(m.wall, []); batches.get(m.wall).push(g);
+    }
     for (const [wx, wz, w, nx, nz] of windows) {
       const t = new T.Matrix4().makeRotationY(Math.atan2(nx, nz)).setPosition(wx, 0, wz); // local +z = outward
       const b = (x, yy, z, bw, bh, bd, material) => box(x, yy, z, bw, bh, bd, material, t);
@@ -691,7 +703,15 @@ export function buildArchitecture(scene) {
       for (let k = -3; k <= 3; k++) b(0, y + k * h / 8, .07, w, .014, .018, m.metal);
       b(0, sill - .065, .12, w + .25, .12, .3, m.trim);
     }
+  }  for (const [material, geometries] of batches) {
+    const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = material !== m.weather && material !== m.entranceGlazing; mesh.receiveShadow = true; mesh.layers.enable(1); group.add(mesh);
+    geometries.forEach(g => g.dispose());
   }
+  screenTemplates.forEach(parts => [parts.screen, parts.sill, ...parts.letters].forEach(g => g.dispose()));
+  const interior = buildEntranceHall(group, m);
+  buildClassroomWing(group, { ...m, tread: interior.floor.material, fan: interior.fan });
+  buildWestWing(group, m, classroom.lowerFloor - .2);
+
   buildTerraces(group, m);
   for (const { pivot } of doors) pivot.traverse(object => { if (object.isMesh) object.layers.enable(1); });
   return { group, doors, materials: m, interior, classroomFans: ['II', 'III'].flatMap(n => group.getObjectsByProperty('name', `Class ${n} ceiling fan rotor`)) };
