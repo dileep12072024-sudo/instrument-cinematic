@@ -450,7 +450,8 @@ async function boot() {
   architecture.mergedDrawCalls = mergeStaticDetail(architecture.group); // ~400 fewer draw calls
   westFittings = architecture.group.getObjectByName('West wing fittings');
   dispensers = architecture.group.getObjectByName('West wing ground floor (video-built)')?.userData.dispensers || [];
-  architecture.group.traverse(o => { if (o.userData.casements) casements.push(o.userData.casements); }); // windows that open
+  architecture.group.traverse(o => { if (o.userData.casements) casements.push(o.userData.casements); // windows that open
+    if (o.userData.clickables) clickables.push(...o.userData.clickables); if (o.userData.update) roomUpdates.push(o.userData.update); }); // switches, fans, room lights
   { // A tap or click (not a drag) on a water machine within reach starts it pouring.
     const canvas = renderer.domElement, ray = new THREE.Raycaster(), at = new THREE.Vector2(); let down = null;
     canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
@@ -460,6 +461,8 @@ async function boot() {
       ray.setFromCamera(at, camera); ray.far = 8;
       const hit = ray.intersectObjects(dispensers.map(d => d.hit), false)[0];
       if (hit && dispensers.find(d => d.hit === hit.object).start(sound)) { needsRender = true; return; }
+      const control = ray.intersectObjects(clickables, false)[0]; // a switch on a switchboard
+      if (control && control.object.userData.onClick()) { needsRender = true; return; }
       ray.far = 25; // windows: tap one to open or close it (both leaves swing outward)
       const pane = ray.intersectObjects(casements.map(c => c.group), true).find(h => h.object.userData.casement);
       if (pane) { casements.find(c => c.windows.includes(pane.object.userData.casement)).toggle(pane.object.userData.casement); needsRender = true; }
@@ -586,7 +589,7 @@ async function compileShadowShaders() {
   }
 }
 let previous = performance.now(), frames = 0, hallLit = false;
-let westFittings = null, dispensers = [], casements = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
+let westFittings = null, dispensers = [], casements = [], clickables = [], roomUpdates = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
 function animate(now) {
   requestAnimationFrame(animate);
   const frameDuration = now - previous;
@@ -679,6 +682,7 @@ function animate(now) {
     landscape.updateTreeDetail?.(camera);
     for (const d of dispensers) d.update(now, Math.min(interval / 1000, .1));
     for (const c of casements) if (c.update(camera, Math.min(interval / 1000, .1))) needsRender = true;
+    for (const u of roomUpdates) if (u(Math.min(interval / 1000, .1))) needsRender = true;
     if (westFittings) westFittings.visible = westBox.distanceToPoint(camera.position) < 30; // far away they are sub-pixel
     // Every draw call costs CPU and GPU-process time on ANGLE: ~170 tiny ones made every few frames late (p90 50 ms).
     for (const [o, s] of smallParts) o.visible = s.radius > .005 * s.center.distanceTo(camera.position);

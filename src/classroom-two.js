@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { classroomBuilder } from './classroom-three.js';
+import { createRoomLights } from './roomlights.js';
 
 // Fitted to the existing wing; the video establishes the layout, not survey dimensions.
 export const classTwo = { minX: -12.65, maxX: -1.18, frontZ: -18.16, backZ: -29.82, ceiling: 6.25, platform: .16 };
@@ -67,9 +68,14 @@ export function buildClassTwo(parent, m, floorY) {
     box(x + w / 2, ceiling + .04, z + d / 2, w - .012, .08, d - .012, ceilingMat);
   }
   box(cx, ceiling + .09, cz, width, .015, depth, seam);
-  const benchLines = [-3.05, -5.4, -7.75, -10.1];
-  for (const x of benchLines) for (let row = 0; row < 6; row++) bench(x, -27.5 + row * .86, 1.55, -Math.PI / 2);
-  group.userData.benchLines = benchLines; group.userData.deskCount = 24; group.userData.benchWidth = 1.55;
+  // Desk-benches as filmed (video 20261014_122755, 23-60 s): the outer columns stand close along the window walls with a
+  // narrow strip of floor, two middle columns between the pillar lines; they run from the platform to the pillars, the
+  // area by the entrance is open floor with one bench against the AC wall. Rows per column are counted from the video
+  // where visible, so they are estimates where a column is partly hidden.
+  const benchLines = [[-11.5, 8], [-8.4, 8], [-5.2, 7], [-2.1, 7]];
+  for (const [x, rows] of benchLines) for (let row = 0; row < rows; row++) bench(x, -27.5 + row * .86, 1.55, -Math.PI / 2);
+  bench(-11.5, -19.35, 1.55, -Math.PI / 2);
+  group.userData.benchLines = benchLines.map(([x]) => x); group.userData.deskCount = benchLines.reduce((n, [, r]) => n + r, 1); group.userData.benchWidth = 1.55;
   const board = new T.MeshStandardMaterial({ name: 'Class II green chalkboards', color: '#244e43', roughness: .86 });
   for (const x of [-8.6, -5]) {
     box(x, floorY + 2.0, backZ + .18, 1.65, 1.45, .06, m.aluminium);
@@ -87,13 +93,16 @@ export function buildClassTwo(parent, m, floorY) {
   }
   box(-6.8, floorY + platform + .98, -29.62, .44, .12, .04, m.wood);
   for (let x = -6.97; x < -6.6; x += .035) box(x, floorY + platform + .76, -29.62, .008, .32, .012, cream);
-  for (const x of [-3.1, -6.7, -10.3]) for (const z of [-22.8, -25.2, -27.6]) {
+  const fanRows = [[], [], []];
+  for (const x of [-3.1, -6.7, -10.3]) for (const [row, z] of [-22.8, -25.2, -27.6].entries()) {
     rod([x, ceiling, z], [x, ceiling - .48, z], .018, fanMat);
     const cup = new T.CylinderGeometry(.11, .045, .13, 16); cup.translate(x, ceiling - .08, z); add(cup, fanMat);
     const fan = m.fan.clone(true); fan.name = 'Class II ceiling fan rotor'; fan.position.set(x, ceiling - .5, z);
-    fan.rotation.y = random() * Math.PI * 2; fan.traverse(o => { if (o.isMesh) o.material = fanMat; }); group.add(fan);
+    fan.rotation.y = random() * Math.PI * 2; fan.traverse(o => { if (o.isMesh) o.material = fanMat; }); group.add(fan); fanRows[row].push(fan);
   }
-  for (const x of [-4.55, -8.15, -11.15]) for (const z of [-19.92, -23.52, -27.12]) box(x, ceiling - .025, z, .57, .02, .57, lightMat);
+  // Nine LED panels in three rows across the room, each row on its own switch (switchboard beside the door).
+  const panelRows = [-19.92, -23.52, -27.12].map(z => ({ z, material: lightMat.clone(), xs: [-4.55, -8.15, -11.15] }));
+  for (const r of panelRows) { r.glow = r.material.emissiveIntensity; for (const x of r.xs) box(x, ceiling - .025, r.z, .57, .02, .57, r.material); }
   const colors = ['#bd387d', '#3783a1', '#b6a345', '#40856c'].map(color => new T.MeshStandardMaterial({ color, roughness: .9, side: T.DoubleSide }));
   for (let i = 0; i < 18; i++) {
     const x = -2.5 - (i % 6) * 1.7, z = -23 - Math.floor(i / 6) * 2, y = ceiling - .28 - random() * .15;
@@ -114,6 +123,37 @@ export function buildClassTwo(parent, m, floorY) {
     box(x, floorY + 1.5, frontZ - .09, .23, .11, .035, cream);
     rod([x, floorY + 1.55, frontZ - .08], [x, ceiling, frontZ - .08], .008, seam);
   }
-  const fill = new T.PointLight('#f7f3df', 40, 16, 2); fill.position.set(cx, ceiling - .25, cz); group.add(fill);
-  return finish();
+  const room = finish();
+  // Each panel lights the room itself (roomlights.js) instead of one heavy light in the middle.
+  room.updateWorldMatrix(true, false);
+  const world = (x, y, z) => new T.Vector3(x, y, z).applyMatrix4(room.matrixWorld);
+  const bounds = new T.Box3(); for (const x of [minX - .15, maxX + .15]) for (const y of [floorY - .2, ceiling + .2]) for (const z of [backZ - .15, frontZ + .15]) bounds.expandByPoint(world(x, y, z)); // walls' inner faces included
+  const lights = createRoomLights('Class II', bounds);
+  for (const r of panelRows) r.fittings = r.xs.map(x => lights.add(world(x, ceiling - .05, r.z), 7, level => { r.material.emissiveIntensity = r.glow * Math.max(level, .03); }));
+  room.traverse(o => { if (o.isMesh) for (const mat of [o.material].flat()) lights.patch(mat); });
+  // Switchboard on the wall beside the entrance (video 78 s: a white modular plate on the door side): three rocker
+  // switches for the light rows, three for the fan rows. A tap flips a switch.
+  const plateMat = new T.MeshStandardMaterial({ name: 'Switch plate', color: '#f2f1ec', roughness: .35 });
+  const rockerMat = new T.MeshStandardMaterial({ name: 'Switch rockers', color: '#e9e8e2', roughness: .3 });
+  const ledOn = new T.MeshBasicMaterial({ color: '#ff3b2f' }), ledOff = new T.MeshBasicMaterial({ color: '#4a1714' });
+  const switches = new T.Group(); switches.name = "Class II switchboard"; switches.position.set(maxX - .012, floorY + 1.35, -20.12); switches.rotation.y = -Math.PI / 2; room.add(switches);
+  const plate = new T.Mesh(new T.BoxGeometry(.36, .14, .012), plateMat); switches.add(plate);
+  const fanSpeed = [1, 1, 1], fanOn = [true, true, true], clickables = [];
+  const toggles = [...panelRows.map(r => ({ get: () => r.fittings[0].on, set: on => r.fittings.forEach(f => lights.set(f, on)) })),
+    ...fanRows.map((row, k) => ({ get: () => fanOn[k], set: on => { fanOn[k] = on; } }))];
+  toggles.forEach((t, k) => {
+    const x = -.15 + k * .06, rocker = new T.Mesh(new T.BoxGeometry(.04, .07, .012), rockerMat), led = new T.Mesh(new T.CircleGeometry(.006, 10), ledOn);
+    rocker.position.set(x, -.005, .012); led.position.set(x, .045, .0065); switches.add(rocker, led);
+    const show = () => { const on = t.get(); rocker.rotation.x = on ? .18 : -.18; led.material = on ? ledOn : ledOff; };
+    rocker.userData.onClick = () => { t.set(!t.get()); show(); return true; }; clickables.push(rocker); show();
+  });
+  for (const mat of [plateMat, rockerMat]) lights.patch(mat);
+  room.userData.clickables = clickables;
+  room.userData.update = dt => {
+    let changed = lights.update(dt);
+    fanRows.forEach((row, k) => { const target = fanOn[k] ? 1 : 0; fanSpeed[k] += (target - fanSpeed[k]) * Math.min(1, dt * (target ? .8 : .35)); // spin up and coast down
+      if (fanSpeed[k] > .002) { for (const fan of row) fan.rotation.y += fanSpeed[k] * 15 * dt; changed = true; } });
+    return changed;
+  };
+  return room;
 }
