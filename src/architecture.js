@@ -225,6 +225,16 @@ export function buildArchitecture(scene) {
       } else emit(x - w / 2, x + w / 2);
     };
     const floors = Math.round((height - 1.4) / 4), floorH = (height - 1.4) / floors, bay = width / bays;
+    // Blue pilasters at every bay line and the storey trim, for storeys whose wall another module builds.
+    const facadeTrim = (f, from = -width / 2) => {
+      const y = f * floorH;
+      for (let j = 0; j <= bays; j++) { const x = -width / 2 + j * bay; if (x >= from - .01 && (!tower || j === 0 || j === bays)) b(x, y + floorH / 2, .17, .3, floorH, .12, m.blue); }
+      b(0, y + floorH - .1, .26, width + .24, .19, .2, m.trim);
+      const sill = f === 1 ? classroom.lowerFloor : y; // the upstairs classrooms sit on the lowered floor: band and vents follow their sills
+      b(from / 2 + width / 4, sill + .45, .21, width / 2 - from, .35, .075, m.blue); // storey band
+      if (type !== 'west') for (let j = 0; j < bays; j++) { const x = -width / 2 + bay * (j + .5); if (x < from) continue; // vents under the upper windows
+        b(x, sill + .12, .2, .48, .24, .025, m.dark); for (let k = -2; k <= 2; k++) b(x, sill + .12 + k * .05, .22, .49, .022, .03, m.grille); }
+    };
     const westOuter = type === 'west-end' || type === 'west-outer';
     const westWindow = type === 'west' || westOuter;
     const tower = type.startsWith('tower') || type === 'east-wing' || westOuter;
@@ -236,9 +246,11 @@ export function buildArchitecture(scene) {
       belowClassroomJunction = f === 0 && type === 'room' && cx < 0 && rotation === Math.PI / 2;
       belowClassThree = f === 0 && type === 'west-outer' && rotation === -Math.PI / 2;
       belowClassTwo = f === 0 && (type === 'west-end' || type === 'west' && rotation === Math.PI / 2);
-      // Class II owns the end and courtyard-facing walls, including their lower sills.
-      if (f === 1 && (type === 'west-end' || type === 'west' && rotation === Math.PI / 2)) continue;
+      // Class II owns the end and courtyard-facing walls, including their lower sills. The facade's blue pilasters and
+      // storey trim still run over them (owner, 2026-10-17: they had been lost with the old wall).
+      if (f === 1 && (type === 'west-end' || type === 'west' && rotation === Math.PI / 2)) { facadeTrim(f); continue; }
       if (f === 1 && onlyFloor === null && type === 'west-outer' && rotation === -Math.PI / 2) {
+        facadeTrim(f, classroom.originZ - classThree.maxX - cz); // over the classroom-owned stretch too
         // Both classrooms own their outer windows and lowered sill/room slabs.
         for (const [a, c] of [[cz - width / 2, classroom.originZ - classThree.maxX]]) {
           face(cx, (a + c) / 2, rotation, c - a, height, Math.max(1, Math.round((c - a) / 3.5)), type, closedGround, openGround, 1);

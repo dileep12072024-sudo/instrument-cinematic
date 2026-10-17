@@ -161,7 +161,7 @@ export function buildSpineInterior(parent, m) {
       const z = front + .1; // leaf just inside the corridor face, swinging into the room
       put(P.doorFrame(d.w, 2.1, .16), frameWood, d.x, y, front);
       const { leaf, metal } = P.flushLeaf(d.w - .02, 2.08, -1); put(leaf, d.office ? office : laminate, d.x + d.w / 2 - .01, y + .01, front - .02); put(metal, brass, d.x + d.w / 2 - .01, y + .01, front - .02);
-      put(P.rbox(d.w + .14, .1, .3, .01), marble, d.x, y + .05, front + .2); // threshold step
+      put(P.rbox(d.w, .012, .16, .004), marble, d.x, y + .006, front); // flush marble sill in the doorway, no step (owner)
       { const g = new T.PlaneGeometry(d.w, 2.1); put(g, dim, d.x, y + 1.05, front - .4); } // one-sided: seen from the corridor only
       if (d.garland) for (let i = 0; i <= 16; i++) { const t = i / 16; put(new T.SphereGeometry(.035, 6, 4), i % 2 ? marigold : marigoldRed, d.x - d.w / 2 - .05 + t * (d.w + .1), y + 2.2 - Math.sin(t * Math.PI) * .14, front + .12); }
     }
@@ -180,7 +180,10 @@ export function buildSpineInterior(parent, m) {
       ...vents.map(x => ({ x: x - cx, y: 3.47, w: .96, h: .39 })),
     ] : WEST_DOORS.map(d => ({ x: d.x - cx, y: y + 1.05, w: d.w, h: 2.1 }));
     wall(cx, front, 0, wallEnd - wallStart, y, 3.8, openings);
-    if (!right) westDoors(y);
+    if (!right) { westDoors(y);
+      // The only lettering here: a small OFFICE blade board projecting from the wall beside the office door (video 31-38 s).
+      for (const turn of [Math.PI / 2, -Math.PI / 2]) sign('OFFICE', -19.75, y + 2.35, front + .22, turn, .42);
+      box(-19.75, y + 2.45, front + .04, .03, .03, .06, m.metal); }
     let from = right ? wallStart : westWing.stepsTop; // the west skirting stops at the top step down into the wing
     for (const x of right ? doorCenters : WEST_DOORS.map(d => d.x).sort((a, b) => a - b)) { const half = right ? .67 : .56; box((from + x - half) / 2, y + .09, front + .019, x - half - from, .18, .036, skirting); from = x + half; }
     const skirtEnd = right ? wallEnd : -WEST_STEPS_END;
