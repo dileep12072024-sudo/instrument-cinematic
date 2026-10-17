@@ -192,3 +192,20 @@ Measured on the owner's Intel UHD (real off-screen Chrome, see memory "real-gpu-
 - [ ] Purge the old raw-file URLs from Cloudflare's edge cache (owner's dashboard; e.g. `/media/campus.mp4`, and `/media/west-wing/water-cooler.webp`, removed 2026-10-15 but still cached).
 - [ ] Full headless suite (`check-site.mjs`) hung for 20 min in software WebGL with WSL near its memory limit on
       2026-10-15 and was stopped; re-run on a quiet machine. Real-GPU renders and `check-zfight --strict` passed.
+
+## Owner's queue (2026-10-17) - work strictly in this order, one section at a time, perfect before moving on
+1. West wing: tube lights and fans working, switchboards where the references show them.
+2. Upstairs classroom windows: remove the duplicate outside windows (added 273a5ad/32bb8c0); no glass in the
+   building is transparent - translucent patterned (frosted) glass.
+3. Classroom-wing corridor exactly as the videos/photos incl. text: library-wall black text plates
+   (Internal parts/20260928_094701.mp4, Videos/Wall of Library), ground-floor hall boards rebuilt in three.js
+   (no photo stickers), calendar text, the water filter near it; Internal_2/20261013_130612.mp4 door names;
+   a door (not a wall) at the end of the classroom corridors.
+4. Class IV (Videos/Class IV.mp4): doors, textures etc. exactly.
+5. East wing corridor (Videos/20261014_111121.mp4, photo 20261014_110743.jpg); ground floor: seminar hall's
+   second door goes after the window (move the door, not the window).
+6. West wing: all room doors and windows closed; glazed windows -> lab-door wood, closed.
+7. West block ground-floor facade bay (owner image 69): add the same windows as its neighbours, closed; leave the others.
+8. Switchboards in the right places; everything functional (the site becomes a game: avatars interact).
+Context: two layers planned - portfolio layer (motion graphics) and virtual exploration (game, user avatars);
+building the exploration layer now.

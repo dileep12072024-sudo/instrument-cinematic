@@ -2,6 +2,7 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import * as P from './props.js';
+import { createRoomLights, makeSwitchboard } from './roomlights.js';
 import { groundSpine } from './footprint.js';
 import { concreteScreenParts } from './architecture.js';
 
@@ -75,6 +76,8 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   const dark = new T.MeshBasicMaterial({ name: 'Unlit room beyond', color: '#0b0c0c' });
   const glassDark = new T.MeshStandardMaterial({ name: 'Dusty high window glass', color: '#7d8a86', roughness: .35, metalness: .15 });
   const tube = new T.MeshStandardMaterial({ name: 'Wing tube lights', color: '#ffffff', emissive: '#f4f8ff', emissiveIntensity: 1.4 });
+  // Two circuits for the passage tubes, each on its own switch: the junction (with the lab-door tube), the dim corridor.
+  const tubeJunction = tube.clone(), tubeCorridor = tube.clone(); tubeJunction.name = 'Junction tube lights'; tubeCorridor.name = 'Dim corridor tube lights';
   const steel = new T.MeshStandardMaterial({ name: 'Brushed steel fittings', color: '#b9bec0', metalness: .85, roughness: .32 });
   const metalBox = new T.MeshStandardMaterial({ name: 'Cream electrical boxes', color: '#d8d2bf', roughness: .6, metalness: .25 });
   const pvc = new T.MeshStandardMaterial({ name: 'White PVC pipes and conduits', color: '#e9e7df', roughness: .5 });
@@ -249,7 +252,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     return { map, u, h, width };
   }
   const signs = [];
-  function tubeLight(u, h) { const b = P.tubeBatten(); put(b.body, metalBox, u, at(h) + .03, .045); put(b.tube, tube, u, at(h) + .03, .045); }
+  function tubeLight(u, h, material = tube) { const b = P.tubeBatten(); put(b.body, metalBox, u, at(h) + .03, .045); put(b.tube, material, u, at(h) + .03, .045); }
   function fuseBoxes(u, h, pipe = true) {
     for (const [du, dh, w, hh] of [[0, 0, .5, .46], [.52, .1, .36, .38], [-.02, -.55, .44, .3], [.46, -.46, .26, .34], [.2, .45, .3, .22]]) { const f = P.fuseBox(w, hh, .16); put(f.body, metalBox, u + du, at(h + dh), .08); put(f.metal, steel, u + du, at(h + dh), .08); }
     for (const du of [-.18, .05, .3]) rod([u + du, at(h + .25), .03], [u + du, at(3.0), .03], .018, pvc, 5);
@@ -338,7 +341,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   // Process Control lab: grey-blue five-panel leaves folded back against the wall, tube light, clock, ventilator, plaque.
   W(2.2, () => {
     labDoor(0, 1.3, 2.15, { grilleGate: false, open: true, material: greyDoor, garland: true, panels: 5 });
-    tubeLight(-.05, 2.36);
+    tubeLight(-.05, 2.36, tubeJunction);
     for (const [r, d, z, material] of [[.155, .02, .025, steel], [.145, .02, .035, navy]]) { const g = new T.CylinderGeometry(r, r, d, 28); g.rotateX(Math.PI / 2); g.translate(.78, at(2.42), z); add(g, material); }
     for (const y of [2.6, 2.98]) box(0, at(y), .02, 1.24, .05, .06, grille);
     for (const s of [-1, 1]) box(s * .6, at(2.79), .02, .05, .38, .06, grille);
@@ -513,7 +516,8 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   for (const [x, z, s] of [[inW + .55, doors.instruments, .6], [inW + .6, doors.control, .55], [inE - .7, eastDoor.u - .3, .45]]) { const g = new T.PlaneGeometry(s, s); g.rotateX(-Math.PI / 2); g.translate(x, F + .006, z); add(g, kolamMat); }
 
   // Tube lights on the west wall: junction, along the dim corridor, the washing bay.
-  for (const [u, h] of [[-1.85, 2.42], [-4.9, 2.42], [-9.4, 2.42], [-12.9, 2.42]]) placed(new T.Matrix4().set(0, 0, 1, inW, 0, 1, 0, 0, -1, 0, 0, u, 0, 0, 0, 1), () => tubeLight(0, h));
+  const passageTubes = [[-1.85, 2.42, tubeJunction], [-4.9, 2.42, tubeCorridor], [-9.4, 2.42, tubeCorridor], [-12.9, 2.42, tubeCorridor]];
+  for (const [u, h, mat] of passageTubes) placed(new T.Matrix4().set(0, 0, 1, inW, 0, 1, 0, 0, -1, 0, 0, u, 0, 0, 0, 1), () => tubeLight(0, h, mat));
   // Whitewashed ceilings (the video shows them pale even in the dim corridor).
   const ceilingMat = new T.MeshStandardMaterial({ name: 'Whitewashed wing ceiling', color: '#ecebe4', roughness: .95, emissive: '#55544e', side: T.DoubleSide });
   for (const [z0, z1, h] of [[ZB, corridorSouth, ceilingLow], [inN, ZB, ceilingHigh], [corridorSouth, inS, southCeiling - F]]) {
@@ -582,6 +586,22 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     (structure.has(material) ? group : fittings).add(mesh);
   }
   group.traverse(o => { if (o.isMesh) o.layers.enable(1); });
-  group.userData = { ...westWing, fittings, dispensers };
+  // Working tube lights (roomlights.js): each tube lights the passage, limited to it, on two switched circuits. The
+  // switch plate sits beside the distribution boxes at the junction (photo 38 shows the electrics there; a separate
+  // plate is not visible, so its exact place is estimated).
+  {
+    const bounds = new T.Box3(new T.Vector3(XW - .1, F - .2, ZN - .1), new T.Vector3(westWing.stepsTop + .2, F + ceilingHigh + .2, ZS + .1));
+    const lights = createRoomLights('West wing passage', bounds), circuits = [{ material: tubeJunction, fittings: [] }, { material: tubeCorridor, fittings: [] }];
+    const glow = tube.emissiveIntensity;
+    const add = (circuit, x, y, z) => circuit.fittings.push(lights.add(new T.Vector3(x, y, z), 5, level => { circuit.material.emissiveIntensity = glow * Math.max(level, .03); }));
+    add(circuits[0], inW + .08, at(2.36) + .03, 2.25);
+    for (const [u, h, mat] of passageTubes) add(mat === tubeJunction ? circuits[0] : circuits[1], inW + .08, at(h) + .03, u);
+    const { clickables } = makeSwitchboard(group, { name: 'West wing passage', position: [inW + .012, at(1.35), -.35], turn: Math.PI / 2,
+      toggles: circuits.map(c => ({ get: () => c.fittings[0].on, set: on => c.fittings.forEach(f => lights.set(f, on)) })) });
+    group.traverse(o => { if (o.isMesh) for (const mat of [o.material].flat()) lights.patch(mat); });
+    group.userData.clickables = clickables;
+    group.userData.update = dt => lights.update(dt);
+  }
+  group.userData = { ...group.userData, ...westWing, fittings, dispensers };
   return group;
 }
