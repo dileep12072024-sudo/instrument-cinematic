@@ -281,8 +281,6 @@ export function buildArchitecture(scene) {
       // start at the wing floor; the storey above stays where it is.
       const sunk = f === 0 && (westOuter || type === 'west') ? westWing.floor : f === 0 && type === 'low-corridor' && rotation === 0 ? westWing.corridor : 0, y0 = y + sunk; // front of the west corridor: with its floor
       let openingY = raisedScreen ? groundSpine.screenBottom + openingH / 2 : y0 + (f === 0 ? 1.9 : 2.55);
-      // The sunk storey is taller: its screens rise from 0.85 above the floor to 0.75 below the storey above, as filmed.
-      if (sunk && type === 'west') { const bottom = y0 + .85, top = y + floorH - .75; openingH = top - bottom; openingY = (top + bottom) / 2; }
       const hasGate = (type === 'gate-return' || type === 'west-end') && f === 0;
       const gateMaterial = type === 'west-end' ? m.westGate : m.gate;
       if (!hasGate) b(0, y0 + (openingY - openingH / 2 - y0) / 2, 0, width, openingY - openingH / 2 - y0, .32, m.wall);
@@ -332,12 +330,7 @@ export function buildArchitecture(scene) {
           b(x, openingY, 0, ow, openingH, .32, m.wall);
         } else if (lattice) {
           if ((f !== 0 || !type.includes('corridor')) && !(type === 'low-corridor' && f === 1 && rotation === 0) && !(f === 0 && (type === 'west' || passageEnd))) b(x, openingY, -.27, ow, openingH, .05, m.dark);
-          if (f === 0 && passageEnd) {
-            // The washing bay's screen stops 2.4 above the lowered wing floor, plain wall above it (frames 122-133).
-            const bottom = openingY - openingH / 2, top = westWing.floor + 2.4;
-            concreteScreen(x, (bottom + top) / 2, ow, top - bottom, transform);
-            b(x, (top + bottom + openingH) / 2, 0, ow, bottom + openingH - top, .32, m.wall);
-          } else if (f === 0) {
+          if (f === 0) { // (the washing bay's end screen now uses the full opening: owner, it had been cut short)
             concreteScreen(x, openingY, ow, openingH, transform);
           } else {
             // Clipped diagonal strips form the pierced diamond screens visible in the photos.
@@ -405,7 +398,7 @@ export function buildArchitecture(scene) {
           box(cx + .19, classroom.lowerFloor + .45, (rear + junction) / 2, .075, .35, junction - rear, m.blue);
         } else b(0, type === 'low-corridor' && rotation === 0 ? classroom.floor + .45 : y + floorH + .45, .19, width, .35, .075, m.blue);
       }
-      if (f === 0 && (westWindow || type === 'east-wing')) b(0, sunk && type === 'west' ? y + floorH - .68 : 3.15 + sunk, .38, width + .25, .14, 1.05, m.trim); // sunshade above the openings
+      if (f === 0 && (westWindow || type === 'east-wing')) b(0, 3.15 + sunk, .38, width + .25, .14, 1.05, m.trim); // sunshade above the openings
     }
     if (onlyFloor !== null) return;
     facade = false; belowClassroomJunction = false;

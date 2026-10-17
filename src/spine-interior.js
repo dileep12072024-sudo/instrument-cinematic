@@ -2,7 +2,9 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint, groundSpine as layout, seminarPassage as passage } from './footprint.js';
 import { westWing } from './west-wing.js';
-const WEST_STEPS_END = 4.6; // the west corridor floor starts here, below the two treads after the hall gate
+import * as P from './props.js';
+const WEST_STEPS_END = 4.6;
+const WEST_DOORS = [{ x: -5.35, w: .95 }, { x: -10.2, w: .95, garland: true }, { x: -13.2, w: .95, garland: true }, { x: -16.3, w: .95, garland: true }, { x: -20.45, w: 1.0, garland: true, office: true }]; // order and look from the video; spacing estimated // the west corridor floor starts here, below the two treads after the hall gate
 import { classroom } from './classroom-wing.js';
 
 // Visible circulation and closed room fronts only. Dimensions remain interpreted.
@@ -144,6 +146,27 @@ export function buildSpineInterior(parent, m) {
     const mesh = new T.Mesh(new T.PlaneGeometry(width, width / 6), new T.MeshStandardMaterial({ map, roughness: .85 })); mesh.position.set(x, y, z); mesh.rotation.y = rotation; group.add(mesh);
   }
 
+  // West corridor room doors (video 0-38 s): flush ochre laminate leaves in dark timber frames, a white marble step at
+  // each threshold, garlands over some; the OFFICE door at the junction end is painted blue-grey. Rooms behind are dim.
+  function westDoors(y) {
+    const laminate = new T.MeshStandardMaterial({ name: 'Ochre door laminate', map: P.woodTexture('#c39a4c', { vertical: true }), roughness: .45 });
+    const office = new T.MeshStandardMaterial({ name: 'Office door paint', map: P.paintTexture('#4b5d66', { rust: 0, chips: .5, primer: '#9a8f78' }), roughness: .55 });
+    const frameWood = new T.MeshStandardMaterial({ name: 'Dark door frames', map: P.woodTexture('#4a2e1c'), roughness: .6 });
+    const marble = new T.MeshStandardMaterial({ name: 'White marble thresholds', color: '#e6e3dc', roughness: .25 });
+    const brass = new T.MeshStandardMaterial({ name: 'Door ironmongery', color: '#8d8a84', metalness: .8, roughness: .35 });
+    const dim = new T.MeshBasicMaterial({ name: 'Dim room beyond', color: '#14120f' });
+    const marigold = new T.MeshStandardMaterial({ name: 'Door garlands', color: '#f0a020', roughness: .8 }), marigoldRed = new T.MeshStandardMaterial({ name: 'Door garlands red', color: '#e2561c', roughness: .8 });
+    const put = (g, material, x, yy, z) => { g.translate(x, yy, z); add(g, material); };
+    for (const d of WEST_DOORS) {
+      const z = front + .1; // leaf just inside the corridor face, swinging into the room
+      put(P.doorFrame(d.w, 2.1, .16), frameWood, d.x, y, front);
+      const { leaf, metal } = P.flushLeaf(d.w - .02, 2.08, -1); put(leaf, d.office ? office : laminate, d.x + d.w / 2 - .01, y + .01, front - .02); put(metal, brass, d.x + d.w / 2 - .01, y + .01, front - .02);
+      put(P.rbox(d.w + .14, .1, .3, .01), marble, d.x, y + .05, front + .2); // threshold step
+      { const g = new T.PlaneGeometry(d.w, 2.1); put(g, dim, d.x, y + 1.05, front - .4); } // one-sided: seen from the corridor only
+      if (d.garland) for (let i = 0; i <= 16; i++) { const t = i / 16; put(new T.SphereGeometry(.035, 6, 4), i % 2 ? marigold : marigoldRed, d.x - d.w / 2 - .05 + t * (d.w + .1), y + 2.2 - Math.sin(t * Math.PI) * .14, front + .12); }
+    }
+  }
+
   for (const part of footprint.filter(p => p.type.includes('corridor'))) {
     const right = part.x > 0, y = right ? base : westWing.corridor; // west: three steps below the hall (owner, 2026-10-16)
     const start = part.x - part.width / 2 + (right ? .7 : 0), end = right ? passage.terminalX : part.x + part.width / 2;
@@ -155,10 +178,11 @@ export function buildSpineInterior(parent, m) {
       ...doorCenters.map((x, i) => ({ x: x - cx, y: base + 1.08, w: i ? 1.18 : 1.08, h: 2.16 })),
       ...windows.map(([x, w]) => ({ x: x - cx, y: base + 1.28, w, h: 1.36 })),
       ...vents.map(x => ({ x: x - cx, y: 3.47, w: .96, h: .39 })),
-    ] : [];
+    ] : WEST_DOORS.map(d => ({ x: d.x - cx, y: y + 1.05, w: d.w, h: 2.1 }));
     wall(cx, front, 0, wallEnd - wallStart, y, 3.8, openings);
+    if (!right) westDoors(y);
     let from = right ? wallStart : westWing.stepsTop; // the west skirting stops at the top step down into the wing
-    for (const x of right ? doorCenters : []) { box((from + x - .67) / 2, y + .09, front + .019, x - .67 - from, .18, .036, skirting); from = x + .67; }
+    for (const x of right ? doorCenters : WEST_DOORS.map(d => d.x).sort((a, b) => a - b)) { const half = right ? .67 : .56; box((from + x - half) / 2, y + .09, front + .019, x - half - from, .18, .036, skirting); from = x + half; }
     const skirtEnd = right ? wallEnd : -WEST_STEPS_END;
     box((from + skirtEnd) / 2, y + .09, front + .019, skirtEnd - from, .18, .036, skirting);
     if (!right) { // front wall: plaster from the lowered floor up to the facade's base (y = 0), with its skirting

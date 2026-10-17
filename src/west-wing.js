@@ -566,7 +566,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   // Rooms behind the doors (owner, 2026-10-17): the block is divided between the doors that open off the passage, each
   // room with whitewashed partitions, a pale tiled floor and a ceiling. Their contents were not filmed, so they are left
   // empty (the Process Control lab glimpse is the one furnished room). Partitions sit between neighbouring doors.
-  { const x0 = -33.84, x1 = XW - .1, top = F + ceilingHigh, roomWall = new T.MeshStandardMaterial({ name: 'Room whitewash', color: '#e8e6dd', roughness: .92 });
+  { const x0 = -33.84, x1 = XW - .1, top = southCeiling, roomWall = new T.MeshStandardMaterial({ name: 'Room whitewash', color: '#e8e6dd', roughness: .92 }); // top: under the upstairs Class II/III floors
     for (const z of [9.6, 3.52, 0.03, -1.85, -6.9, -11.3]) box((x0 + x1) / 2, (F + top) / 2, z, x1 - x0, top - F, .12, roomWall);
     const roomTiles = canvasMap(128, 128, (g, w, h) => { g.fillStyle = '#d8d6cc'; g.fillRect(0, 0, w, h); g.strokeStyle = '#a9a79e'; g.lineWidth = 3; g.strokeRect(0, 0, w, h); }, true);
     const floorMat = new T.MeshStandardMaterial({ name: 'Room floor tiles', map: roomTiles, roughness: .4 });

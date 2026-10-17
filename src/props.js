@@ -230,7 +230,7 @@ export function carton(w, h, d) { return { box: rbox(w, h, d, .004, 0, h / 2, 0)
 // Aluminium step ladder leaning on a wall: channel rails, ribbed treads, rear legs, top cap.
 export function stepLadder(h = 2.05) {
   const parts = [], n = 7, slope = .14;
-  for (const s of [-1, 1]) { const g = rbox(.05, h / Math.cos(slope), .022, .004); g.rotateX(slope); g.translate(s * .2, h / 2, -Math.tan(slope) * h / 2 + .02); parts.push(g); } // rails carry the treads
+  for (const s of [-1, 1]) { const g = rbox(.05, h / Math.cos(slope), .022, .004); g.rotateX(-slope); g.translate(s * .2, h / 2, -Math.tan(slope) * h / 2 + .02); parts.push(g); } // rails lean with the treads
   for (let k = 1; k <= n; k++) { const y = k * h / (n + 1); const g = rbox(.4, .02, .09, .004); g.translate(0, y, -Math.tan(slope) * y + .02); parts.push(g); for (let r = -1; r <= 1; r++) parts.push(rbox(.39, .006, .006, .002, 0, y + .012, -Math.tan(slope) * y + .02 + r * .025)); }
   parts.push(rbox(.46, .04, .14, .01, 0, h + .02, -Math.tan(slope) * h));
   return merge(parts);
@@ -258,4 +258,16 @@ export function tubeBatten(len = 1.22) {
 export function fuseBox(w, h, d) {
   return { body: merge([rbox(w, h, d, .008), rbox(w - .02, h - .02, .004, .002, 0, 0, d / 2 + .001)]),
     metal: merge([new T.CylinderGeometry(.006, .006, .04, 8).translate(-w / 2 + .005, h / 4, d / 2), new T.CylinderGeometry(.006, .006, .04, 8).translate(-w / 2 + .005, -h / 4, d / 2), rbox(.02, .04, .012, .003, w / 2 - .03, 0, d / 2 + .006)]) };
+}
+// Flush timber door with a wood-grain laminate face (the west corridor's room doors, video 0-28 s): one leaf with
+// lipped edges, a handle, a hasp with padlock and a tower bolt; hinge at x = 0, opening toward dir. { leaf, metal }.
+export function flushLeaf(lw, h, dir = 1, t = .04) {
+  const X = x => dir * x, leaf = merge([rbox(lw, h, t, .004, X(lw / 2), h / 2, 0), rbox(lw, .012, t + .004, .002, X(lw / 2), h - .006, 0), rbox(lw, .012, t + .004, .002, X(lw / 2), .006, 0)]);
+  const metal = [];
+  for (const y of [.2, h / 2, h - .2]) metal.push(new T.CylinderGeometry(.01, .01, .09, 10).translate(0, y, t / 2 + .003));
+  for (const z of [-1, 1]) metal.push(member([X(lw - .07), h * .45 - .06, z * (t / 2 + .025)], [X(lw - .07), h * .45 + .06, z * (t / 2 + .025)], .007, .007, 8),
+    member([X(lw - .07), h * .45 - .06, z * (t / 2 + .002)], [X(lw - .07), h * .45 - .06, z * (t / 2 + .025)], .006, .006, 6), member([X(lw - .07), h * .45 + .06, z * (t / 2 + .002)], [X(lw - .07), h * .45 + .06, z * (t / 2 + .025)], .006, .006, 6));
+  metal.push(rbox(.1, .035, .006, .002, X(lw - .03), h * .52, t / 2 + .003), rbox(.04, .05, .018, .006, X(lw + .01), h * .52 - .04, t / 2 + .02), new T.TorusGeometry(.014, .004, 6, 14, Math.PI).translate(X(lw + .01), h * .52 - .015, t / 2 + .02));
+  metal.push(rbox(.025, .14, .012, .003, X(lw - .05), h - .25, t / 2 + .006));
+  return { leaf, metal: merge(metal) };
 }
