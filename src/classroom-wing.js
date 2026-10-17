@@ -286,6 +286,30 @@ export function buildClassroomWing(parent, m) {
   }
   box((windowEnd + end) / 2, classroom.lowerFloor + 1.82, SW, end - windowEnd, 1.48, .16, plaster);
   for (const x of doors) door(x, classroom.lowerFloor, -20.28, .96, x === doors.at(-1) ? 'CLASS ROOM - IV' : '', x === doors.at(-1));
+  // Wall telephones by the classroom doors (130612 at 40-56 and 113-116 s): a steel cradle box with a black handset, its
+  // coiled cord hanging below, fed by a wire from a small white socket box. (x, y, z) is the wall face, ry turns +z out.
+  function wallPhone(x, y, z, ry) {
+    const m = new T.Matrix4().makeRotationY(ry); m.setPosition(x, y, z);
+    const part = (g, material) => { g.applyMatrix4(m); add(g, material); };
+    const b = (w, h, d, px, py, pz, material) => { const g = new T.BoxGeometry(w, h, d); g.translate(px, py, pz); part(g, material); };
+    b(.1, .23, .05, 0, 0, .025, aluminium); b(.07, .19, .006, 0, 0, .053, dark); // cradle box and its dark face
+    b(.05, .2, .035, 0, -.005, .075, dark); b(.06, .05, .045, 0, .085, .08, dark); b(.06, .05, .045, 0, -.095, .08, dark); // handset: grip, ear and mouth pieces
+    const coil = [], turns = 14; for (let i = 0; i <= turns * 8; i++) { const a = i / 8 * Math.PI * 2, t = i / (turns * 8); coil.push(new T.Vector3(Math.cos(a) * .012, -.12 - t * .32, .08 + Math.sin(a) * .012)); }
+    part(new T.TubeGeometry(new T.CatmullRomCurve3(coil), turns * 8, .003, 4, false), dark);
+    b(.07, .07, .03, .12, .2, .015, panelWhite); part(new T.TubeGeometry(new T.CatmullRomCurve3([new T.Vector3(.12, .23, .02), new T.Vector3(.12, .5, .02)]), 1, .004, 4, false), panelWhite);
+  }
+  // Class IV (130612 at 115-118 s): a stencilled IV YEAR paper above the vision panel, and the election strong-room board
+  // over the frame head, red on white.
+  { const iv = doors.at(-1), lf1 = classroom.lowerFloor;
+    const paper = texture((c, w, h) => { c.fillStyle = '#e4e2da'; c.fillRect(0, 0, w, h); for (let i = 0; i < 300; i++) { c.fillStyle = `rgba(90,90,80,${rand() * .12})`; c.fillRect(rand() * w, rand() * h, 2 + rand() * 6, 2 + rand() * 6); }
+      c.fillStyle = '#20302a'; c.font = 'bold 88px Impact, "Arial Narrow", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.save(); c.translate(w / 2, h / 2); c.scale(.62, 1.25); c.fillText('IV YEAR', 0, 0); c.restore(); }, 256, 200);
+    const yearSign = new T.Mesh(new T.PlaneGeometry(.24, .19), new T.MeshStandardMaterial({ map: paper, roughness: .9 })); yearSign.name = 'IV YEAR paper';
+    yearSign.position.set(iv - .03, lf1 + 2.04, -20.28 + .049); group.add(yearSign);
+    const board = texture((c, w, h) => { c.fillStyle = '#f1f1ec'; c.fillRect(0, 0, w, h); c.strokeStyle = '#9a9a92'; c.lineWidth = 4; c.strokeRect(2, 2, w - 4, h - 4);
+      c.fillStyle = '#c4161c'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = 'bold 64px "Arial Narrow", Arial, sans-serif';
+      for (const [t, y, size] of [['STRONG ROOM', 52, 66], ['HOP', 122, 72], ['24 - Visakhapatnam A/C', 186, 46], ['with in', 230, 36], ['4 - Visakhapatnam P/C', 276, 46]]) { c.font = `bold ${size}px "Arial Narrow", Arial, sans-serif`; c.fillText(t, w / 2, y, w - 40); } }, 512, 310);
+    const strong = new T.Mesh(new T.PlaneGeometry(.7, .42), new T.MeshStandardMaterial({ map: board, roughness: .55 })); strong.name = 'STRONG ROOM board';
+    strong.position.set(iv, lf1 + 2.64, -20.31 + .006); group.add(strong); }
   // Uneven lower-wall staining is visible in the side passage; keep it flush to the plaster.
   const wear = texture((c, w, h) => {
     for (let i = 0; i < 6500; i++) {
@@ -295,10 +319,18 @@ export function buildClassroomWing(parent, m) {
   });
   const stain = new T.Mesh(new T.PlaneGeometry(passageLength, 1.05), new T.MeshStandardMaterial({ map: wear, transparent: true, depthWrite: false, roughness: 1 }));
   stain.position.set(passageCentre, classroom.lowerFloor + .525, SW - .095); stain.rotation.y = Math.PI; group.add(stain);
-  // The brown panel at 96-104s is stored against this wall, not another doorway.
-  // Leave the wall closed and the passage clear; stored panels and debris are omitted.
-  box(end, (classroom.lowerFloor + sideCeiling) / 2, -19.15, .16, sideCeiling - classroom.lowerFloor, 2.5, plaster);
-  // The filmed end wall has a small high screened recess, not a full-height door.
+  // The furniture and boxes stored before the end door are left out: the passage is kept clear.
+  // End wall (130612 at 96-104 s, 103154 at 120-132 s): a closed brown flush door, right of centre toward the window
+  // wall, under the high screened vent.
+  const endDoor = -19.06, lf0 = classroom.lowerFloor, wallH = sideCeiling - lf0;
+  for (const [a, b] of [[-20.4, endDoor - .55], [endDoor + .55, -17.9]]) box(end, lf0 + wallH / 2, (a + b) / 2, .16, wallH, b - a, plaster);
+  box(end, (lf0 + 2.4 + sideCeiling) / 2, endDoor, .16, sideCeiling - lf0 - 2.4, 1.1, plaster);
+  { const first = new Map([...batches].map(([m, a]) => [m, a.length])), before = new Set(group.children);
+    door(0, lf0, 0, .93, '', false);
+    const matrix = new T.Matrix4().makeRotationY(-Math.PI / 2); matrix.setPosition(end, 0, endDoor);
+    for (const [material, gs] of batches) for (let j = first.get(material) || 0; j < gs.length; j++) gs[j].applyMatrix4(matrix);
+    for (const child of group.children) if (!before.has(child)) child.applyMatrix4(matrix); }
+  // The vent above it sits in a small dark recess.
   box(end - .085, classroom.lowerFloor + 3.25, -19.15, .012, .44, .94, dark);
   const endVent = screens.get(windowWidth).clone();
   endVent.scale(.9 / windowWidth, .4 / 1.48, .3);
@@ -310,6 +342,8 @@ export function buildClassroomWing(parent, m) {
   const brass = new T.MeshStandardMaterial({ name: 'Brass window grilles', color: '#b49a5c', metalness: .55, roughness: .42 });
   const panelGrey = new T.MeshStandardMaterial({ name: 'Grey distribution boxes', color: '#9fa5a3', metalness: .45, roughness: .45 });
   const panelWhite = new T.MeshStandardMaterial({ name: 'White isolator boxes', color: '#e6e5dd', roughness: .6 });
+  wallPhone(7.45, classroom.lowerFloor + 1.5, -20.31, 0); // between the plain door and Class IV
+  wallPhone(-1.02, classroom.lowerFloor + 1.5, -20.0, Math.PI / 2); // on the pier right of Class II
   // Side passage door wall (z = -20.4, facing +z): photos and 103154 82-117 s.
   const lf = classroom.lowerFloor, wz = -20.31;
   for (const c of grilles) {
@@ -331,12 +365,19 @@ export function buildClassroomWing(parent, m) {
   const darkBand = stone.clone(); darkBand.color.set('#55524d');
   for (const x of [4.9, 7.4, 10.2]) floor(x, -19.15, .48, 2.25, lf + .002, lightTile);
   floor(6.1, -19.15, .9, 2.25, lf + .002, darkBand);
-  const board = texture((c, w, h) => { c.fillStyle = '#f2f1ea'; c.fillRect(0, 0, w, h); c.fillStyle = '#28324a'; c.fillRect(12, h * .2, w * .55, h * .16); c.fillStyle = '#5b6274'; c.fillRect(12, h * .52, w * .72, h * .1); c.fillRect(12, h * .7, w * .4, h * .1); }, 256, 96);
-  const boardMat = new T.MeshStandardMaterial({ map: board, roughness: .7 });
   const face = 1.02; // room-side wall face (local x)
-  for (const u of [5.8, 9.2]) {
-    const sign = new T.Mesh(new T.PlaneGeometry(.46, .17), boardMat); sign.rotation.y = Math.PI / 2; sign.position.set(face - .26, y + 2.62, -(u + .72)); group.add(sign);
-    const back = sign.clone(); back.rotation.y = -Math.PI / 2; back.position.x += .002; group.add(back);
+  // Faculty blade signs over the room doors (103849 at 27-39 s): white boards, blue border, name, degrees and post.
+  for (const [u, name, degrees, post] of [[5.8, 'Dr.A. Kamala Kumari', 'M.Tech,Ph D', 'Associate Professor'], [9.2, 'Dr.P. Swapna', 'M.Tech,Ph.D', 'Professor']]) {
+    const board = texture((c, w, h) => {
+      c.fillStyle = '#f4f3ee'; c.fillRect(0, 0, w, h); c.strokeStyle = '#2a4aa0'; c.lineWidth = 6; c.strokeRect(5, 5, w - 10, h - 10);
+      c.fillStyle = '#1f2f80'; c.textBaseline = 'middle'; c.textAlign = 'center';
+      c.font = 'bold 50px "Times New Roman", Times, serif'; c.fillText(name, w / 2, h * .28, w - 40);
+      c.font = 'bold 24px "Times New Roman", Times, serif'; c.textAlign = 'right'; c.fillText(degrees, w - 28, h * .55);
+      c.font = 'bold 42px "Times New Roman", Times, serif'; c.textAlign = 'center'; c.fillText(post, w / 2, h * .78, w - 40);
+    }, 512, 190);
+    const material = new T.MeshStandardMaterial({ map: board, roughness: .6 });
+    const sign = new T.Mesh(new T.PlaneGeometry(.46, .17), material); sign.name = `Blade sign: ${name}`; sign.position.set(face - .26, y + 2.62, -(u + .72) + .002); group.add(sign); // projects from the wall, read along the corridor
+    const back = sign.clone(); back.rotation.y = Math.PI; back.position.z -= .004; group.add(back);
     box(face - .02, y + 2.74, -(u + .72), .04, .02, .02, dark);
   }
   const inlay = texture((c, w, h) => {
