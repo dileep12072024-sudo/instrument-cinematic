@@ -304,3 +304,33 @@ export function patternedGlass(tint = '#b8c9c4') {
     for (let i = 0; i < 1500; i++) { g.fillStyle = rnd() > .5 ? 'rgba(255,255,255,.12)' : 'rgba(30,45,45,.08)'; g.fillRect(rnd() * w, rnd() * h, 1.5, 1.5); } // stipple
   });
 }
+
+// ---------------------------------------------------------------- engraved plaques
+// Polished black granite plaque with cut lettering (owner, 2026-10-17: built in three.js, never a photo sticker).
+// w x h metres, face toward +z, centred. engrave(g, W, H) draws every letter and ornament in white on a transparent
+// canvas; the cut is then coloured (ink), shadowed along its upper edge and recessed through the bump map, while the
+// polished stone around it stays dark and glossy.
+export function granitePlaque(w, h, engrave, { ink = '#d6cfb9', stone = '#121514', depth = .022, px = 1024 } = {}) {
+  const W = px, H = Math.round(px * h / w), sheet = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
+  const cut = sheet(), cg = cut.getContext('2d'); cg.fillStyle = cg.strokeStyle = '#fff'; engrave(cg, W, H);
+  const tinted = (colour) => { const c = sheet(), g = c.getContext('2d'); g.drawImage(cut, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = colour; g.fillRect(0, 0, W, H); return c; };
+  const map = canvasTexture(W, H, g => {
+    g.fillStyle = stone; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < W * H / 60; i++) { // fine mica and feldspar specks, a few darker clouds
+      g.fillStyle = rnd() > .82 ? `rgba(185,190,182,${.12 + rnd() * .25})` : `rgba(0,0,0,${.2 + rnd() * .3})`;
+      g.fillRect(rnd() * W, rnd() * H, .8 + rnd() * 1.6, .8 + rnd() * 1.6);
+    }
+    g.drawImage(tinted('rgba(0,0,0,.85)'), 0, -1.5); // the cut's upper wall in shadow
+    g.drawImage(tinted(ink), 0, 0);
+  }, { repeat: false });
+  const bump = canvasTexture(W, H, g => { g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.drawImage(cut, 0, 0); }, { repeat: false, srgb: false });
+  const material = new T.MeshStandardMaterial({ name: 'Engraved black granite plaque', map, bumpMap: bump, bumpScale: -1.2, roughness: .2, envMapIntensity: .6 });
+  return new T.Mesh(rbox(w, h, depth, .003), material);
+}
+// One engraved line: centre (cx, cy) and cap height as fractions of the canvas, stretched or condensed to the measured
+// width (fraction of W) so every line sits exactly where it does on the stone. font: CSS family list; weight optional.
+export function engraveLine(g, W, H, text, cx, cy, cap, width, font, weight = '') {
+  const size = cap * H / .72; g.font = `${weight} ${size}px ${font}`.trim(); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  const measured = g.measureText(text)?.width, sx = width && measured ? width * W / measured : 1; // no text metrics in headless checks
+  g.save(); g.translate(cx * W, cy * H + cap * H / 2); g.scale(sx, 1); g.fillText(text, 0, 0); g.restore();
+}

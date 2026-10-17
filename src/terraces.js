@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { stairs, terraceCovers, terraceLevels as levels } from './stair-layout.js';
+import { rbox, granitePlaque, engraveLine } from './props.js';
 
 export function buildTerraces(parent, m) {
   const group = new T.Group(); group.name = 'Reference terraces and roof stair enclosure'; parent.add(group);
@@ -38,6 +39,89 @@ export function buildTerraces(parent, m) {
   }
   function step(x, y, z, w, d, base) {
     box(x, (base + y) / 2 - .06, z, w, y - base + .12, d, roof);
+  }
+  // Library wall, first-floor landing (Wall of Library 105821/105923/110011; 094920 at 3-25 s): two engraved black granite
+  // plaques, each in a raised white plaster surround, and the two grey conduit runs above them. Sizes and spacing are
+  // measured against the library door and the wall's perspective in 105821; the text is as cut on the stones.
+  function libraryWall() {
+    const face = 3.47, floorY = stairs.first;
+    const sans = '"Century Gothic", Futura, "Trebuchet MS", Arial, sans-serif', serif = '"Bookman Old Style", Rockwell, Georgia, serif', arial = 'Arial, Helvetica, sans-serif';
+    const westWing = (g, W, H) => {
+      engraveLine(g, W, H, 'THIS BLOCK (WEST WING) INAUGURATED', .5, .108, .065, .946, '"Arial Narrow", Arial, sans-serif', 'bold');
+      engraveLine(g, W, H, 'BY', .5, .219, .029, .052, sans);
+      engraveLine(g, W, H, 'Prof . Y. C. SIMHADRI', .467, .334, .065, .693, '"Times New Roman", Times, serif');
+      engraveLine(g, W, H, 'M.A., Ph.D (USA). D.Litt., L.L.D,', .474, .442, .037, .595, sans);
+      engraveLine(g, W, H, 'M.S.W., B L(INDIA) D.Y.W. (LONDON)', .485, .504, .037, .69, sans);
+      engraveLine(g, W, H, 'C.R.Y.W (GERMANY) L.I.E (JAPAN)', .493, .57, .037, .623, sans);
+      engraveLine(g, W, H, 'HON\'BLE VICE-CHANCELLOR', .475, .652, .04, .532, sans);
+      engraveLine(g, W, H, 'ANDHRA UNIVERSITY VISAKHAPATNAM', .472, .73, .04, .753, sans);
+      engraveLine(g, W, H, 'ON', .5, .83, .037, .059, sans);
+      // "25th" with the raised "th", cut as one line.
+      const cap = .037 * H, size = cap / .72, y = .909 * H + cap / 2;
+      g.textBaseline = 'alphabetic'; g.textAlign = 'left';
+      const parts = [['WEDNESDAY., THE 25', size, 0], ['th', size * .55, -cap * .5], [' JUNE, 2008', size, 0]];
+      const widths = parts.map(([t, s]) => { g.font = `${s}px ${sans}`; return g.measureText(t)?.width || 1; }), sx = .674 * W / widths.reduce((a, b) => a + b);
+      let x = .472 * W - .674 * W / 2;
+      parts.forEach(([t, s, dy], k) => { g.font = `${s}px ${sans}`; g.save(); g.translate(x, y + dy); g.scale(sx, 1); g.fillText(t, 0, 0); g.restore(); x += widths[k] * sx; });
+      // Border line with concave notched corners.
+      const i = .014 * W, r = .028 * W, x0 = i, y0 = i, x1 = W - i, y1 = H - i;
+      g.lineWidth = .0028 * W; g.beginPath(); g.moveTo(x0 + r, y0); g.lineTo(x1 - r, y0); g.arc(x1, y0, r, Math.PI, Math.PI / 2, true);
+      g.lineTo(x1, y1 - r); g.arc(x1, y1, r, -Math.PI / 2, Math.PI, true); g.lineTo(x0 + r, y1); g.arc(x0, y1, r, 0, -Math.PI / 2, true);
+      g.lineTo(x0, y0 + r); g.arc(x0, y0, r, Math.PI / 2, 0, true); g.stroke();
+    };
+    const eastWing = (g, W, H) => {
+      // Andhra University emblem: shield with scrolled shoulders, a spoked wheel in a ring, the founding year below.
+      const s = .12 * H; g.save(); g.translate(.505 * W, .112 * H); g.scale(s, s); g.lineWidth = .022;
+      g.beginPath(); g.moveTo(-.36, -.42); g.bezierCurveTo(-.48, .05, -.26, .4, 0, .5); g.bezierCurveTo(.26, .4, .48, .05, .36, -.42); g.quadraticCurveTo(0, -.3, -.36, -.42); g.stroke();
+      for (const sx of [-1, 1]) { g.beginPath(); g.arc(sx * .42, -.4, .07, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(sx * .42, -.4, .03, 0, Math.PI * 2); g.stroke(); }
+      for (const r of [.27, .21, .06]) { g.beginPath(); g.arc(0, -.04, r, 0, Math.PI * 2); g.stroke(); }
+      for (let k = 0; k < 24; k++) { const a = k * Math.PI / 12; g.beginPath(); g.moveTo(Math.cos(a) * .07, -.04 + Math.sin(a) * .07); g.lineTo(Math.cos(a) * .2, -.04 + Math.sin(a) * .2); g.stroke(); }
+      for (let k = 0; k < 40; k++) { const a = k * Math.PI / 20; g.fillRect(Math.cos(a) * .24 - .008, -.04 + Math.sin(a) * .24 - .008, .016, .016); } // lettering around the ring
+      g.restore();
+      g.font = `bold ${.1 * s}px ${serif}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('1926', .505 * W, .112 * H + .34 * s);
+      for (const [t, cx, cy, cap, w, font, weight] of [
+        ['ANDHRA UNIVERSITY', .505, .206, .0216, .47, serif, 'bold'], ['A.U. COLLEGE OF ENGINEERING (A)', .51, .249, .0216, .82, serif, 'bold'],
+        ['Department of Instrument Technology', .505, .293, .0144, .52, arial], ['Inauguration of First Floor (East Wing)', .505, .321, .0144, .53, arial],
+        ['By', .505, .358, .012, .034, arial], ['Sri GANTA SRINIVASA RAO', .506, .399, .0216, .62, serif, 'bold'],
+        ['Hon\'ble Minister for HRD', .506, .435, .0134, .34, arial], ['Govt. of Andhra Pradesh', .506, .463, .0134, .34, arial],
+        ['On 30th August, 2015', .507, .501, .0134, .29, arial], ['In the presence of', .505, .536, .012, .23, arial],
+        ['Col. Prof. G.S.N. RAJU', .508, .572, .02, .43, serif, 'bold'], ['Vice-Chancellor, A.U.', .508, .607, .012, .27, arial],
+        ['Prof. E.A. Narayana', .508, .641, .018, .37, serif, 'bold'], ['Rector, A.U.', .506, .673, .0106, .15, arial],
+        ['Prof. Ch. V. Ramachandra Murthy', .51, .71, .019, .65, serif, 'bold'], ['Principal, AUCE (A)', .506, .741, .012, .26, arial],
+        ['Prof. V. Uma Maheswara Rao', .508, .778, .019, .55, serif, 'bold'], ['Registrar, A.U.', .508, .808, .012, .19, arial],
+        ['Prof. A. Bhujanga Rao', .508, .845, .018, .41, serif, 'bold'], ['Head, Instrument Technology', .508, .874, .012, .37, arial],
+        ['Prof. K. Srinivasa Rao', .273, .918, .0144, .32, serif, 'bold'], ['Dean, Engineering Works', .274, .945, .012, .29, arial],
+        ['Dr. M.G. Madhava Babu', .736, .918, .0144, .35, serif, 'bold'], ['University Engineer', .736, .945, .012, .23, arial],
+      ]) engraveLine(g, W, H, t, cx, cy, cap, w, font, weight);
+      // Inset border line with a scrolled flourish in each corner.
+      const x0 = .055 * W, y0 = .036 * H, x1 = .956 * W, y1 = .975 * H;
+      g.lineWidth = .0025 * W; g.strokeRect(x0, y0, x1 - x0, y1 - y0);
+      for (const [cx, cy, dx, dy] of [[x0, y0, 1, 1], [x1, y0, -1, 1], [x0, y1, 1, -1], [x1, y1, -1, -1]]) {
+        g.save(); g.translate(cx + dx * .012 * W, cy + dy * .012 * W); g.scale(dx * W, dy * W); g.lineWidth = .002;
+        for (const [ax, ay, r] of [[.035, .012, .012], [.012, .035, .012], [.065, .008, .007], [.008, .065, .007], [.022, .022, .01]]) { g.beginPath(); g.arc(ax, ay, r, 0, Math.PI * 1.6); g.stroke(); }
+        g.beginPath(); g.moveTo(0, .1); g.quadraticCurveTo(0, 0, .1, 0); g.stroke();
+        g.restore();
+      }
+    };
+    for (const p of [
+      { x: 1.51, y: floorY + 1.56, w: 1.03, h: .675, frame: [1.14, .80], engrave: westWing },
+      { x: -1.02, y: floorY + 1.21, w: 1.04, h: 1.37, frame: [1.20, 1.50], engrave: eastWing, ink: '#b9c3b2' },
+    ]) {
+      const [fw, fh] = p.frame, sw = (fw - p.w) / 2, sh = (fh - p.h) / 2;
+      for (const s of [-1, 1]) {
+        add(rbox(sw, fh, .045, .008, p.x + s * (fw - sw) / 2, p.y, face - .0225), wall);
+        add(rbox(fw - 2 * sw + .01, sh, .045, .008, p.x, p.y + s * (fh - sh) / 2, face - .0225), wall);
+      }
+      const slab = granitePlaque(p.w, p.h, p.engrave, { ink: p.ink }); slab.name = 'Library wall plaque';
+      slab.position.set(p.x, p.y, face - .02); slab.rotation.y = Math.PI; slab.layers.enable(1); group.add(slab);
+    }
+    // Grey conduits on saddles: one at 2.32 m, one at 2.77 m, stepping onto the library partition's face at x = -1.35.
+    const conduit = new T.MeshStandardMaterial({ name: 'Grey conduit pipes', color: '#8d918b', metalness: .45, roughness: .5 });
+    for (const h of [2.32, 2.77]) {
+      const y = floorY + h;
+      for (const [a, b] of [[[-3.7, y, 3.40], [-1.40, y, 3.40]], [[-1.40, y, 3.40], [-1.30, y, 3.443]], [[-1.30, y, 3.443], [3.78, y, 3.443]]]) tube([a, b], .012, conduit);
+      for (let x = -3.4; x < 3.7; x += .9) box(x, y, x < -1.35 ? 3.418 : 3.461, .03, .034, .018, conduit);
+    }
   }
   function canopy(x, y, z, width, depth, slope = 0) {
     const starts = new Map([...batches].map(([material, gs]) => [material, gs.length]));
@@ -118,13 +202,24 @@ export function buildTerraces(parent, m) {
     for (const dx of [-.34, .34]) { const support = new T.Mesh(new T.BoxGeometry(.06, .12, .55), steel); support.position.set(dx, .06, 0); acGroup.add(support); }
   }
   // Front landings leave all three stair openings clear.
-  for (const y of [stairs.first, stairs.second]) floor(0, y, 2.05, 7.6, 5.5, tile);
+  // First-floor landing: dark grey-brown vitrified tiles, 60 cm, polished (094920, Wall of Library 105821).
+  const landingTiles = new T.CanvasTexture((() => {
+    const t = document.createElement('canvas'); t.width = t.height = 512; const g = t.getContext('2d'), cell = 64;
+    for (let i = 0; i < 8; i++) for (let j = 0; j < 8; j++) { const v = random() * 10 - 5; g.fillStyle = `rgb(${100 + v},${90 + v},${78 + v})`; g.fillRect(i * cell, j * cell, cell, cell); }
+    for (let k = 0; k < 2500; k++) { g.fillStyle = random() > .5 ? 'rgba(150,140,128,.08)' : 'rgba(30,26,22,.1)'; g.fillRect(random() * 512, random() * 512, 1 + random() * 3, 1 + random() * 3); }
+    g.fillStyle = 'rgba(40,34,28,.35)'; for (let i = 0; i < 8; i++) { g.fillRect(i * cell, 0, 1.5, 512); g.fillRect(0, i * cell, 512, 1.5); }
+    return t;
+  })());
+  landingTiles.colorSpace = T.SRGBColorSpace; landingTiles.wrapS = landingTiles.wrapT = T.RepeatWrapping; landingTiles.repeat.set(5 / 4.8, 5 / 4.8); landingTiles.anisotropy = 8;
+  floor(0, stairs.first, 2.05, 7.6, 5.5, new T.MeshStandardMaterial({ name: 'First-floor landing tiles', map: landingTiles, roughness: .28, envMapIntensity: .5 }));
+  floor(0, stairs.second, 2.05, 7.6, 5.5, tile);
   floor(0, stairs.top, 3.075, 7.6, 7.55, tile);
   // The exit opens onto the low apron. Turn along the wall before climbing east.
   for (let i = 0; i < 3; i++) step(3.99 + i * .38, stairs.top + (i + 1) * (levels.rightStrip - stairs.top) / 3, 2.37, .38, 1.76, stairs.top);
   // Library partition on the FRONT middle block, with the door near the west entrance.
   for (const [left, right] of [[-3.78, -3.12], [-1.98, 3.78]]) box((left + right) / 2, 5.95, 3.55, right - left, 3.81, .16, m.wall);
   box(-2.55, 7.24, 3.55, 1.14, 1.24, .16, m.wall);
+  libraryWall();
 
   // The west/classroom roof is the lower open terrace.
   floor(-13.05, levels.leftStrip, 0, 16, 6.5);

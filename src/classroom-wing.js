@@ -173,11 +173,19 @@ export function buildClassroomWing(parent, m) {
   const libraryStart = new Map([...batches].map(([material, gs]) => [material, gs.length]));
   const libraryChildren = new Set(group.children);
   door(0, classroom.landing, 0, 1.02, 'LIBRARY', true, { plateAbove: true });
-  label('DEPARTMENT LIBRARY', 0, classroom.landing + 2.62, .06, .62, .2, '#f4f3ee', '#b0302a');
+  // Paper notice on the frame head (094920 at 11-25 s): outlined red DEPARTMENT over LIBRARY.
+  const notice = texture((c, w, h) => {
+    c.fillStyle = '#f1efe6'; c.fillRect(0, 0, w, h); c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = 'bold 46px Arial'; c.strokeStyle = '#c23a2c'; c.lineWidth = 2; c.strokeText('DEPARTMENT', w / 2, h * .33, w - 40);
+    c.font = 'bold 50px Arial'; c.fillStyle = '#c23a2c'; c.fillText('LIBRARY', w / 2, h * .7, w - 110);
+  }, 320, 200);
+  const paper = new T.Mesh(new T.PlaneGeometry(.335, .21), new T.MeshStandardMaterial({ map: notice, roughness: .9 }));
+  paper.name = 'DEPARTMENT LIBRARY notice'; paper.position.set(0, classroom.landing + 2.50, .06); group.add(paper);
   const libraryTransform = new T.Matrix4().makeRotationY(Math.PI / 2); libraryTransform.setPosition(-1.28, 0, 1.45);
   for (const [material, gs] of batches) for (let j = libraryStart.get(material) || 0; j < gs.length; j++) gs[j].applyMatrix4(libraryTransform);
   for (const child of group.children) if (!libraryChildren.has(child)) child.applyMatrix4(libraryTransform);
-  for (const z of [.57, 2.33]) box(-1.33, (classroom.landing + ceiling) / 2, z, .14, ceiling - classroom.landing, .64, plaster);
+  // Only the pier left of the door: right of it the terrace partition carries on as the plaque wall (one plane, as filmed).
+  box(-1.33, (classroom.landing + ceiling) / 2, .57, .14, ceiling - classroom.landing, .64, plaster);
   box(-1.33, (classroom.landing + 2.5 + ceiling) / 2, 1.45, .14, ceiling - classroom.landing - 2.5, 1.12, plaster);
   for (let i = 0; i < 2; i++) {
     const h = (2 - i) * classroom.stepRise;
