@@ -368,7 +368,7 @@ export function buildArchitecture(scene) {
           const windowFrame = westWindow && f > 0 ? m.entranceWood : m.frame;
           const side = (ow - ww) / 2;
           for (const s of [-1, 1]) b(x + s * (ww + side) / 2, openingY, 0, side, openingH, .32, m.wall);
-          b(x, openingY, .01, ww, wh, .03, glass); // glass at the outer face: the casements open outward (owner)
+          b(x, openingY, -.19, ww, wh, .05, glass);
           for (const s of [-1, 1]) {
             b(x, openingY + s * (wh / 2 + (openingH - wh) / 4), 0, ww, (openingH - wh) / 2, .32, m.wall);
             b(x + s * ww / 2, openingY, .005, .085, wh, .12, windowFrame);
@@ -383,7 +383,7 @@ export function buildArchitecture(scene) {
             b(x, openingY, .015, .065, wh, .13, windowFrame);
             for (const s of type === 'east-wing' ? [-1, 1] : [0]) b(x, openingY + s * wh / 6, .015, ww, .05, .13, windowFrame);
           }
-          const grilleZ = -.1; // grilles inside the glass, never outside an outward-opening window (owner, 2026-10-17)
+          const grilleZ = westWindow || type === 'east-wing' ? -.04 : .09;
           for (let k = -4; k <= 4; k++) b(x + k * ww / 10, openingY, grilleZ, .015, wh, .018, m.metal);
           for (let k = -3; k <= 3; k++) b(x, openingY + k * wh / 8, grilleZ, ww, .014, .018, m.metal);
           b(x, openingY - wh / 2 - .065, .13, ww + .25, .12, .55, m.trim);
