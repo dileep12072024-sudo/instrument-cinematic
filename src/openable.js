@@ -28,10 +28,14 @@ export function casementCluster(name, frameMaterial, glassMaterial, { near = 22,
     group, windows,
     add(matrix, w, h, opts = {}) {
       const win = { leaves: [], open: false };
-      for (const dir of [1, -1]) {
-        const lw = w / 2, { frame, glass } = leafGeometry(lw, h, dir, { rows: opts.rows ?? rows, cols: opts.cols ?? cols });
+      // Leaves: two (hinged at the outer edges) or three - the outer two hinged at the edges, the middle one on the
+      // mullion to its left - each a third of the opening, as the original three-light windows (owner, 2026-10-17).
+      const count = opts.leaves ?? 2, lw = w / count;
+      const hinges = count === 3 ? [[-w / 2, 1], [w / 2, -1], [-w / 6, 1]] : [[-w / 2, 1], [w / 2, -1]];
+      for (const [hx, dir] of hinges) {
+        const { frame, glass } = leafGeometry(lw, h, dir, { rows: opts.rows ?? rows, cols: opts.cols ?? cols });
         const pivot = new T.Group(); pivot.matrixAutoUpdate = false;
-        const hinge = new T.Matrix4().makeTranslation(-dir * w / 2, 0, 0).premultiply(matrix);
+        const hinge = new T.Matrix4().makeTranslation(hx, 0, 0).premultiply(matrix);
         const a = new T.Mesh(frame, frameMaterial), b = new T.Mesh(glass, glassMaterial); a.castShadow = true; pivot.add(a, b);
         for (const mesh of [a, b]) mesh.userData.casement = win;
         live.add(pivot);

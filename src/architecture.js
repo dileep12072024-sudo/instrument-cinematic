@@ -700,7 +700,7 @@ export function buildArchitecture(scene) {
       const b = (x, yy, z, bw, bh, bd, material) => box(x, yy, z, bw, bh, bd, material, t);
       // Fixed outer frame; two glazed leaves that open outward (no grille outside: the room has its own inside).
       for (const sx of [-1, 1]) { b(sx * (w / 2 + .04), y, .02, .08, h + .08, .1, m.entranceWood); b(0, y + sx * (h / 2 + .04), .02, w + .16, .08, .1, m.entranceWood); }
-      outside.add(new T.Matrix4().copy(t).multiply(new T.Matrix4().makeTranslation(0, sill, .11)), w, h, { rows: 3, cols: 2 });
+      outside.add(new T.Matrix4().copy(t).multiply(new T.Matrix4().makeTranslation(0, sill, .11)), w, h, { leaves: 3, rows: 3, cols: 1 });
       b(0, sill - .065, .12, w + .25, .12, .3, m.trim);
     }
     outside.finish(); group.add(outside.group); group.userData.casements = outside;
