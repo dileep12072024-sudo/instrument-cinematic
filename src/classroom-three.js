@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import * as P from './props.js';
 
 // Local classroom-wing coordinates. Dimensions are fitted to the shell, not surveyed.
 export const classThree = { minX: -1.085, maxX: 7.3, frontZ: -20.43, backZ: -29.82, ceiling: 6.25, platform: .16 };
@@ -23,31 +24,27 @@ export function classroomBuilder(parent, m, floorY, name) {
     const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h);
     const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.wrapS = t.wrapT = T.RepeatWrapping; t.anisotropy = 4; return t;
   }
+  // Glossy cream vitrified tiles with brown marble veining, 0.6 m (Class II photos 20261014_1225-1227 and video).
   const tileMap = texture((c, w, h) => {
-    c.fillStyle = '#c5c2b6'; c.fillRect(0, 0, w, h);
-    for (let i = 0; i < 1000; i++) {
-      const x = random() * w, y = random() * h;
-      c.fillStyle = `rgba(120,111,92,${random() * .08})`;
-      c.beginPath(); c.ellipse(x, y, 5 + random() * 40, 2 + random() * 12, -.5, 0, Math.PI * 2); c.fill();
+    const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#e6dccb'); g.addColorStop(1, '#d9cbb4'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 26; i++) { // soft beige clouds
+      c.fillStyle = `rgba(${190 + random() * 30},${170 + random() * 25},${140 + random() * 25},${.16 + random() * .2})`;
+      c.beginPath(); c.ellipse(random() * w, random() * h, 20 + random() * 90, 6 + random() * 30, random() * 3, 0, Math.PI * 2); c.fill();
     }
-    for (let i = 0; i < 60; i++) {
-      let x = random() * w, y = random() * h;
-      c.strokeStyle = `rgba(113,104,87,${.10 + random() * .15})`; c.lineWidth = .4 + random() * 4;
+    for (let i = 0; i < 22; i++) { // long brown veins with thinner branches
+      let x = random() * w, y = random() * h; const a = -.6 + random() * .5, len = 20 + random() * 30;
+      c.strokeStyle = `rgba(${120 + random() * 40},${85 + random() * 30},${55 + random() * 20},${.45 + random() * .35})`; c.lineWidth = 1 + random() * 3.5;
       c.beginPath(); c.moveTo(x, y);
-      for (let k = 0; k < 12; k++) { x += random() * 25; y += random() * 30 - 24; c.lineTo(x, y); }
+      for (let k = 0; k < len; k++) { x += Math.cos(a) * 9 + (random() - .5) * 8; y += Math.sin(a) * 9 + (random() - .5) * 8; c.lineTo(x, y); }
       c.stroke();
     }
-    c.strokeStyle = '#77786c88'; c.lineWidth = 3; c.strokeRect(0, 0, w, h);
+    c.strokeStyle = 'rgba(150,140,125,.7)'; c.lineWidth = 2; c.strokeRect(0, 0, w, h); // grout
   });
-  const tiles = new T.MeshStandardMaterial({ name: `Class ${name} pale stone tiles`, map: tileMap, roughness: .32, envMapIntensity: .45 });
-  const deskMap = texture((c, w, h) => {
-    c.fillStyle = '#c6a77a'; c.fillRect(0, 0, w, h);
-    for (let i = 0; i < 500; i++) { c.fillStyle = `rgba(110,75,40,${random() * .08})`; c.fillRect(0, random() * h, w, .5 + random()); }
-  });
-  const oak = new T.MeshStandardMaterial({ name: 'Class III light timber benches', map: deskMap, roughness: .52 });
+  const tiles = new T.MeshStandardMaterial({ name: `Class ${name} marble-pattern tiles`, map: tileMap, roughness: .14, envMapIntensity: .8 }); // glossy: the lights reflect in it
+  const oak = new T.MeshStandardMaterial({ name: 'Class III light timber benches', map: P.woodTexture('#c9a473', { worn: 1 }), roughness: .45 });
   const steel = new T.MeshStandardMaterial({ name: 'Class III black steel frames', color: '#252a25', metalness: .55, roughness: .48 });
   const cream = new T.MeshStandardMaterial({ color: '#e9e7de', roughness: .85 });
-  const ceilingMat = new T.MeshStandardMaterial({ name: 'Class III acoustic ceiling', color: '#deded6', roughness: .9, emissive: '#84847b', emissiveIntensity: .2 });
+  const ceilingMat = new T.MeshStandardMaterial({ name: 'Class III acoustic ceiling', color: '#f4f4f0', roughness: .9, emissive: '#c8c8c0', emissiveIntensity: .35 }); // bright white panels, as photographed
   const seam = new T.MeshStandardMaterial({ color: '#a6aaa4', metalness: .35, roughness: .65 });
   const lightMat = new T.MeshStandardMaterial({ color: '#f5f7ed', emissive: '#eef5ea', emissiveIntensity: 1.7 });
   const fanMat = new T.MeshStandardMaterial({ color: '#553837', metalness: .35, roughness: .46 });
@@ -75,9 +72,7 @@ export function classroomBuilder(parent, m, floorY, name) {
   function bench(x, z, width, angle = 0) {
     const matrix = new T.Matrix4().makeRotationY(angle); matrix.setPosition(x, 0, z);
     transformed(matrix, () => {
-      box(-.18, floorY + .76, 0, .40, .035, width, oak);
-      box(.26, floorY + .45, 0, .27, .035, width, oak);
-      box(.43, floorY + .79, 0, .035, .34, width, oak);
+      for (const [x, y, w, h] of [[-.18, .76, .40, .035], [.26, .45, .27, .035], [.43, .79, .035, .34]]) add(P.rbox(w, h, width, .008, x, floorY + y, 0), oak); // rounded timber edges
       for (const dz of [-width / 2 + .09, width / 2 - .09]) {
         for (const dx of [-.32, .38]) box(dx, floorY + .37, dz, .028, .74, .028, steel);
         box(.03, floorY + .035, dz, .78, .028, .028, steel);
