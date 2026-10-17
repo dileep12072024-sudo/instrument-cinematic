@@ -223,3 +223,59 @@ Regression rays verify the restored partition and separate rear room floor,
 two window sills instead of the false door, closed corner and unobstructed steps.
 The browser check adds a reverse view toward Class III for inspecting the
 corrected window from the owner's screenshot direction.
+
+## October 16: Class II and III Interiors
+
+Owner confirmations supersede the earlier uncertainty: no windows on either
+side of Class IV, and no interconnecting door between II and III. Approaching
+along the corridor, III is straight ahead and II is on the left. The approved
+pierced corridor screens and both three-riser flights are unchanged.
+
+Class III was reviewed at 94 half-second timestamps across the 47.12-second
+clip, plus all three supplied photographs. This is sampled frame inspection,
+not a claim to have examined every encoded frame. The owner clarified four
+bench lines across the view from the board. Benches are now 1.55 m wide rather
+than 1.95 m; six benches per line is an inferred fit, not a confirmed count.
+The interior includes the front platform, display with exposed green board,
+lectern, teacher table/chair, four outer windows, two corridor windows,
+patterned maroon curtains, three ACs, wall fans, nine animated ceiling fans,
+suspended grid, light panels, paper decorations and hanging projector support.
+The nearest corridor window has the observed sloping curtain rod; its AC is
+above that window, not the farther one. The plain side-door jambs are sealed.
+
+Class II references: `Videos/Class II/20261014_122755.mp4` (89.82 seconds,
+24 chronological sampled frames, closer inspection at 35, 39, 62 and 81s),
+and photographs 122550, 122625, 122652 and 122723. Its distinct layout has a
+pillar-separated entrance aisle, timber/steel benches, pale veined stone,
+maroon patterned curtains, grilled timber windows, three AC units, ceiling
+fans/lights, projector and raised teaching platform. The white board overlaps
+the centre window between two green boards. The entrance has the photographed
+network cabinet and cable loops. No people or stored debris are modelled.
+The secondary sign in the footage does not override the owner's explicit
+no-interconnecting-door clarification. Dimensions, hidden construction,
+bench count and exact fixture spacing remain reference-based estimates.
+
+The II doorway is open inward at the lower landing datum (2.964 m). Its room
+floor shares that datum; the obsolete 4.03 m slab is removed across the room,
+not merely notched at the threshold. The separately developed ground-floor
+west-wing ceiling and its lantern beneath II also follow the lowered slab
+underside (2.764 m); its ground-floor doors and stair levels stay unchanged.
+Exterior openings belong to each classroom instead of overlapping a second
+generic facade. The small room behind the return-corridor partition remains.
+
+Both rooms have dedicated walk-selector routes. Geometry checks cover the II
+threshold/aisle and separation wall, III's four bench lines, side-door jambs,
+existing stair heights and corridor closure. Browser checks sample 501 points
+per route, verify floor/body clearance, capture desktop and phone views,
+inspect canvas pixels, and check fan motion and runtime/shader errors.
+Reference photos/videos are not bundled with the website; no additional
+Blender files were created.
+
+October 17 verification: geometry and interaction checks passed, as did the
+strict coplanar-face check. The staged-only source snapshot passed its geometry
+checks and production build independently of unrelated pending changes. The
+working build passed too (existing Three.js chunk-size warning remains).
+Windows Chrome on Intel UHD passed all three 501-sample routes, desktop/mobile
+canvas checks, fan motion and runtime/shader checks. Captures are in the ignored
+`artifacts/classroom-review/` directory. These checks establish renderability and
+clearance, not surveyed dimensions or photorealistic equivalence.

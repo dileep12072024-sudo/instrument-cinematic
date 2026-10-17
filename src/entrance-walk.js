@@ -46,6 +46,23 @@ const classroomRoute = [
   { at: .76, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ, yaw: 0, name: 'Classroom side passage' },
   { at: 1, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ - classroomPassage.end + 1.25, yaw: 0, name: 'Classroom side-passage end' },
 ];
+const classThreeRoute = [
+  { at: 0, x: -23.5, y: classroom.lowerFloor + 1.65, z: classroom.originZ + .35, yaw: -Math.PI / 2, name: 'Class Room III doorway' },
+  { at: .18, x: -25.7, y: classroom.lowerFloor + 1.65, z: classroom.originZ + .35, yaw: -Math.PI / 2, name: 'Class Room III entrance' },
+  { at: .32, x: -25.7, y: classroom.lowerFloor + 1.65, z: classroom.originZ - .95, yaw: -Math.PI / 2, name: 'Teaching platform' },
+  { at: .5, x: -29.13, y: classroom.lowerFloor + 1.65, z: classroom.originZ - .95, yaw: Math.PI, name: 'Teaching display and lectern' },
+  { at: .88, x: -29.13, y: classroom.lowerFloor + 1.65, z: classroom.originZ - 6.65, yaw: 0, name: 'Class Room III centre aisle' },
+  { at: 1, x: -29.13, y: classroom.lowerFloor + 1.65, z: classroom.originZ - 6.65, yaw: Math.PI, name: 'Class Room III toward the teaching platform' },
+];
+const classTwoRoute = [
+  { at: 0, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ + .4, yaw: Math.PI, name: 'Class Room II threshold' },
+  { at: .15, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ + 2.4, yaw: Math.PI, name: 'Class Room II entrance aisle' },
+  { at: .45, x: -23.15, y: classroom.lowerFloor + 1.65, z: classroom.originZ + 11.6, yaw: -Math.PI / 2, name: 'Class Room II pillars and benches' },
+  { at: .72, x: -32.1, y: classroom.lowerFloor + 1.65, z: classroom.originZ + 11.6, yaw: 0, name: 'Class Room II teaching platform' },
+  { at: .82, x: -32.1, y: classroom.lowerFloor + 1.65, z: classroom.originZ + 6.575, yaw: -Math.PI / 2, name: 'Class Room II front aisle' },
+  { at: .92, x: -29.4, y: classroom.lowerFloor + 1.65, z: classroom.originZ + 6.575, yaw: -Math.PI / 2, name: 'Class Room II boards and projector' },
+  { at: 1, x: -29.4, y: classroom.lowerFloor + 1.65, z: classroom.originZ + 6.575, yaw: Math.PI / 2, name: 'Class Room II toward the entrance' },
+];
 
 function walkingRoute(points) {
   let distance = 0;
@@ -130,7 +147,7 @@ export function createEntranceWalk(camera, canvas, onExit, onChange) {
     seek(stop?.at ?? (direction > 0 ? 1 : 0));
   }
   slider.addEventListener('input', () => seek(Number(slider.value) / 1000));
-  document.querySelector('#walk-route').addEventListener('change', e => { route = { hall: stops, right: rightWing, seminar: seminarSurrounds, classroom: classroomRoute, stairs: stairRoute, terraceLeft: leftTerraceRoute, terraceRight: rightTerraceRoute, upperCorridor: upperCorridorRoute }[e.target.value] || stops; shownYaw = shownPitch = yaw = pitch = 0; seek(0); });
+  document.querySelector('#walk-route').addEventListener('change', e => { route = { hall: stops, right: rightWing, seminar: seminarSurrounds, classroom: classroomRoute, classII: classTwoRoute, classIII: classThreeRoute, stairs: stairRoute, terraceLeft: leftTerraceRoute, terraceRight: rightTerraceRoute, upperCorridor: upperCorridorRoute }[e.target.value] || stops; shownYaw = shownPitch = yaw = pitch = 0; seek(0); });
   play.onclick = () => { if (progress === 1) progress = 0; playing = !playing; sync(); };
   document.querySelector('#walk-back').onclick = () => step(-1);
   document.querySelector('#walk-forward').onclick = () => step(1);

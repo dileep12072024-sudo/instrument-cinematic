@@ -77,6 +77,7 @@ $('#light-panel').insertAdjacentHTML('beforeend', '<label class="motion-row" for
 $('#hour').min = 0; $('#hour').max = 23.99;
 $('#weather-detail').insertAdjacentHTML('afterend', '<p id="moon-detail" class="weather-detail"></p>');
 refreshIcons();
+$("#walk-route").insertAdjacentHTML("beforeend", '<option value="classII">Class Room II</option><option value="classIII">Class Room III</option>');
 const sound = createAmbience();
 function updateSoundButton() {
   const active = sound.enabled;
@@ -596,6 +597,7 @@ function animate(now) {
   if (!entranceWalk?.active && !panorama && !avatar?.active) controls.update(Math.min(frameDuration / 1000, 1));
   const windSpeed = updateWind(landscape, weatherState, dt, reduced);
   if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
+  if (!reduced && entranceWalk?.active) for (const fan of architecture.classroomFans) fan.rotation.y += dt * 4;
   rain.update(dt, weatherState, reduced, windSpeed);
   puddles?.update(dt, weatherState, reduced);
   lightning.visible = weatherState.storm && !reduced;

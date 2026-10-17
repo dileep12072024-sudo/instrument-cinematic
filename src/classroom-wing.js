@@ -1,6 +1,8 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { groundSpine } from './footprint.js';
+import { buildClassThree } from './classroom-three.js';
+import { buildClassTwo } from './classroom-two.js';
 
 // Heights are reference-based estimates; the entrance and junction both descend into the wing.
 const flightRise = groundSpine.rightFloor - groundSpine.hallFloor;
@@ -8,7 +10,7 @@ export const classroom = { floor: 4.044 - flightRise, landing: 4.044, lowerFloor
 export const classroomPassage = {
   start: 1.085, end: 11, // owner confirmed the small room behind this original partition
   windowWall: -18.27, windowWidth: 1.95, windows: [4.8, 7.1, 9.4],
-  doors: [6.5, 8.9], grilles: [2.5, 4.6, 10.1],
+  doors: [6.5, 8.9], grilles: [2.5, 4.6],
 };
 
 export function buildClassroomWing(parent, m) {
@@ -212,14 +214,19 @@ export function buildClassroomWing(parent, m) {
   for (const z of [-18.285, -20.015]) box(-1.10, (classroom.lowerFloor + sideCeiling) / 2, z, .16, sideCeiling - classroom.lowerFloor, .57, plaster);
   box(-1.10, (classroom.lowerFloor + 2.42 + sideCeiling) / 2, -19.15, .16, sideCeiling - classroom.lowerFloor - 2.42, 1.16, plaster);
   const iiStart = new Map([...batches].map(([material, gs]) => [material, gs.length])), iiChildren = new Set(group.children);
-  door(0, classroom.lowerFloor, 0, 1.02, 'CLASS ROOM - II');
+  door(0, classroom.lowerFloor, 0, 1.02, 'CLASS ROOM - II', true, { open: -Math.PI * .48 });
   const iiTransform = new T.Matrix4().makeRotationY(Math.PI / 2); iiTransform.setPosition(-1.04, 0, -19.15);
   for (const [material, gs] of batches) for (let j = iiStart.get(material) || 0; j < gs.length; j++) gs[j].applyMatrix4(iiTransform);
   for (const child of group.children) if (!iiChildren.has(child)) child.applyMatrix4(iiTransform);
+  floor(-1.15, -19.15, .35, 1.16, classroom.lowerFloor);
+  // Seal the reveal above the frame; the frame top is below the masonry lintel.
+  box(-1.10, classroom.lowerFloor + 2.385, -19.15, .16, .07, 1.16, plaster);
   // 103154 at 60s: III is left of centre; its information plaque occupies the right pier.
   for (const [left, right] of [[-1.085, -.93], [.23, 1.10]]) box((left + right) / 2, (classroom.lowerFloor + sideCeiling) / 2, -20.35, right - left, sideCeiling - classroom.lowerFloor, .16, plaster);
   box(-.35, (classroom.lowerFloor + 2.42 + sideCeiling) / 2, -20.35, 1.16, sideCeiling - classroom.lowerFloor - 2.42, .16, plaster);
-  door(-.35, classroom.lowerFloor, -20.24, 1.02, 'CLASS ROOM - III');
+  box(-.35, classroom.lowerFloor + 2.385, -20.35, 1.16, .07, .16, plaster);
+  door(-.35, classroom.lowerFloor, -20.24, 1.02, 'CLASS ROOM - III', true, { open: -Math.PI * .48 });
+  floor(-.35, -20.36, 1.1, .3, classroom.lowerFloor);
   const plaqueMap = texture((c, w, h) => {
     c.fillStyle = '#101916'; c.fillRect(0, 0, w, h);
     c.strokeStyle = '#a3945d'; c.lineWidth = 2;
@@ -246,7 +253,16 @@ export function buildClassroomWing(parent, m) {
   const passageLength = end - start, passageCentre = (start + end) / 2;
   floor(passageCentre, -19.15, passageLength, 2.3, classroom.lowerFloor);
   box(passageCentre, sideCeiling, -19.15, passageLength, .12, 2.5, ceilingPlaster);
-  box(passageCentre, (classroom.lowerFloor + sideCeiling) / 2, -20.4, passageLength, sideCeiling - classroom.lowerFloor, .18, plaster);
+  const sideDoor = doors[0], sideLeft = sideDoor - .55, sideRight = sideDoor + .55;
+  for (const [a, b] of [[start, sideLeft], [sideRight, end]]) box((a + b) / 2, classroom.lowerFloor + .475, -20.4, b - a, .95, .18, plaster);
+  box(passageCentre, (classroom.lowerFloor + 2.37 + sideCeiling) / 2, -20.4, passageLength, sideCeiling - classroom.lowerFloor - 2.37, .18, plaster);
+  let roomEdge = start;
+  for (const x of grilles) {
+    box((roomEdge + x - .75) / 2, classroom.lowerFloor + 1.66, -20.4, x - .75 - roomEdge, 1.42, .18, plaster);
+    roomEdge = x + .75;
+  }
+  for (const [a, b] of [[roomEdge, sideLeft], [sideRight, end]]) box((a + b) / 2, classroom.lowerFloor + 1.66, -20.4, b - a, 1.42, .18, plaster);
+  box(sideDoor, classroom.lowerFloor + 2.36, -20.4, 1.16, .02, .18, plaster);
   // Window wall sits 0.3 m inside the west wing's east face, whose wall and blue pilasters otherwise show through.
   const SW = classroomPassage.windowWall;
   box(passageCentre, classroom.lowerFloor + .54, SW, passageLength, 1.08, .16, plaster);
@@ -282,14 +298,13 @@ export function buildClassroomWing(parent, m) {
   // brown-framed brass-grilled windows between doors, electrical boxes fed from the conduit run,
   // high square wall niches, faculty name boards, darker floor bands and the patterned tile inlay.
   const brass = new T.MeshStandardMaterial({ name: 'Brass window grilles', color: '#b49a5c', metalness: .55, roughness: .42 });
-  const curtain = new T.MeshStandardMaterial({ name: 'Maroon room curtains behind grilles', color: '#4a2328', roughness: .9 });
   const panelGrey = new T.MeshStandardMaterial({ name: 'Grey distribution boxes', color: '#9fa5a3', metalness: .45, roughness: .45 });
   const panelWhite = new T.MeshStandardMaterial({ name: 'White isolator boxes', color: '#e6e5dd', roughness: .6 });
   // Side passage door wall (z = -20.4, facing +z): photos and 103154 82-117 s.
   const lf = classroom.lowerFloor, wz = -20.31;
   for (const c of grilles) {
-    const sill = lf + .95, w = c === grilles.at(-1) ? .9 : 1.5, h = 1.42, mid = sill + h / 2;
-    box(c, mid, wz + .004, w - .06, h - .06, .008, curtain);
+    const sill = lf + .95, w = 1.5, h = 1.42, mid = sill + h / 2;
+    box(c, mid, wz + .004, w - .06, h - .06, .008, clearGlass);
     for (const dx of [-w / 2, -w / 6, w / 6, w / 2]) box(c + dx, mid, wz + .03, .07, h, .06, wood);
     for (const dy of [-h / 2, h / 2]) box(c, mid + dy, wz + .03, w + .07, .07, .06, wood);
     for (const dy of [-h / 6, h / 6]) box(c, mid + dy, wz + .015, w - .07, .035, .025, wood);
@@ -375,6 +390,8 @@ export function buildClassroomWing(parent, m) {
   const leaf = new T.Group(); leaf.name = 'Open classroom entrance leaf'; leaf.position.set(posts[1], entryY, .46); leaf.rotation.y = -Math.PI * .49; group.add(leaf);
   panelFrame(leaf, -leafWidth / 2, leafWidth);
   const push = label('PUSH', -.12, 1.08, .03, .16, .07, '#f5f5f0', '#111'); leaf.attach(push); push.position.set(-.12, 1.08, .03); push.rotation.set(0, 0, 0);
+  buildClassThree(group, { plaster, wood, aluminium, glass: clearGlass, fan: m.fan }, classroom.lowerFloor);
+  buildClassTwo(group, { plaster, wood, aluminium, glass: clearGlass, fan: m.fan }, classroom.lowerFloor);
   for (const [material, geometries] of batches) {
     const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = mesh.receiveShadow = true; group.add(mesh); geometries.forEach(g => g.dispose());
   }

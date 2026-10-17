@@ -3,6 +3,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint, groundSpine, seminarPassage, hallWindows } from './footprint.js';
 import { buildEntranceHall } from './entrance-hall.js';
 import { buildClassroomWing, classroom, classroomPassage } from './classroom-wing.js';
+import { classThree } from './classroom-three.js';
+import { classTwo } from './classroom-two.js';
+import { buildWestWing, westWing } from './west-wing.js';
 import { buildTerraces } from './terraces.js';
 import { stairs, terraceLevels } from './stair-layout.js';
 
@@ -90,6 +93,46 @@ function woodGrain() {
   return texture(c);
 }
 
+// Pierced concrete block screen (the photographed blocks): chipped openings, narrow slots in every eighth pair of
+// columns, and a wider ventilation slot with a sill and the raised A U forms. Centred on the origin, 0.2 deep (from
+// -0.07 to 0.13, +z facing out). The facade panels are 16 x 11 blocks; smaller panels (west wing) use fewer blocks of
+// the same size. Returns { screen, sill, letters } geometries.
+export function concreteScreenParts(w, h, cols = 16, rows = 11) {
+  const shape = new T.Shape();
+  shape.moveTo(-w / 2, -h / 2); shape.lineTo(w / 2, -h / 2); shape.lineTo(w / 2, h / 2); shape.lineTo(-w / 2, h / 2); shape.closePath();
+  const cw = w / cols, ch = h / rows;
+  const hole = (left, bottom, width, height) => {
+    const p = new T.Path(), chip = Math.min(width, height) * .075;
+    p.moveTo(left, bottom); p.lineTo(left + chip, bottom + height * .52); p.lineTo(left, bottom + height);
+    p.lineTo(left + width * .58, bottom + height - chip); p.lineTo(left + width, bottom + height);
+    p.lineTo(left + width - chip, bottom + height * .35); p.lineTo(left + width, bottom); p.closePath(); shape.holes.push(p);
+  };
+  const slot = cols >= 8 && rows >= 5, slotRow = Math.round(rows * 4 / 11), c0 = Math.round(cols * 5 / 16), n = Math.max(2, Math.round(cols * 5 / 16));
+  for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
+    if (slot && row === slotRow && col >= c0 && col < c0 + n) continue;
+    // Alternating narrow slots interrupt the horizontal openings, as in the concrete blocks.
+    const narrow = col % 8 === 3 || col % 8 === 4;
+    const inset = narrow ? cw * .32 : cw * .14;
+    const wear = Math.sin(row * 9.3 + col * 5.7) * .006;
+    hole(-w / 2 + col * cw + inset, -h / 2 + row * ch + ch * .22 + wear, cw - 2 * inset, ch * .55);
+  }
+  const letters = []; let sill = new T.BufferGeometry();
+  if (slot) {
+    hole(-w / 2 + c0 * cw + .02, -h / 2 + slotRow * ch + .015, n * cw - .04, ch - .025);
+    const sx = -w / 2 + (c0 + n / 2) * cw, sy = -h / 2 + (slotRow + .5) * ch;
+    // Small sloping sill in the wider central ventilation slot.
+    sill = new T.BoxGeometry(n * cw - .04, .035, .24).toNonIndexed(); sill.rotateX(.25); sill.translate(sx, sy - ch / 2, .025);
+    // Raised A U forms within the slot.
+    const lh = ch * 11 / 13, lx = n * cw * 4 / 15;
+    for (const points of [[[-lx * 1.6, -lh * .35], [-lx, lh * .5], [-lx * .4, -lh * .35]], [[-lx * 1.35, 0], [-lx * .65, 0]], [[lx * .3, lh * .5], [lx * .4, -lh * .2], [lx, -lh * .3], [lx * 1.5, -lh * .2], [lx * 1.6, lh * .5]]]) {
+      const curve = new T.CatmullRomCurve3(points.map(([px, py]) => new T.Vector3(sx + px, sy + py, .06)), false, 'centripetal');
+      letters.push(new T.TubeGeometry(curve, 16, .028, 5, false));
+    }
+  }
+  const screen = new T.ExtrudeGeometry(shape, { depth: .2, bevelEnabled: false, steps: 1, curveSegments: 1 }); screen.translate(0, 0, -.07);
+  return { screen, sill, letters };
+}
+
 export function buildArchitecture(scene) {
   const group = new T.Group(); group.name = 'Reference-built department'; scene.add(group);
   const plasterMap = plaster();
@@ -101,6 +144,7 @@ export function buildArchitecture(scene) {
     dark: mat('#222a27'), frame: mat('#627976', { metalness: .25 }), wood: mat('#65503c'),
     glass: new T.MeshPhysicalMaterial({ name: 'Courtyard glass', color: '#6d8580', roughness: .055, metalness: .12, clearcoat: 1, clearcoatRoughness: .04, ior: 1.52, envMapIntensity: 1.4 }),
     metal: mat('#8a928c', { metalness: .65, roughness: .5 }),
+    plinth: mat('#a2785a', { map: plasterMap, bumpMap: plasterMap, bumpScale: .02 }),
     grille: mat('#d1cbb8'), brick: mat('#ae7259'), stain: mat('#ad7c56'), paving: mat('#b4b2a6', { map: noiseMap('#c7c4b8', 7, true), bumpScale: .025 }),
     weather: mat('#ffffff', { map: weatherMap(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }),
   };
@@ -130,43 +174,11 @@ export function buildArchitecture(scene) {
   const screenTemplates = new Map();
   function concreteScreen(x, y, w, h, transform) {
     const key = `${w}:${h}`;
-    if (!screenTemplates.has(key)) {
-      const shape = new T.Shape();
-      shape.moveTo(-w / 2, -h / 2); shape.lineTo(w / 2, -h / 2); shape.lineTo(w / 2, h / 2); shape.lineTo(-w / 2, h / 2); shape.closePath();
-      const cols = 16, rows = 11, cw = w / cols, ch = h / rows;
-      const hole = (left, bottom, width, height) => {
-        const p = new T.Path(), chip = Math.min(width, height) * .075;
-        p.moveTo(left, bottom); p.lineTo(left + chip, bottom + height * .52); p.lineTo(left, bottom + height);
-        p.lineTo(left + width * .58, bottom + height - chip); p.lineTo(left + width, bottom + height);
-        p.lineTo(left + width - chip, bottom + height * .35); p.lineTo(left + width, bottom); p.closePath(); shape.holes.push(p);
-      };
-      for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
-        // Alternating narrow slots interrupt the horizontal openings, as in the concrete blocks.
-        if (row === 4 && col >= 5 && col <= 9) continue;
-        const narrow = col === 3 || col === 4 || col === 11 || col === 12;
-        const inset = narrow ? cw * .32 : cw * .14;
-        const wear = Math.sin(row * 9.3 + col * 5.7) * .006;
-        hole(-w / 2 + col * cw + inset, -h / 2 + row * ch + ch * .22 + wear, cw - 2 * inset, ch * .55);
-      }
-      hole(-w / 2 + 5 * cw + .02, -h / 2 + 4 * ch + .015, 5 * cw - .04, ch - .025);
-      const geo = new T.ExtrudeGeometry(shape, { depth: .2, bevelEnabled: false, steps: 1, curveSegments: 1 });
-      geo.translate(0, 0, -.07); screenTemplates.set(key, geo);
-    }
-    const geo = screenTemplates.get(key).clone(); geo.translate(x, y, 0); geo.applyMatrix4(transform);
-    if (!batches.has(m.screen)) batches.set(m.screen, []); batches.get(m.screen).push(geo);
-    // Small sloping sill in the wider central ventilation slot.
-    const slotY = -h / 11, sill = new T.BoxGeometry(w * 5 / 16 - .04, .035, .24).toNonIndexed(); sill.rotateX(.25); sill.translate(x - w / 32, y + slotY - h / 22, .025); sill.applyMatrix4(transform);
-    batches.get(m.screen).push(sill);
-    // Raised A U forms within the central ventilation slot.
-    const letter = (points, radius = .028) => {
-      const curve = new T.CatmullRomCurve3(points.map(([px, py]) => new T.Vector3(x + px - w / 32, y + py + slotY, .06)), false, 'centripetal');
-      const geo = new T.TubeGeometry(curve, 16, radius, 5, false); geo.applyMatrix4(transform);
-      if (!batches.has(m.blue)) batches.set(m.blue, []); batches.get(m.blue).push(geo);
-    };
-    const lh = h / 13, lx = w / 12;
-    letter([[-lx * 1.6, -lh * .35], [-lx, lh * .5], [-lx * .4, -lh * .35]]);
-    letter([[-lx * 1.35, 0], [-lx * .65, 0]]);
-    letter([[lx * .3, lh * .5], [lx * .4, -lh * .2], [lx, -lh * .3], [lx * 1.5, -lh * .2], [lx * 1.6, lh * .5]]);
+    if (!screenTemplates.has(key)) screenTemplates.set(key, concreteScreenParts(w, h));
+    const parts = screenTemplates.get(key), move = new T.Matrix4().makeTranslation(x, y, 0).premultiply(transform);
+    if (!batches.has(m.screen)) batches.set(m.screen, []); if (!batches.has(m.blue)) batches.set(m.blue, []);
+    for (const g of [parts.screen, parts.sill]) batches.get(m.screen).push(g.clone().applyMatrix4(move));
+    for (const g of parts.letters) batches.get(m.blue).push(g.clone().applyMatrix4(move));
   }
   function box(x, y, z, w, h, d, material, parent = null) {
     const geo = new T.BoxGeometry(w, h, d); matrix.makeTranslation(x, y, z); geo.applyMatrix4(matrix);
@@ -186,14 +198,21 @@ export function buildArchitecture(scene) {
   }
   function face(cx, cz, rotation, width, height, bays, type, closedGround = false, openGround = false, onlyFloor = null) {
     const transform = new T.Matrix4().compose(new T.Vector3(cx, 0, cz), quaternion.setFromAxisAngle(new T.Vector3(0, 1, 0), rotation), new T.Vector3(1, 1, 1));
-    let facade = true, belowClassroomJunction = false;
+    let facade = true, belowClassroomJunction = false, belowClassThree = false, belowClassTwo = false;
     const b = (x, y, z, w, h, d, material) => {
       const emit = (left, right, top = Infinity) => {
         const bottom = y - h / 2, clippedTop = Math.min(y + h / 2, top);
         if (clippedTop > bottom && right > left) box((left + right) / 2, (bottom + clippedTop) / 2, z, right - left, clippedTop - bottom, d, material, transform);
       };
       // Close the wall below the lower classroom landing, never across its walking space.
-      if (belowClassroomJunction && x - w / 2 < cz - 1.083333) {
+      if (belowClassTwo) {
+        emit(x - w / 2, x + w / 2, classroom.lowerFloor - .16);
+      } else if (belowClassThree) {
+        const a = classroom.originZ - classThree.maxX - cz, c = classroom.originZ - classTwo.minX + .18 - cz;
+        emit(x - w / 2, Math.min(x + w / 2, a));
+        emit(Math.max(x - w / 2, a), Math.min(x + w / 2, c), classroom.lowerFloor - .16);
+        emit(Math.max(x - w / 2, c), x + w / 2);
+      } else if (belowClassroomJunction && x - w / 2 < cz - 1.083333) {
         const split = Math.min(x + w / 2, cz - 1.083333);
         emit(x - w / 2, split, classroom.lowerFloor - .06);
         emit(split, x + w / 2);
@@ -212,7 +231,20 @@ export function buildArchitecture(scene) {
     const corridor = type === 'corridor' || type === 'gate-return';
     for (let f = 0; f < floors; f++) {
       if (onlyFloor !== null && f !== onlyFloor) continue;
+      // west-wing.js builds this ground-floor wall (screens and the courtyard door) along the filmed passage.
+      if (f === 0 && type === 'room' && cx < 0 && rotation === Math.PI / 2) continue;
       belowClassroomJunction = f === 0 && type === 'room' && cx < 0 && rotation === Math.PI / 2;
+      belowClassThree = f === 0 && type === 'west-outer' && rotation === -Math.PI / 2;
+      belowClassTwo = f === 0 && (type === 'west-end' || type === 'west' && rotation === Math.PI / 2);
+      // Class II owns the end and courtyard-facing walls, including their lower sills.
+      if (f === 1 && (type === 'west-end' || type === 'west' && rotation === Math.PI / 2)) continue;
+      if (f === 1 && onlyFloor === null && type === 'west-outer' && rotation === -Math.PI / 2) {
+        // Both classrooms own their outer windows and lowered sill/room slabs.
+        for (const [a, c] of [[cz - width / 2, classroom.originZ - classThree.maxX]]) {
+          face(cx, (a + c) / 2, rotation, c - a, height, Math.max(1, Math.round((c - a) / 3.5)), type, closedGround, openGround, 1);
+        }
+        continue;
+      }
       if (f === 1 && type === 'low-corridor' && rotation === 0) {
         // The interior owns the actual openings and pierced screens, including their exterior faces.
         // Keep the blue structural strips; a second generic facade would obstruct the new windows.
@@ -245,10 +277,13 @@ export function buildArchitecture(scene) {
       if ((openGround || type === 'tower-front' || type === 'tower-side') && f === 0) continue;
       const raisedScreen = type === 'corridor' && cx > 0 && f === 0 && rotation === 0;
       const y = f * floorH, openingH = raisedScreen ? 2.04 : f === 0 ? 2.15 : 1.9;
-      const openingY = raisedScreen ? groundSpine.screenBottom + openingH / 2 : y + (f === 0 ? 1.9 : 2.55);
+      // The west wing's ground storey is sunk with its floor (owner, 2026-10-16): its walls, screens, windows and gate
+      // start at the wing floor; the storey above stays where it is.
+      const sunk = f === 0 && (westOuter || type === 'west') ? westWing.floor : 0, y0 = y + sunk;
+      const openingY = raisedScreen ? groundSpine.screenBottom + openingH / 2 : y0 + (f === 0 ? 1.9 : 2.55);
       const hasGate = (type === 'gate-return' || type === 'west-end') && f === 0;
       const gateMaterial = type === 'west-end' ? m.westGate : m.gate;
-      if (!hasGate) b(0, y + (openingY - openingH / 2 - y) / 2, 0, width, openingY - openingH / 2 - y, .32, m.wall);
+      if (!hasGate) b(0, y0 + (openingY - openingH / 2 - y0) / 2, 0, width, openingY - openingH / 2 - y0, .32, m.wall);
       const high = openingY + openingH / 2;
       b(0, (high + y + floorH) / 2, 0, width, y + floorH - high, .32, m.wall);
       for (let j = 0; j < bays; j++) {
@@ -256,12 +291,19 @@ export function buildArchitecture(scene) {
         const worldZ = cz - Math.sin(rotation) * x;
         const solid = closedGround === 'all' || f === 0 && (closedGround === true || closedGround === 'rear-half' && worldZ < -3.25);
         const glass = closedGround === true || worldZ < -3.25 ? m.rearGlass : m.glass;
-        const lattice = type === 'low-corridor' || corridor && f < floors - 1 || type === 'west' && f === 0;
-        b(x - bay / 2, y + floorH / 2, 0, .6, floorH, .32, m.wall);
-        if (!tower || j === 0) b(x - bay / 2, y + floorH / 2, .05, .3, floorH, .45, m.blue);
+        const passageEnd = f === 0 && type === 'west-outer' && rotation === Math.PI && Math.abs(cx - x + 23.5) < .6; // screened end bay
+        const lattice = type === 'low-corridor' || corridor && f < floors - 1 || type === 'west' && f === 0 || passageEnd;
+        b(x - bay / 2, (y0 + y + floorH) / 2, 0, .6, y + floorH - y0, .32, m.wall);
+        if (!tower || j === 0) b(x - bay / 2, (y0 + y + floorH) / 2, .05, .3, y + floorH - y0, .45, m.blue);
+        if (f === 0 && j === 0 && type === 'low-corridor' && rotation === 0) { // the corner pier stands on the landing three steps down
+          b(x - bay / 2, westWing.floor / 2 - .01, 0, .6, -westWing.floor + .02, .32, m.wall); b(x - bay / 2, westWing.floor / 2 - .01, .25, .3, -westWing.floor + .02, .2, m.blue); // blue on the outside face only
+        }
         if (hasGate && j === bays - 1) {
-          const gateBottom = .16, gateTop = high, gateHeight = gateTop - gateBottom;
-          if (type !== 'gate-return') b(x, (gateTop + gateBottom) / 2, -.4, ow, gateHeight, .06, m.dark);
+          // The west gate (frame 57): full passage width on a 0.8 dwarf wall (west-wing.js), 1.55 tall, plain wall above.
+          const westGate = type === 'west-end', gateBottom = westGate ? westWing.floor + .02 : .16, gateTop = westGate ? westWing.floor + 2.35 : high, gateHeight = gateTop - gateBottom;
+          if (westGate) b(x, (gateTop + high) / 2, 0, ow, high - gateTop, .32, m.wall);
+          {
+          if (type !== 'gate-return' && type !== 'west-end') b(x, (gateTop + gateBottom) / 2, -.4, ow, gateHeight, .06, m.dark);
           for (const s of [-1, 1]) b(x + s * (ow / 2 - .04), (gateTop + gateBottom) / 2, .08, .08, gateHeight, .12, gateMaterial);
           for (const yy of [gateBottom, gateTop]) b(x, yy, .08, ow, .08, .12, gateMaterial);
           const bars = Math.round(ow / .18);
@@ -278,15 +320,21 @@ export function buildArchitecture(scene) {
             const edge = .16;
             ramp(x - edge / 2, .08, ow - edge, 1.2, .16, m.eastRamp, transform);
             ramp(x + (ow - edge) / 2, .08, edge, 1.2, .16, m.rampEdge, transform);
-          } else {
+          } else if (!westGate) {
             ramp(x, .08, ow, 1.2, .16, m.paving, transform);
           }
-          b(x, 3.12, .45, bay, .16, 1.15, m.trim);
+          }
+          b(x, westGate ? gateTop + .12 : 3.12, .45, bay, .16, 1.15, m.trim);
         } else if (solid) {
           b(x, openingY, 0, ow, openingH, .32, m.wall);
         } else if (lattice) {
-          if ((f !== 0 || !type.includes('corridor')) && !(type === 'low-corridor' && f === 1 && rotation === 0)) b(x, openingY, -.27, ow, openingH, .05, m.dark);
-          if (f === 0) {
+          if ((f !== 0 || !type.includes('corridor')) && !(type === 'low-corridor' && f === 1 && rotation === 0) && !(f === 0 && (type === 'west' || passageEnd))) b(x, openingY, -.27, ow, openingH, .05, m.dark);
+          if (f === 0 && passageEnd) {
+            // The washing bay's screen stops 2.4 above the lowered wing floor, plain wall above it (frames 122-133).
+            const bottom = openingY - openingH / 2, top = westWing.floor + 2.4;
+            concreteScreen(x, (bottom + top) / 2, ow, top - bottom, transform);
+            b(x, (top + bottom + openingH) / 2, 0, ow, bottom + openingH - top, .32, m.wall);
+          } else if (f === 0) {
             concreteScreen(x, openingY, ow, openingH, transform);
           } else {
             // Clipped diagonal strips form the pierced diamond screens visible in the photos.
@@ -338,12 +386,12 @@ export function buildArchitecture(scene) {
         if (f === 0 && !hasGate) {
           for (let k = 0; k < 8; k++) {
             const h = .06 + random() * .15;
-            b(x - ow / 2 + k * ow / 8, h / 2, .169, ow / 8, h, .008, m.stain);
+            b(x - ow / 2 + k * ow / 8, y0 + h / 2, .169, ow / 8, h, .008, m.stain); // at the ground
           }
         }
       }
-      b(width / 2, y + floorH / 2, 0, .6, floorH, .32, m.wall);
-      b(width / 2, y + floorH / 2, .05, .3, floorH, .45, m.blue);
+      b(width / 2, (y0 + y + floorH) / 2, 0, .6, y + floorH - y0, .32, m.wall);
+      b(width / 2, (y0 + y + floorH) / 2, .05, .3, y + floorH - y0, .45, m.blue);
       if (f === 0 && type === 'low-corridor' && rotation === 0) {
         // Keep the exterior trim's outer edge, but not its old intrusion into the lowered corridor.
         b(0, y + floorH - .1, .175, width + .24, .19, .48, m.trim);
@@ -354,7 +402,7 @@ export function buildArchitecture(scene) {
           box(cx + .19, classroom.lowerFloor + .45, (rear + junction) / 2, .075, .35, junction - rear, m.blue);
         } else b(0, type === 'low-corridor' && rotation === 0 ? classroom.floor + .45 : y + floorH + .45, .19, width, .35, .075, m.blue);
       }
-      if (f === 0 && (westWindow || type === 'east-wing')) b(0, 3.15, .38, width + .25, .14, 1.05, m.trim);
+      if (f === 0 && (westWindow || type === 'east-wing')) b(0, 3.15 + sunk, .38, width + .25, .14, 1.05, m.trim);
     }
     if (onlyFloor !== null) return;
     facade = false; belowClassroomJunction = false;
@@ -383,7 +431,9 @@ export function buildArchitecture(scene) {
     }
     if (type !== 'tower-front' && type !== 'gate-return') {
       const gateInset = type === 'west-end' ? bay : 0;
-      const geo = new T.PlaneGeometry(width - gateInset - .35, .8); geo.translate(-gateInset / 2, .4, .168); geo.applyMatrix4(transform);
+      // Splash stains start at the ground: the low-lying earth around the west wing (regrade.js) sits below y = 0.
+      const ground = type === 'west-outer' || type === 'west-end' || type === 'west' ? westWing.floor : 0;
+      const geo = new T.PlaneGeometry(width - gateInset - .35, .8); geo.translate(-gateInset / 2, ground + .4, .168); geo.applyMatrix4(transform);
       if (!batches.has(m.weather)) batches.set(m.weather, []); batches.get(m.weather).push(geo);
     }
   }
@@ -440,7 +490,23 @@ export function buildArchitecture(scene) {
         }
       }
     }
-    box(x, .02, z, w, .18, d, m.roof);
+    if (type === 'low-corridor') box(x + (westWing.stepsTop - x + w / 2) / 2, .02, (z - d / 2 + groundSpine.roomFront) / 2, w - (westWing.stepsTop - x + w / 2), .18, groundSpine.roomFront - (z - d / 2), m.roof); // rooms only: the corridor floor is three steps lower
+    else box(x, type === 'west' ? westWing.floor - .1 : .02, z, w, .18, d, m.roof); // the west wing floor is three steps lower
+    // Plinth: the walls continue into the ground (the terrain around the building lies 0.05-0.15 below the floor
+    // datum), stained by rain splash as photographed, so the building never shows a gap or the slab edge.
+    if (type === 'west') { // hollow: the wing floor sits three steps down inside it (west-wing.js)
+      // The whole ground storey is sunk with its floor (owner): walls start at the floor; a plinth ring closes below.
+      const t = .3, bottom = westWing.floor - .5, top = westWing.floor - .02;
+      for (const s of [-1, 1]) box(x, (bottom + top) / 2, z + s * d / 2, w + t, top - bottom, t, m.plinth);
+      for (const s of [-1, 1]) box(x + s * w / 2, (bottom + top) / 2, z, t, top - bottom, d + t, m.plinth);
+    } else if (type === 'low-corridor') { // stops at the top step; the landing below belongs to the west wing
+      // Rooms keep a solid base to y = 0; under the corridor (three steps down) it stops below the floor, with a ring
+      // under the facade wall up to its base.
+      const cut = westWing.stepsTop - (x - w / 2), x0 = x - w / 2 + cut, x1 = x + w / 2 + .01, rooms = groundSpine.roomFront, front = z + d / 2;
+      box((x0 + x1) / 2, -.4, (z - d / 2 - .01 + rooms) / 2, x1 - x0, .8, rooms - (z - d / 2 - .01), m.plinth);
+      box((x0 + x1) / 2, (westWing.corridor - .02 - .8) / 2, (rooms + front - .15) / 2, x1 - x0, westWing.corridor - .02 + .8, front - .15 - rooms, m.plinth);
+      box((x0 + x1) / 2, -.4, front, x1 - x0, .8, .3, m.plinth);
+    } else box(x, -.4, z, w + .02, .8, d + .02, m.plinth);
     const roofBase = h - 1.4 - (type === 'west' ? .5 : 0);
     for (let y = 4; y < roofBase - .001; y += 4) {
       // Every stair level needs an opening, including the final roof return.
@@ -450,9 +516,11 @@ export function buildArchitecture(scene) {
         box(x, y - .07, (-d / 2 + 1.08) / 2, w, .2, 1.08 + d / 2, m.roof);
       } else if (type === 'west' && y === 4) {
         const left = x - w / 2, right = x + w / 2, passageLeft = -24.5, rear = classroom.originZ - classroomPassage.end, front = 3.25;
-        box((left + passageLeft) / 2, y - .07, z, passageLeft - left, .2, d, m.roof);
+        const roomRear = classroom.originZ - classThree.maxX;
+        box((left + passageLeft) / 2, y - .07, (-d / 2 + roomRear) / 2, passageLeft - left, .2, roomRear + d / 2, m.roof);
         box((passageLeft + right) / 2, y - .07, (-d / 2 + rear) / 2, right - passageLeft, .2, rear + d / 2, m.roof);
-        box((passageLeft + right) / 2, y - .07, (front + d / 2) / 2, right - passageLeft, .2, d / 2 - front, m.roof);
+        // Class II's entire floor is lowered, not just a pocket behind its door.
+        box(x, classroom.lowerFloor - .12, (front + d / 2) / 2, w, .16, d / 2 - front, m.roof);
         box((passageLeft + right) / 2, classroom.lowerFloor - .12, (rear + front) / 2, right - passageLeft, .16, front - rear, m.roof);
       } else box(x, y - .07, z, w, .2, d, m.roof);
     }
@@ -586,12 +654,13 @@ export function buildArchitecture(scene) {
     const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = material !== m.weather && material !== m.entranceGlazing; mesh.receiveShadow = true; mesh.layers.enable(1); group.add(mesh);
     geometries.forEach(g => g.dispose());
   }
-  screenTemplates.forEach(geo => geo.dispose());
+  screenTemplates.forEach(parts => [parts.screen, parts.sill, ...parts.letters].forEach(g => g.dispose()));
   const interior = buildEntranceHall(group, m);
-  buildClassroomWing(group, { ...m, tread: interior.floor.material });
+  buildClassroomWing(group, { ...m, tread: interior.floor.material, fan: interior.fan });
+  buildWestWing(group, m, classroom.lowerFloor - .2);
   buildTerraces(group, m);
   for (const { pivot } of doors) pivot.traverse(object => { if (object.isMesh) object.layers.enable(1); });
-  return { group, doors, materials: m, interior };
+  return { group, doors, materials: m, interior, classroomFans: ['II', 'III'].flatMap(n => group.getObjectsByProperty('name', `Class ${n} ceiling fan rotor`)) };
 }
 
 function foliageTexture() {

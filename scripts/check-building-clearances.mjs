@@ -24,7 +24,8 @@ const roomSigns = wing.getObjectsByProperty('isMesh', true).filter(o => o.name.s
 assert.deepEqual(roomSigns.map(o => o.name).sort(), ['II', 'III', 'IV'].map(n => `Door sign: CLASS ROOM - ${n}`), 'The three reference classroom doors are II, III and IV');
 const plaque = wing.getObjectByName('Class III information plaque');
 assert.ok(plaque?.material.map && plaque.position.x > .23, 'Reference plaque is on the wall to the right of Class III');
-assert.equal(wing.getObjectByName('Door sign: CLASS ROOM - III').position.x, -.35, 'Class III door is offset left, as filmed');
+assert.ok(wing.getObjectByName('Door sign: CLASS ROOM - III').position.z < -20.5, 'Class III leaf opens into the room');
+assert.equal(wingHits([-.35, classroom.lowerFloor + 1.2, -19.9], [0, 0, -1], 1.5).length, 0, 'Class III entrance is open through the wall');
 for (const x of [-1, .27, .65, 1.04]) {
   const hit = wingHits([x, classroom.lowerFloor + 1, -19.9], [0, 0, -1], .5)[0];
   assert.equal(hit?.object.material.name, 'Weathered classroom plaster', 'Moving the Class III door leaves no openings in its side piers');
@@ -55,8 +56,40 @@ assert.ok(rearRoomFloor && Math.abs(rearRoomFloor.point.y - 4.03) < .005, 'The r
 assert.deepEqual(classroomPassage.grilles.filter(x => x < classroomPassage.doors[0]), [2.5, 4.6], 'Two Class III windows precede its plain side door');
 for (const x of [2.5, 4.6]) {
   assert.equal(wingHits([x, classroom.lowerFloor + .5, -19.15], [0, 0, -1], 1.5)[0]?.object.material.name, 'Weathered classroom plaster', 'Solid sill replaces the false full-height doorway');
-  assert.equal(wingHits([x, classroom.lowerFloor + 1.66, -19.15], [0, 0, -1], 1.5)[0]?.object.material.name, 'Maroon room curtains behind grilles', 'Timber/grille window occupies the corrected opening');
+  assert.ok(wingHits([x + .035, classroom.lowerFloor + 1.66, -19.15], [0, 0, -1], 1.5).some(h => h.object.material.name === 'Classroom sliding glass'), 'Timber/grille window has real glazing into Class III');
 }
+assert.deepEqual(classroomPassage.grilles, [2.5, 4.6], 'No windows beside the Class IV door');
+const room = scene.getObjectByName('Class Room III interior');
+assert.equal(room.userData.deskCount, 24);
+assert.equal(room.userData.benchLines.length, 4, 'Four lines of benches when viewed from the board');
+assert.equal(room.userData.benchWidth, 1.55, 'Benches are narrower than the initial oversized layout');
+assert.equal(room.getObjectsByProperty('name', 'Class III ceiling fan rotor').length, 9);
+for (let x = .95; x <= 6.65; x += .1) {
+  const hit = wingHits([x, classroom.lowerFloor + 1.65, -25.13], [0, -1, 0])[0];
+  assert.ok(hit && Math.abs(hit.point.y - classroom.lowerFloor) < .005, 'Class III aisle is clear of desks and the legacy slab');
+}
+for (const z of [-20.25, -20.36, -20.5, -21.2]) {
+  const hit = wingHits([-.35, classroom.lowerFloor + 1.65, z], [0, -1, 0])[0];
+  assert.ok(hit && Math.abs(hit.point.y - classroom.lowerFloor) < .005, 'Class III doorway has a continuous level threshold');
+}
+for (const x of [-.92, -1.09, -1.23, -1.5, -2, -6, -11.6]) {
+  const hit = wingHits([x, classroom.lowerFloor + .8, -19.15], [0, -1, 0])[0];
+  assert.ok(hit && Math.abs(hit.point.y - classroom.lowerFloor) < .005, 'Class II threshold is level with the lower landing');
+}
+for (const y of [.05, .4, .9, 1.2, 2.1]) {
+  assert.equal(wingHits([-.7, classroom.lowerFloor + y, -19.15], [-1, 0, 0], 1.6).length, 0, 'Class II open doorway is unobstructed from bottom to top');
+}
+const roomTwo = scene.getObjectByName('Class Room II interior');
+assert.equal(roomTwo.userData.deskCount, 24);
+assert.equal(roomTwo.userData.columns.length, 3, 'Class II has a separate pillar-lined entrance aisle');
+assert.equal(roomTwo.getObjectsByProperty('name', 'Class II ceiling fan rotor').length, 9);
+for (let x = -2.4; x >= -11.6; x -= .15) {
+  assert.ok(Math.abs(wingHits([x, classroom.lowerFloor + 1.65, -19.15], [0, -1, 0])[0]?.point.y - classroom.lowerFloor) < .005, 'Class II aisle has no old slab through it');
+}
+for (const z of [-21.8, -23.5, -26, -28.5]) {
+  assert.equal(wingHits([-1.5, classroom.lowerFloor + 1, z], [1, 0, 0], .5)[0]?.object.material.name, 'Weathered classroom plaster', 'Class II and III have no interconnecting doorway');
+}
+for (const x of [6, 7]) assert.ok(wingHits([x, classroom.lowerFloor + 1, -20.6], [0, 0, 1], .5).length, 'Class III side-door jambs have no gaps');
 for (let z = -17.63; z > -20.1; z -= .025) {
   const hit = wingHits([0, classroom.lowerFloor + 1.65, z], [0, -1, 0])[0];
   assert.ok(hit && Math.abs(hit.point.y - classroom.lowerFloor) < .005, `No shell lintel crosses the lower junction at ${z}`);
