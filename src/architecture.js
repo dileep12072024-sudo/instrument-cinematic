@@ -652,7 +652,8 @@ export function buildArchitecture(scene) {
     doors.push({ pivot, side, openAngle: -side * Math.PI });
   }
   box(0, .18, 6.85, 7.5, .09, .45, mat('#343d3c', { roughness: .25 }));
-  box(0, 3.36, 7.32, 1.8, .065, .065, new T.MeshStandardMaterial({ color: '#fffde7', emissive: '#fffde7', emissiveIntensity: 2 }));
+  m.porchTube = new T.MeshStandardMaterial({ name: 'Porch tube light', color: '#fffde7', emissive: '#fffde7', emissiveIntensity: 2 });
+  box(0, 3.36, 7.32, 1.8, .065, .065, m.porchTube);
   const sign = new T.Mesh(new T.PlaneGeometry(9.8, .35), mat('white', { map: textMap('DEPARTMENT OF INSTRUMENT TECHNOLOGY', '#eee9da', '#96372e'), roughness: .9 }));
   sign.position.set(0, 3.7, 10.901); group.add(sign);
   const upperSign = new T.Mesh(new T.PlaneGeometry(6.8, .36), new T.MeshStandardMaterial({ map: textMap('INSTRUMENT TECHNOLOGY', '#dfddd3', '#858880'), roughness: .9 }));

@@ -271,3 +271,24 @@ export function flushLeaf(lw, h, dir = 1, t = .04) {
   metal.push(rbox(.025, .14, .012, .003, X(lw - .05), h - .25, t / 2 + .006));
   return { leaf, metal: merge(metal) };
 }
+// Wall-mounted oscillating fan (Class III video 14-39 s: on the pillars and walls). Returns a group whose
+// userData.rotor spins about its local z and userData.head sweeps about y; the fan faces local +z.
+export function wallFan(body, metal) {
+  const fan = new T.Group(); fan.name = 'Wall fan';
+  fan.add(new T.Mesh(rbox(.1, .16, .04, .01, 0, 0, .02), body)); // wall plate
+  fan.add(new T.Mesh(member([0, 0, .03], [0, -.02, .16], .018, .016, 10), body)); // bracket arm
+  const head = new T.Group(); head.position.set(0, -.02, .17); fan.add(head);
+  head.add(new T.Mesh(lathe([[0, -.09], [.055, -.085], [.065, -.03], [.06, .02], [.03, .05], [0, .05]], 20).rotateX(Math.PI / 2), body)); // motor
+  const guard = [];
+  for (const r of [.06, .12, .18, .22]) guard.push(new T.TorusGeometry(r, .0025, 4, 40).translate(0, 0, .1));
+  for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8; guard.push(member([Math.cos(a) * .03, Math.sin(a) * .03, .13], [Math.cos(a) * .22, Math.sin(a) * .22, .1], .002, .002, 4)); }
+  for (let k = 0; k < 16; k++) { const a = k * Math.PI / 8; guard.push(member([Math.cos(a) * .22, Math.sin(a) * .22, .1], [Math.cos(a) * .22, Math.sin(a) * .22, .02], .002, .002, 4)); }
+  head.add(new T.Mesh(merge(guard), metal));
+  const rotor = new T.Group(); rotor.position.z = .07; head.add(rotor);
+  const blades = [new T.CylinderGeometry(.03, .03, .03, 16).rotateX(Math.PI / 2)];
+  for (let k = 0; k < 3; k++) { const g = new T.CircleGeometry(.09, 16, -.5, 1); g.scale(1, .55, 1); g.translate(.11, 0, 0); g.rotateZ(k * Math.PI * 2 / 3); g.rotateX(.0); blades.push(g); }
+  const bladeMat = new T.MeshStandardMaterial({ name: 'Wall fan blades', color: '#e8e6df', roughness: .4, side: T.DoubleSide, transparent: true, opacity: .92 });
+  rotor.add(new T.Mesh(merge(blades), bladeMat));
+  fan.userData = { rotor, head, axis: 'z' };
+  return fan;
+}

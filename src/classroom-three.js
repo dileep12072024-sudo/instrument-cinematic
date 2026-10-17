@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import * as P from './props.js';
+import { roomControls } from './roomlights.js';
 
 // Local classroom-wing coordinates. Dimensions are fitted to the shell, not surveyed.
 export const classThree = { minX: -1.085, maxX: 7.3, frontZ: -20.43, backZ: -29.82, ceiling: 6.25, platform: .16 };
@@ -172,6 +173,7 @@ export function buildClassThree(parent, m, floorY) {
     box(-.47, platformY + .65, -29.1 + dz, .36, .035, .035, steel);
   }
   // Wall-mounted fans, their surface wiring, and switches visible in the room video.
+  const wallRotors = [];
   for (const [x, z, direction] of [[.45, frontZ - .23, -1], [5.7, frontZ - .23, -1], [4.25, backZ + .28, 1]]) {
     const y = ceiling - .64;
     box(x, y - .12, z - direction * .11, .10, .28, .08, cream);
@@ -182,9 +184,11 @@ export function buildClassThree(parent, m, floorY) {
       const a = i * Math.PI / 6;
       rod([x, y, z + direction * .035], [x + Math.cos(a) * .23, y + Math.sin(a) * .23, z], .002, seam);
     }
+    // The blades turn: a rotor inside the guard, switched from the board by the door.
+    const rotor = new T.Group(); rotor.position.set(x, y, z - direction * .025); rotor.userData.axis = 'z'; group.add(rotor); wallRotors.push(rotor);
     for (let i = 0; i < 3; i++) {
       const blade = new T.SphereGeometry(1, 10, 6), a = i * Math.PI * 2 / 3;
-      blade.scale(.10, .045, .008); blade.rotateZ(a); blade.translate(x + Math.cos(a) * .1, y + Math.sin(a) * .1, z - direction * .025); add(blade, steel);
+      blade.scale(.10, .045, .008); blade.rotateZ(a); blade.translate(Math.cos(a) * .1, Math.sin(a) * .1, 0); rotor.add(new T.Mesh(blade, steel));
     }
     box(x + .12, floorY + 1.6, z - direction * .1, .18, .1, .03, cream);
     rod([x + .12, floorY + 1.65, z - direction * .11], [x + .12, y - .2, z - direction * .11], .008, seam);
@@ -199,15 +203,17 @@ export function buildClassThree(parent, m, floorY) {
     const cable = new T.CatmullRomCurve3([new T.Vector3(x + .4, ceiling - .78, z), new T.Vector3(x + .63, ceiling - .92, z), new T.Vector3(x + .8, ceiling - .7, z)]);
     add(new T.TubeGeometry(cable, 12, .007, 5, false), steel);
   }
-  for (const x of [.8, 3.35, 5.9]) for (const z of [-22.5, -25.4, -28.3]) {
+  const fanRows = [[], [], []];
+  for (const x of [.8, 3.35, 5.9]) for (const [row, z] of [-22.5, -25.4, -28.3].entries()) {
     rod([x, ceiling - .05, z], [x, ceiling - .48, z], .018, fanMat);
     const cup = new T.CylinderGeometry(.11, .045, .13, 16); cup.translate(x, ceiling - .09, z); add(cup, fanMat);
     const fan = m.fan.clone(true); fan.name = 'Class III ceiling fan rotor'; fan.position.set(x, ceiling - .5, z);
-    fan.rotation.y = random() * Math.PI * 2; fan.traverse(o => { if (o.isMesh) o.material = fanMat; }); group.add(fan);
+    fan.rotation.y = random() * Math.PI * 2; fan.traverse(o => { if (o.isMesh) o.material = fanMat; }); group.add(fan); fanRows[row].push(fan);
   }
-  for (const x of [1.615, 4.615]) for (const z of [-22.32, -25.32, -28.32]) {
+  const panelRows = [-22.32, -25.32, -28.32].map(z => ({ material: lightMat.clone(), positions: [1.615, 4.615].map(x => [x, ceiling - .06, z]) }));
+  for (const r of panelRows) for (const [x, , z] of r.positions) {
     box(x, ceiling - .018, z, .61, .025, .61, seam);
-    box(x, ceiling - .035, z, .57, .015, .57, lightMat);
+    box(x, ceiling - .035, z, .57, .015, .57, r.material);
   }
   const paperColors = ['#b43a87', '#c8af58', '#277ca5', '#389478'];
   const papers = paperColors.map(color => new T.MeshStandardMaterial({ color, roughness: .9, side: T.DoubleSide }));
@@ -224,6 +230,10 @@ export function buildClassThree(parent, m, floorY) {
   box(1.6, ceiling - .85, -26.8, .3, .025, .26, m.aluminium);
   const hangingCable = new T.CatmullRomCurve3([[1.63, ceiling, -26.8], [1.73, ceiling - .82, -26.82], [1.72, ceiling - 1.02, -26.8], [1.53, ceiling - .9, -26.8]].map(p => new T.Vector3(...p)));
   add(new T.TubeGeometry(hangingCable, 20, .007, 5, false), steel);
-  const fill = new T.PointLight('#f7f3df', 36, 13, 2); fill.position.set(cx, ceiling - .25, cz); group.add(fill);
-  return finish();
+  const room = finish();
+  fanRows.push(wallRotors); // the wall fans (above) on their own switch
+  // Each panel lights the room, switchboard beside the entrance door, fans spin (roomlights.js).
+  roomControls(room, { name: 'Class III', box: [minX, maxX, floorY, ceiling, backZ, frontZ], panelRows, fanRows,
+    board: { position: [.5, floorY + 1.35, frontZ - .2], turn: Math.PI } });
+  return room;
 }

@@ -336,5 +336,5 @@ export function buildEntranceHall(parent, exterior) {
   }
   group.traverse(object => { if (object.isMesh) object.layers.enable(1); });
   buildSpineInterior(group, { ...exterior, exteriorWall: exterior.wall, wall, tread, floor: floorMaterial });
-  return { group, fan, floor, lights, stepsPerFlight: stairways.userData.flights[0].sideSteps };
+  return { group, fan, floor, lights, tubes: tubeMat, stepsPerFlight: stairways.userData.flights[0].sideSteps };
 }

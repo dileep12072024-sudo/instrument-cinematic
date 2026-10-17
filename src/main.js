@@ -5,6 +5,7 @@ import { createIcons, PersonStanding, Eye, Copy, ArrowUpRight, ArrowLeft, ArrowR
 import { buildArchitecture, buildEntranceApron } from './architecture.js';
 import { loadBlenderEnvironment, prefetchEnvironment } from './blender-environment.js';
 import { buildSurroundings, placeFacadeTrees } from './surroundings.js';
+import { makeSwitchboard } from './roomlights.js';
 import { mergeStaticDetail, mergeGateParts, mergeByMaterialName, mergeStatic, resolveCoplanar } from './batching.js';
 import { createAvatar } from './avatar.js';
 import { footprint } from './footprint.js';
@@ -123,6 +124,7 @@ scene.background = new THREE.Color('#b6c5c9'); scene.fog = new THREE.Fog('#b6c5c
 const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 500);
 let controls, architecture, landscape, surroundings, entranceWalk, panoramaLook, avatar;
 let selected = 0, transition = null, journey = false, journeyStart = 0, isOrbiting = false, doorsOpen = false, hour = 16.5, targetHour = 16.5;
+const hallSwitch = { lights: true, fan: true, porch: true }; // entrance hall switch box: wall tubes, fan, porch tube
 let ready = false, drift = !reduced, quality = 'auto', needsRender = true, lastRendered = 0, lastShadowUpdate = 0;
 let interactive = false, dragging = 0, avatarMovedAt = 0;
 let panorama = false;
@@ -318,7 +320,7 @@ function updateLighting(h) {
   scene.fog.color.set('#b6c5c9').lerp(new THREE.Color('#182336'), evening).lerp(new THREE.Color('#64757b'), wet * .6);
   if (scene.background?.isColor) scene.background.copy(scene.fog.color);
   surroundings?.update(scene.fog.color);
-  entranceLight.intensity = evening * 40;
+  entranceLight.intensity = hallSwitch.porch ? evening * 40 : 0; // the porch tube is on its switch (hall switch box)
   warm.opacity = evening * .6; warm.emissiveIntensity = evening * 1.4;
   if (architecture) {
     for (const material of [architecture.materials.glass, architecture.materials.rearGlass]) material.envMapIntensity = THREE.MathUtils.lerp(1.4, .22, evening);
@@ -450,6 +452,11 @@ async function boot() {
   architecture.mergedDrawCalls = mergeStaticDetail(architecture.group); // ~400 fewer draw calls
   westFittings = architecture.group.getObjectByName('West wing fittings');
   dispensers = architecture.group.getObjectByName('West wing ground floor (video-built)')?.userData.dispensers || [];
+  // The hall's switch box on the east wall (entrance photos): wall tubes, ceiling fan, porch tube light.
+  makeSwitchboard(architecture.interior.group, { name: 'Entrance hall', position: [3.675, 1.281, 6.568], turn: -Math.PI / 2, toggles: [
+    { get: () => hallSwitch.lights, set: on => { hallSwitch.lights = on; architecture.interior.tubes.emissiveIntensity = on ? 1.7 : .05; } },
+    { get: () => hallSwitch.fan, set: on => { hallSwitch.fan = on; } },
+    { get: () => hallSwitch.porch, set: on => { hallSwitch.porch = on; architecture.materials.porchTube.emissiveIntensity = on ? 2 : .05; updateLighting(hour); } }] });
   architecture.group.traverse(o => { if (o.userData.casements) casements.push(o.userData.casements); // windows that open
     if (o.userData.clickables) clickables.push(...o.userData.clickables); if (o.userData.update) roomUpdates.push(o.userData.update); }); // switches, fans, room lights
   { // A tap or click (not a drag) on a water machine within reach starts it pouring.
@@ -588,7 +595,7 @@ async function compileShadowShaders() {
     finally { scene.fog = fog; for (const [o, m] of swapped) o.material = m; }
   }
 }
-let previous = performance.now(), frames = 0, hallLit = false;
+let previous = performance.now(), frames = 0, hallLit = false, hallFanSpeed = 1;
 let westFittings = null, dispensers = [], casements = [], clickables = [], roomUpdates = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
 function animate(now) {
   requestAnimationFrame(animate);
@@ -644,13 +651,15 @@ function animate(now) {
   // Orbit speed follows wall time, including slower devices; damping is for pointer input.
   if (!entranceWalk?.active && !panorama && !avatar?.active) controls.update(Math.min(frameDuration / 1000, 1));
   const windSpeed = updateWind(landscape, weatherState, dt, reduced);
-  if (!reduced && entranceWalk?.active) architecture.interior.fan.rotation.y += dt * 3;
+  hallFanSpeed += ((hallSwitch.fan ? 1 : 0) - hallFanSpeed) * Math.min(1, dt * (hallSwitch.fan ? .8 : .35)); // spins up, coasts down
+  if (!reduced && hallFanSpeed > .002) architecture.interior.fan.rotation.y += hallFanSpeed * 12 * dt;
   if (!reduced && entranceWalk?.active) for (const fan of architecture.classroomFans) fan.rotation.y += dt * 4;
   rain.update(dt, weatherState, reduced, windSpeed);
   puddles?.update(dt, weatherState, reduced, scene.environmentIntensity);
   // Hall lights only while the camera is inside the entrance hall; elsewhere they cost every lit pixel for nothing.
   const inHall = entranceWalk?.active || Math.abs(camera.position.x) < 4.2 && camera.position.z > -7.2 && camera.position.z < 7.6 && camera.position.y < 4.4;
-  if (hallLit !== inHall) { hallLit = inHall; architecture.interior.lights.forEach(light => { light.intensity = inHall ? light.userData.on : 0; light.shadow.needsUpdate = true; }); renderer.shadowMap.needsUpdate = true; needsRender = true; }
+  const hallOn = inHall && hallSwitch.lights; // the wall tubes are lit only when switched on (and drawn only inside the hall)
+  if (hallLit !== hallOn) { hallLit = hallOn; architecture.interior.lights.forEach(light => { light.intensity = hallOn ? light.userData.on : 0; light.shadow.needsUpdate = true; }); renderer.shadowMap.needsUpdate = true; needsRender = true; }
   if (weatherState.storm && !reduced) {
     nextStrike ||= now + 5000 + Math.random() * 15000;
     if (now > nextStrike) {
