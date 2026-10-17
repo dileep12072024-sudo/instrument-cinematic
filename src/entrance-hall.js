@@ -3,6 +3,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { groundSpine, hallWindows } from './footprint.js';
 import { buildSpineInterior } from './spine-interior.js';
 import { buildStairways } from './stairways.js';
+import { hallBoardTexture, noticeTexture } from './hall-boards.js';
 
 // Evidence and approximate dimensions: docs/entrance-video.md.
 export function buildEntranceHall(parent, exterior) {
@@ -258,10 +259,11 @@ export function buildEntranceHall(parent, exterior) {
       for (let i = 0; i < uv.count; i++) uv.setXY(i, (u + uv.getX(i) * w) / aw, 1 - (v + (1 - uv.getY(i)) * h) / ah);
       const rough = finish[edge] ?? .5; if (!faces.has(rough)) faces.set(rough, []); faces.get(rough).push(g);
     }
-    const map = loader.load(`/media/entrance-hall/${file}${lean ? '-mobile' : ''}.webp`); map.colorSpace = T.SRGBColorSpace; map.anisotropy = 16;
+    // Drawn boards (hall-boards.js); the old crop only lends the anti-ragging poster its printed photographs.
+    const map = hallBoardTexture(side, lean ? 1 : 2, side > 0 ? `/media/entrance-hall/${file}${lean ? '-mobile' : ''}.webp` : null);
     for (const [roughness, list] of faces) {
       // A trace of their own photographed light keeps high boards legible in the dim hall.
-      const boards = new T.Mesh(mergeGeometries(list), new T.MeshStandardMaterial({ name: 'Photographed hall boards', map, roughness, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .12 }));
+      const boards = new T.Mesh(mergeGeometries(list), new T.MeshStandardMaterial({ name: 'Hall boards and notices', map, roughness, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .12 }));
       boards.name = `${side < 0 ? 'West' : 'East'} hall boards and notices`; boards.receiveShadow = true; group.add(boards);
       list.forEach(g => g.dispose());
     }
@@ -297,11 +299,12 @@ export function buildEntranceHall(parent, exterior) {
     light.shadow.autoUpdate = false; light.shadow.needsUpdate = true;
     light.shadow.camera.layers.set(1);
   }
-  // Use the actual photographed signs; do not fabricate their text or illustrations.
-  for (const [side, file, width, height, z] of [[1, 'environment-notice', .86, 1.42, -1.1], [-1, 'department-notice', .65, 1.9, -.93]]) {
-    const tex = loader.load(`/media/entrance-hall/${file}.webp`); tex.colorSpace = T.SRGBColorSpace;
+  // Two printed notices in the stair hall (093712 frames), drawn: the environment poster's lettering is legible, the
+  // department notice's print is not legible in the frames, so it shows only its layout.
+  for (const [side, file, width, height, z] of [[1, 'environment', .86, 1.42, -1.1], [-1, 'department', .65, 1.9, -.93]]) {
+    const tex = noticeTexture(file);
     const notice = new T.Mesh(new T.PlaneGeometry(width, height), new T.MeshStandardMaterial({ map: tex, roughness: .9 }));
-    notice.name = 'Notice photographed in entrance video'; notice.rotation.y = -side * Math.PI / 2;
+    notice.name = `Printed ${file} notice`; notice.rotation.y = -side * Math.PI / 2;
     notice.position.set(side * 3.715, 2.25, z); group.add(notice);
   }
   const fan = new T.Group(); fan.name = 'Entrance ceiling fan'; fan.position.set(0, 3.35, 3.9); group.add(fan);
