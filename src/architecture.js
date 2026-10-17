@@ -669,6 +669,29 @@ export function buildArchitecture(scene) {
   const interior = buildEntranceHall(group, m);
   buildClassroomWing(group, { ...m, tread: interior.floor.material, fan: interior.fan });
   buildWestWing(group, m, classroom.lowerFloor - .2);
+  // Upstairs over the west block (owner, 2026-10-17): the Class II/III rooms stay exactly as built inside; from outside
+  // each of their windows gets the original facade window at the outer face of the wall - maroon frame with glazing bars,
+  // glass, grille and a grey concrete sill. Positions are the classrooms' own (classroom-two/three.js), mapped to world.
+  {
+    const sill = classroom.lowerFloor + .95, head = classroom.lowerFloor + 2.37, h = head - sill, y = (sill + head) / 2;
+    const toWorld = (lx, lz) => [classroom.originX + lz, classroom.originZ - lx]; // classroom group: rotated a quarter turn
+    const windows = [ // [world x, world z, width, outward normal x, outward normal z]
+      ...[-10.4, -6.8, -3.2].map(lx => [...toWorld(lx, -29.98), 1.65, -1, 0]),                // Class II, west side
+      ...[-9.8, -6.7, -3.6].map(lx => [...toWorld(lx, -18.16 + .06 + .12), 1.55, 1, 0]),     // Class II, courtyard side
+      ...[-27.85, -25.05, -22.25, -19.4].map(lz => [...toWorld(-12.65 - .08 - .12, lz), 1.65, 0, 1]), // Class II, south end
+      ...[.15, 2.2, 4.25, 6.3].map(lx => [...toWorld(lx, -29.82 - .08 - .16), 1.48, -1, 0]),  // Class III, west side
+    ];
+    for (const [wx, wz, w, nx, nz] of windows) {
+      const t = new T.Matrix4().makeRotationY(Math.atan2(nx, nz)).setPosition(wx, 0, wz); // local +z = outward
+      const b = (x, yy, z, bw, bh, bd, material) => box(x, yy, z, bw, bh, bd, material, t);
+      b(0, y, -.005, w, h, .012, m.glass);
+      for (const sx of [-1, 1]) { b(sx * w / 2, y, .01, .085, h, .1, m.entranceWood); b(0, y + sx * h / 2, .01, w + .1, .08, .1, m.entranceWood); }
+      for (const sx of [-1, 1]) { b(sx * w / 6, y, .02, .07, h, .1, m.entranceWood); b(0, y + sx * h / 6, .02, w, .06, .1, m.entranceWood); }
+      for (let k = -4; k <= 4; k++) b(k * w / 10, y, .07, .015, h, .018, m.metal);
+      for (let k = -3; k <= 3; k++) b(0, y + k * h / 8, .07, w, .014, .018, m.metal);
+      b(0, sill - .065, .12, w + .25, .12, .3, m.trim);
+    }
+  }
   buildTerraces(group, m);
   for (const { pivot } of doors) pivot.traverse(object => { if (object.isMesh) object.layers.enable(1); });
   return { group, doors, materials: m, interior, classroomFans: ['II', 'III'].flatMap(n => group.getObjectsByProperty('name', `Class ${n} ceiling fan rotor`)) };
