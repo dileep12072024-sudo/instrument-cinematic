@@ -433,27 +433,67 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
 
   // Water cooler in the front corner (photos 39-41), modelled: a stainless cabinet on castors standing on a concrete
   // plinth, blue printed panels above and below a recessed tap bay with two push taps and two steel tumblers.
-  // The panel artwork is generated, not photographed.
-  const printPanel = (kind) => canvasMap(256, kind === 'side' ? 640 : 256, (g, w, h) => {
-    const bg = g.createLinearGradient(0, 0, w, h); bg.addColorStop(0, '#2f86de'); bg.addColorStop(1, '#1c5fb8'); g.fillStyle = bg; g.fillRect(0, 0, w, h);
-    const logo = (x, y, s) => { g.fillStyle = '#fff'; g.strokeStyle = '#c4161c'; g.lineWidth = 4 * s; g.beginPath(); g.ellipse(x, y, 46 * s, 22 * s, 0, 0, Math.PI * 2); g.fill(); g.stroke(); g.fillStyle = '#c4161c'; g.font = `italic bold ${24 * s}px Georgia`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Divis', x, y + 1); };
-    const drop = (x, y, s) => { const d = g.createLinearGradient(x - 20 * s, y - 40 * s, x + 20 * s, y + 30 * s); d.addColorStop(0, '#d6f0ff'); d.addColorStop(1, '#3d9be8'); g.fillStyle = d; g.beginPath(); g.moveTo(x, y - 46 * s); g.bezierCurveTo(x + 8 * s, y - 20 * s, x + 26 * s, y, x + 24 * s, y + 14 * s); g.arc(x, y + 14 * s, 24 * s, 0, Math.PI); g.bezierCurveTo(x - 26 * s, y, x - 8 * s, y - 20 * s, x, y - 46 * s); g.fill(); };
-    const words = (x, y, s) => { g.fillStyle = '#fff'; g.textAlign = 'left'; g.font = `${14 * s}px Arial`; g.fillText('Safe', x, y - 26 * s); g.font = `bold ${38 * s}px Arial`; g.fillText('Water', x, y + 8 * s); g.font = `${13 * s}px Arial`; g.fillText('Healthy Life', x + 4 * s, y + 30 * s); };
-    if (kind === 'top') { logo(62, 40, 1); g.fillStyle = '#c4161c'; g.font = 'bold 15px Arial'; g.textAlign = 'left'; g.fillText('Divis Laboratories Ltd.', 112, 46); words(118, 130, 1); drop(205, 190, .9); g.fillStyle = 'rgba(255,255,255,.18)'; g.beginPath(); g.ellipse(58, 175, 42, 70, 0, 0, Math.PI * 2); g.fill(); }
-    if (kind === 'bottom') { g.fillStyle = '#3b2a8c'; g.beginPath(); g.moveTo(0, h); g.lineTo(w, h * .45); g.lineTo(w, h); g.fill(); logo(70, 42, .9); words(26, 140, .95); drop(200, 165, .8); }
-    if (kind === 'side') {
-      logo(60, 40, .8); g.fillStyle = '#fff'; g.fillRect(0, 70, w, 52); g.fillStyle = '#c4161c'; g.font = 'bold 21px Arial'; g.textAlign = 'center'; g.fillText('Divis Laboratories Ltd.', w / 2, 98);
-      g.fillStyle = '#9fb6c8'; g.fillRect(14, 140, w - 28, 150); g.fillStyle = '#6a7f8f'; for (let k = 0; k < 6; k++) g.fillRect(30 + k * 36, 170, 22, 110); g.fillStyle = '#5b8f3e'; g.fillRect(14, 262, w - 28, 28);
-      words(30, 360, 1); drop(205, 400, .8); g.fillStyle = '#3b2a8c'; g.fillRect(0, 450, w, 40); g.fillStyle = '#e8e0c8'; g.fillRect(14, 498, w - 28, 80);
-      g.fillStyle = '#1c5fb8'; g.fillRect(0, 588, w, 52); g.fillStyle = '#fff'; g.font = 'bold 20px Arial'; g.fillText('SAFE DRINKING WATER', w / 2, 621);
-    }
-  });
+  // The panels' lettering, logos and Telugu text are drawn as printed (water-cooler-front.png, rectified); only the
+  // printed photographs on them (two people drinking, the university building, the Sujalam kiosk) come from that photo.
+  const coolerPictures = { woman: [0, 0, 430, 540], manFront: [430, 0, 480, 500], building: [910, 0, 560, 580], manSide: [1470, 0, 340, 440], kiosk: [1810, 0, 580, 640] };
+  const picturesImage = typeof Image !== 'undefined' ? new Image() : null, panelRepaints = [];
+  if (picturesImage) { picturesImage.onload = () => panelRepaints.forEach(f => f()); picturesImage.src = '/media/west-wing/cooler-pictures.webp'; }
+  const printPanel = (kind, pw, ph) => {
+    const W = kind === 'side' ? 340 : 512, H = Math.round(W * ph / pw);
+    const paint = (g, w, h) => {
+      const bg = g.createLinearGradient(0, 0, w * .3, h); bg.addColorStop(0, '#3d93e3'); bg.addColorStop(1, '#2672cc'); g.fillStyle = bg; g.fillRect(0, 0, w, h);
+      const say = (s, x, y, size, { font = 'Arial, sans-serif', weight = 'bold', color = '#fff', align = 'center', width, stroke } = {}) => {
+        g.font = `${weight} ${size}px ${font}`; g.textAlign = align; g.textBaseline = 'middle';
+        const m = g.measureText(s)?.width, sx = width && m ? width / m : 1; g.save(); g.translate(x, y); g.scale(sx, 1);
+        if (stroke) { g.strokeStyle = stroke; g.lineWidth = size * .18 / sx; g.lineJoin = 'round'; g.strokeText(s, 0, 0); } g.fillStyle = color; g.fillText(s, 0, 0); g.restore(); };
+      const logo = (x, y, rx) => { g.fillStyle = '#fff'; g.strokeStyle = '#c4161c'; g.lineWidth = rx * .09; g.beginPath(); g.ellipse(x, y, rx, rx * .62, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+        say("Divi's", x, y + rx * .04, rx * .62, { font: '"Brush Script MT", "Segoe Script", Georgia, serif', weight: 'italic bold', color: '#c4161c', width: rx * 1.35 }); };
+      const drop = (x, y, s) => { const d = g.createLinearGradient(x - 20 * s, y - 40 * s, x + 20 * s, y + 30 * s); d.addColorStop(0, '#e2f5ff'); d.addColorStop(1, '#2f8ee6'); g.fillStyle = d; g.beginPath(); g.moveTo(x, y - 46 * s); g.bezierCurveTo(x + 8 * s, y - 20 * s, x + 26 * s, y, x + 24 * s, y + 14 * s); g.arc(x, y + 14 * s, 24 * s, 0, Math.PI); g.bezierCurveTo(x - 26 * s, y, x - 8 * s, y - 20 * s, x, y - 46 * s); g.fill(); g.fillStyle = 'rgba(255,255,255,.7)'; g.beginPath(); g.ellipse(x - 9 * s, y + 6 * s, 4 * s, 10 * s, .3, 0, Math.PI * 2); g.fill(); };
+      const picture = (name, x, y, pw2, ph2) => { // printed photograph, its edges feathered into the panel's blue
+        if (!picturesImage?.complete || !picturesImage.naturalWidth) return; const [sx, sy, sw, sh] = coolerPictures[name];
+        const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(pw2)); c.height = Math.max(1, Math.round(ph2)); const p = c.getContext('2d');
+        p.drawImage(picturesImage, sx, sy, sw, sh, 0, 0, c.width, c.height); p.globalCompositeOperation = 'destination-in';
+        for (const [x0, y0, x1, y1] of [[0, 0, c.width, 0], [0, 0, 0, c.height]]) { const f = p.createLinearGradient(x0, y0, x1, y1); f.addColorStop(0, 'rgba(0,0,0,0)'); f.addColorStop(.07, '#000'); f.addColorStop(.93, '#000'); f.addColorStop(1, 'rgba(0,0,0,0)'); p.fillStyle = f; p.fillRect(0, 0, c.width, c.height); }
+        g.drawImage(c, x, y); };
+      const ink = (s, x, y, size) => say(s, x, y, size, { font: '"Segoe Print", "Comic Sans MS", cursive', weight: '', color: 'rgba(70,80,120,.75)' }); // marker on the print
+      const water = (x, y, s, align = 'left') => { say('Safe', x + s * .05, y - s * .62, s * .26, { align, color: '#fff' }); say('Water', x, y, s * .62, { align, color: '#fff' }); say('Healthy Life', x + s * .08, y + s * .5, s * .22, { align, color: '#1d3f8f' }); };
+      if (kind === 'top') {
+        picture('woman', 0, h * .45, w * .54, h * .54); logo(w * .2, h * .135, w * .135);
+        ink('88979 28802', w * .58, h * .03, h * .05);
+        g.fillStyle = '#111'; g.fillRect(w * .8, h * .055, w * .13, h * .06); say('POWER ON', w * .845, h * .072, h * .016, { color: '#ddd', width: w * .07 }); say('RO ON', w * .845, h * .1, h * .016, { color: '#ddd', width: w * .05 });
+        g.fillStyle = '#ff5a2a'; g.beginPath(); g.arc(w * .91, h * .085, h * .015, 0, Math.PI * 2); g.fill();
+        say('Donated by', w * .6, h * .13, h * .03, { color: '#1d2f6f', width: w * .16 }); g.fillStyle = '#1d2f6f'; g.fillRect(w * .52, h * .15, w * .16, 1.5);
+        say('Divis Laboratories Ltd.', w * .63, h * .195, h * .05, { color: '#d0202a', stroke: '#fff', width: w * .58 });
+        water(w * .36, h * .45, h * .2); drop(w * .79, h * .72, h * .0043);
+      }
+      if (kind === 'bottom') {
+        g.fillStyle = '#5aa7ee'; g.beginPath(); g.moveTo(0, h * .38); g.lineTo(w, h * .5); g.lineTo(w, h * .62); g.lineTo(0, h * .5); g.fill();
+        g.fillStyle = '#3b2a8c'; g.beginPath(); g.moveTo(w * .45, h); g.lineTo(w, h * .55); g.lineTo(w, h); g.fill();
+        picture('manFront', w * .4, h * .12, w * .6, h * .5); logo(w * .24, h * .17, w * .17);
+        water(w * .1, h * .58, h * .26); drop(w * .67, h * .78, h * .0044);
+      }
+      if (kind === 'side') {
+        logo(w * .2, h * .05, w * .09); logo(w * .9, h * .055, w * .06);
+        say('రక్షిత మంచి నీరు', w * .55, h * .052, h * .022, { font: '"Nirmala UI", Gautami, "Noto Sans Telugu", sans-serif', color: '#1d2f6f', width: w * .5 });
+        say('దివీస్ లాబొరేటరీస్ లిమిటెడ్', w * .5, h * .105, h * .024, { font: '"Nirmala UI", Gautami, "Noto Sans Telugu", sans-serif', color: '#d0202a', stroke: '#fff', width: w * .86 });
+        ink('8897928802', w * .55, h * .14, h * .022);
+        picture('building', 0, h * .165, w, h * .22);
+        g.fillStyle = '#3b2a8c'; g.beginPath(); g.moveTo(w * .4, h * .64); g.lineTo(w, h * .52); g.lineTo(w, h * .64); g.fill();
+        picture('manSide', w * .45, h * .36, w * .55, h * .17); water(w * .06, h * .45, h * .07); drop(w * .27, h * .565, h * .0013);
+        picture('kiosk', 0, h * .6, w, h * .26);
+        g.save(); g.translate(w * .5, h * .915); g.rotate(-.24); say('SAFE DRINKING WATER', 0, 0, h * .026, { width: w * .9 }); g.restore();
+      }
+    };
+    const texture = canvasMap(W, H, paint);
+    panelRepaints.push(() => { const c = texture.image, g = c.getContext('2d'); paint(g, c.width, c.height); texture.needsUpdate = true; });
+    return texture;
+  };
   {
     const cx = inE - .42, cz = inS - .42, cw = .62, cd = .5, base = at(.25 + .07), ch = 1.45;
     box(cx + .03, at(.125), cz + .02, .8, .25, .72, concrete); // plinth
     for (const dx of [-.26, .26]) for (const dz of [-.2, .2]) { cyl(cx + dx, at(.29), cz + dz, .03, .03, .05, black, 10); box(cx + dx, at(.31), cz + dz, .05, .02, .05, steel); }
     box(cx, base + ch / 2, cz + .07, cw, ch, .36, steel); // cabinet carcass, its face 0.14 behind the front: the tap bay is a recess
-    const front = cz - cd / 2, panel = (kind, w, h, x, y, z, ry) => { const mesh = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshStandardMaterial({ name: `Cooler ${kind} print`, map: printPanel(kind), roughness: .45 })); mesh.rotation.y = ry; mesh.position.set(x, y, z); fittings.add(mesh); };
+    const front = cz - cd / 2, panel = (kind, w, h, x, y, z, ry) => { const mesh = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshStandardMaterial({ name: `Cooler ${kind} print`, map: printPanel(kind, w, h), roughness: .45 })); mesh.rotation.y = ry; mesh.position.set(x, y, z); fittings.add(mesh); };
     const bottomH = .5, bayH = .4, topH = ch - bottomH - bayH;
     box(cx, base + bottomH / 2, front + .03, cw, bottomH, .06, steel); box(cx, base + bottomH + bayH + topH / 2, front + .03, cw, topH, .06, steel);
     panel('bottom', cw - .05, bottomH - .04, cx, base + bottomH / 2, front - .002, Math.PI);
@@ -463,7 +503,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     box(cx, base + bottomH + .02, front + .07, cw - .08, .015, .1, steel); // drip grate
     for (const dx of [-.14, .14]) {
       cyl(cx + dx, base + bottomH + bayH - .1, front + .1, .016, .016, .05, steel, 8); box(cx + dx, base + bottomH + bayH - .13, front + .08, .02, .03, .06, black);
-      cyl(cx + dx, base + bottomH + .085, front + .08, .04, .035, .11, steel, 16); // tumbler
+      put(P.steelTumbler(.04, .1), steel, cx + dx, base + bottomH + .03, front + .08); // steel tumbler on the grate
     }
     // Working: the right-hand tap runs into its tumbler.
     { const hit = new T.Mesh(new T.BoxGeometry(cw, ch, cd), new T.MeshBasicMaterial()); hit.position.set(cx, base + ch / 2, cz);
