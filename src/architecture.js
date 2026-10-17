@@ -677,10 +677,10 @@ export function buildArchitecture(scene) {
     // (m.wall), a thin layer with openings at the windows, so the upper floor matches the rest of the building.
     const base = classroom.lowerFloor, top = terraceLevels.leftWing - .12;
     const skins = [ // [fixed world coordinate, axis ('x': the face is at world x = c, running along z), from, to, outward sign, window centres along the run, width]
-      [-34.03, 'x', 3.35, 14.82, -1, [-10.4, -6.8, -3.2].map(lx => classroom.originZ - lx), 1.65],
+      [-34.03, 'x', 3.25, 15.03, -1, [-10.4, -6.8, -3.2].map(lx => classroom.originZ - lx), 1.65],
       [-34.07, 'x', -5.13, 3.25, -1, [.15, 2.2, 4.25, 6.3].map(lx => classroom.originZ - lx), 1.48],
-      [-21.97, 'x', 3.35, 14.82, 1, [-9.8, -6.7, -3.6].map(lx => classroom.originZ - lx), 1.55],
-      [15.03, 'z', -33.82, -22.16, 1, [-27.85, -25.05, -22.25, -19.4].map(lz => classroom.originX + lz), 1.65],
+      [-21.97, 'x', 3.35, 15.03, 1, [-9.8, -6.7, -3.6].map(lx => classroom.originZ - lx), 1.55],
+      [15.03, 'z', -34.03, -21.97, 1, [-27.85, -25.05, -22.25, -19.4].map(lz => classroom.originX + lz), 1.65],
     ];
     for (const [c, axis, from, to, sign, centres, w] of skins) {
       const q = u => axis === 'x' && sign > 0 ? -u : u; // rotated a quarter turn toward +x the plane's local x runs along -z
