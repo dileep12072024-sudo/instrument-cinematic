@@ -7,7 +7,6 @@ import { classThree } from './classroom-three.js';
 import { classTwo } from './classroom-two.js';
 import { buildWestWing, westWing } from './west-wing.js';
 import { buildTerraces } from './terraces.js';
-import { casementCluster } from './openable.js';
 import { stairs, terraceLevels } from './stair-layout.js';
 
 let seed = 1937;
@@ -663,18 +662,10 @@ export function buildArchitecture(scene) {
     box(x, height / 2, 3.53, .065, height, .08, m.trim);
     box(x + .12, .25, 3.53, .24, .065, .08, m.trim);
   }
-  // Upstairs over the west block (owner, 2026-10-17): the Class II/III rooms stay exactly as built inside; from outside
-  // each of their windows gets the original facade window at the outer face of the wall - maroon frame with glazing bars,
-  // glass, grille and a grey concrete sill. Positions are the classrooms' own (classroom-two/three.js), mapped to world.
+  // Upstairs over the west block: the Class II/III walls get the facade's plaster outside, open at their own windows
+  // (no added windows: owner, 2026-10-17). Positions are the classrooms' own (classroom-two/three.js), mapped to world.
   {
     const sill = classroom.lowerFloor + .95, head = classroom.lowerFloor + 2.37, h = head - sill, y = (sill + head) / 2;
-    const toWorld = (lx, lz) => [classroom.originX + lz, classroom.originZ - lx]; // classroom group: rotated a quarter turn
-    const windows = [ // [world x, world z, width, outward normal x, outward normal z]
-      ...[-10.4, -6.8, -3.2].map(lx => [...toWorld(lx, -29.98), 1.65, -1, 0]),                // Class II, west side
-      ...[-9.8, -6.7, -3.6].map(lx => [...toWorld(lx, -18.16 + .06 + .12), 1.55, 1, 0]),     // Class II, courtyard side
-      ...[-27.85, -25.05, -22.25, -19.4].map(lz => [...toWorld(-12.65 - .08 - .12, lz), 1.65, 0, 1]), // Class II, south end
-      ...[.15, 2.2, 4.25, 6.3].map(lx => [...toWorld(lx, -29.82 - .08 - .16), 1.48, -1, 0]),  // Class III, west side
-    ];
     // The classroom walls are smooth classroom plaster outside too; give their outer faces the facade's own aged plaster
     // (m.wall), a thin layer with openings at the windows, so the upper floor matches the rest of the building.
     const base = classroom.lowerFloor, top = terraceLevels.leftWing - .12;
@@ -695,16 +686,6 @@ export function buildArchitecture(scene) {
       g.applyMatrix4(turn); g.computeVertexNormals();
       if (!batches.has(m.wall)) batches.set(m.wall, []); batches.get(m.wall).push(g);
     }
-    const outside = casementCluster('Upstairs classroom windows (outside)', m.entranceWood, m.rearGlass, { near: 25 });
-    for (const [wx, wz, w, nx, nz] of windows) {
-      const t = new T.Matrix4().makeRotationY(Math.atan2(nx, nz)).setPosition(wx, 0, wz); // local +z = outward
-      const b = (x, yy, z, bw, bh, bd, material) => box(x, yy, z, bw, bh, bd, material, t);
-      // Fixed outer frame; two glazed leaves that open outward (no grille outside: the room has its own inside).
-      for (const sx of [-1, 1]) { b(sx * (w / 2 + .04), y, .02, .08, h + .08, .1, m.entranceWood); b(0, y + sx * (h / 2 + .04), .02, w + .16, .08, .1, m.entranceWood); }
-      outside.add(new T.Matrix4().copy(t).multiply(new T.Matrix4().makeTranslation(0, sill, .11)), w, h, { leaves: 3, rows: 3, cols: 1 });
-      b(0, sill - .065, .12, w + .25, .12, .3, m.trim);
-    }
-    outside.finish(); group.add(outside.group); group.userData.casements = outside;
   }  for (const [material, geometries] of batches) {
     const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = material !== m.weather && material !== m.entranceGlazing; mesh.receiveShadow = true; mesh.layers.enable(1); group.add(mesh);
     geometries.forEach(g => g.dispose());

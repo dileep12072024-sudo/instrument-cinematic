@@ -2,6 +2,7 @@ import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { stairs, stairFlights } from './stair-layout.js';
 import { casementCluster } from './openable.js';
+import { patternedGlass } from './props.js';
 
 export function buildStairways(parent, m) {
   const group = new T.Group(); group.name = 'Connected stairways: ground to roof'; parent.add(group);
@@ -64,7 +65,7 @@ export function buildStairways(parent, m) {
     box(side * 2.65, stairs.ground + .006, -5.05, 2.08, .012, 1.32, m.tread);
   }
   // Rear windows are openings through the shell, including the three top-landing windows.
-  const glass = new T.MeshStandardMaterial({ color: '#dce8e3', transparent: true, opacity: .18, roughness: .12, depthWrite: false });
+  const glass = new T.MeshStandardMaterial({ name: 'Stair window patterned glass', map: patternedGlass('#c5d3cf'), transparent: true, opacity: .82, roughness: .45, depthWrite: false, side: T.DoubleSide }); // never clear (owner)
   const aluminium = new T.MeshStandardMaterial({ color: '#d4d7d0', metalness: .65, roughness: .33 });
   const casements = casementCluster('Rear stair windows', aluminium, glass, { near: 25 });
   const rows = [];

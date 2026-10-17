@@ -1,4 +1,5 @@
 import * as T from 'three';
+import { patternedGlass } from './props.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { groundSpine } from './footprint.js';
 import { buildClassThree } from './classroom-three.js';
@@ -68,7 +69,8 @@ export function buildClassroomWing(parent, m) {
   const plaster = new T.MeshStandardMaterial({ name: 'Weathered classroom plaster', map: plasterMap, bumpMap: plasterMap, bumpScale: .008, roughness: .9 });
   const screenMaterial = plaster.clone(); screenMaterial.name = 'Pierced classroom concrete screens'; screenMaterial.roughness = .95;
   const screens = new Map();
-  const clearGlass = new T.MeshStandardMaterial({ name: 'Classroom sliding glass', color: '#729b9a', transparent: true, opacity: .24, roughness: .07, depthWrite: false });
+  // Pressed patterned glass (owner: no window here is clear): translucent, blurred, patterned.
+  const clearGlass = new T.MeshStandardMaterial({ name: 'Classroom patterned glass', map: patternedGlass(), transparent: true, opacity: .82, roughness: .45, depthWrite: false, side: T.DoubleSide });
   const doorGlass = new T.MeshStandardMaterial({ color: '#899d97', roughness: .27, metalness: .1, envMapIntensity: .5 });
   function floor(x, z, w, d, y, material = stone) {
     const g = new T.PlaneGeometry(w, d); g.rotateX(-Math.PI / 2); g.translate(x, y, z);

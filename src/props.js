@@ -292,3 +292,15 @@ export function wallFan(body, metal) {
   fan.userData = { rotor, head, axis: 'z' };
   return fan;
 }
+// Pressed patterned glass, as in every window here (owner, 2026-10-17: translucent, blurred, patterned - never clear):
+// a stippled floral pattern that scatters the view. Use with transparent, moderate opacity and some roughness.
+export function patternedGlass(tint = '#b8c9c4') {
+  return canvasTexture(256, 256, (g, w, h) => {
+    g.fillStyle = tint; g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 32) for (let x = (y / 32) % 2 ? 16 : 0; x < w + 16; x += 32) { // rosettes on a staggered grid
+      for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3; g.fillStyle = 'rgba(255,255,255,.28)'; g.beginPath(); g.ellipse(x + Math.cos(a) * 7, y + Math.sin(a) * 7, 5, 2.6, a, 0, Math.PI * 2); g.fill(); }
+      g.fillStyle = 'rgba(40,60,58,.25)'; g.beginPath(); g.arc(x, y, 3, 0, Math.PI * 2); g.fill();
+    }
+    for (let i = 0; i < 1500; i++) { g.fillStyle = rnd() > .5 ? 'rgba(255,255,255,.12)' : 'rgba(30,45,45,.08)'; g.fillRect(rnd() * w, rnd() * h, 1.5, 1.5); } // stipple
+  });
+}
