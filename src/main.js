@@ -20,6 +20,7 @@ import { createPanoramaLook } from './panorama-look.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
 import { pieces } from './merge-pieces.js';
 import { createRise, createRiseDust, RISE_LENGTH } from './rise.js';
+import { createPortfolio } from './portfolio.js';
 import './style.css';
 
 const $ = s => document.querySelector(s);
@@ -39,7 +40,7 @@ $('#app').innerHTML = `
     <div id="viewport"></div><div class="shade" aria-hidden="true"></div>
     <header class="topbar">
       <a href="#" class="brand" aria-label="Instrument Technology home"><span class="brand-mark" aria-hidden="true">IT<span></span></span><span>ANDHRA UNIVERSITY<small>A CAMPUS PORTRAIT</small></span></a>
-      <nav aria-label="Main navigation"><button id="about" class="icon-btn" aria-label="About this portrait" data-tip="About this portrait">${icon('info')}</button><span class="nav-divider"></span><button id="film" class="film-btn">${icon('play')}<span>Play the journey</span></button></nav>
+      <nav aria-label="Main navigation"><button id="to-story" class="text-btn">The department</button><span class="nav-divider"></span><button id="about" class="icon-btn" aria-label="About this portrait" data-tip="About this portrait">${icon('info')}</button><span class="nav-divider"></span><button id="film" class="film-btn">${icon('play')}<span>Play the journey</span></button></nav>
     </header>
     <div class="scene-meta"><span class="live-dot"></span><span id="scene-mode">LIVE EXPLORATION</span><span class="meta-line"></span><span id="time-label">16:30 / AFTERNOON</span><span class="meta-line weather-divider"></span><span id="weather-label" class="weather-live">SYNCING SKY</span></div>
     <div class="scene-number" aria-hidden="true"><span id="scene-number">01</span><small>/ 04</small></div>
@@ -70,7 +71,7 @@ $('#app').innerHTML = `
     <button id="plan" class="plan" aria-label="View building from above" data-tip="Overhead view"><canvas width="220" height="120" aria-hidden="true"></canvas><span>NORTH CAMPUS ${icon('arrow-up-right')}</span></button>
     <footer class="chapter-bar"><div class="chapter-caption"><span>THE CAMPUS</span><small>Four perspectives. One place.</small></div><nav class="chapters" aria-label="Camera viewpoints">${chapters.map((c, i) => `<button data-chapter="${i}" class="chapter ${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}"><span>0${i + 1}</span><strong>${c.name}</strong><span class="chapter-line"></span></button>`).join('')}</nav><button id="next" class="next-btn" aria-label="Next viewpoint">${icon('arrow-right')}</button></footer>
     <div id="journey-track" class="journey-track" hidden><span></span></div>
-    <div id="loader" class="loader"><span class="loading-mark">IT</span><p>A place comes into focus.</p><span class="load-track"><span></span></span><small id="loading-status">Preparing the campus</small></div>
+    <div id="loader" class="loader"><span class="loading-mark">IT</span><p>Raising the department</p><span class="load-track"><span></span></span><small id="loading-status">Preparing the campus</small><button id="begin" class="begin-btn" hidden>Enter</button><small class="begin-note">Opens in full screen.</small></div>
     <div id="toast" role="status" hidden></div>
   </main>
   <dialog id="about-dialog" class="about-dialog"><div class="dialog-top"><span class="eyebrow">ABOUT THE PORTRAIT</span><button class="icon-btn close-dialog" aria-label="Close about">${icon('x')}</button></div><h2>Built around<br><em>a real place.</em></h2><p>Department of Instrument Technology.<br>Andhra University, Visakhapatnam.</p><p>This independent architectural portrait is reconstructed from the supplied campus photographs, video, and footprint. The blue structural frame, open corridors, entrance, and different wing heights follow those references.</p><p>Geometry is constructed directly in Three.js. Dimensions, hidden elevations, planting, and materials are interpreted; this is not a measured survey or a photogrammetric scan.</p><a href="https://www.google.com/maps/search/?api=1&query=Andhra+University+Department+of+Instrument+Technology" target="_blank" rel="noopener" class="text-btn">Find the department ${icon('arrow-up-right')}</a><div class="credits">Original photographs & footage supplied by the project owner. Sky lighting: <a href="https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky" target="_blank" rel="noopener">Poly Haven / CC0</a>.<br>This site keeps anonymous visit statistics (device type, browser, approximate city, visit times). No names or IP addresses are stored.</div></dialog>`;
@@ -413,7 +414,7 @@ function resize() {
   if (!renderer) return;
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
   scene.fog.near = small() ? 160 : 80; scene.fog.far = small() ? 450 : 300;
-  if (!interactive && !journey && !entranceWalk?.active) { camera.position.fromArray(cameraFor(selected)); controls.target.fromArray(chapters[selected].target); transition = null; }
+  if (!interactive && !journey && !entranceWalk?.active && !portfolio?.active) { camera.position.fromArray(cameraFor(selected)); controls.target.fromArray(chapters[selected].target); transition = null; }
   needsRender = true;
 }
 function drawPlan() {
@@ -577,8 +578,21 @@ async function boot() {
     for (const d of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, .01], [0, -1, .01]]) { camera.lookAt(ahead.copy(camera.position).add(new THREE.Vector3(...d))); renderer.render(scene, camera); }
     camera.quaternion.copy(facing); }
   ready = true; window.__portrait.ready = true; readyAt = performance.now();
-  if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; } else riseStart = performance.now(); // the arrival
-  renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
+  // The portfolio layer comes first: the story of the department over the live campus, then the doors into it.
+  document.body.append($('#loader')); // above every layer: #experience is fixed (its own stacking context), the story sits over it
+  portfolio = createPortfolio({ scene, camera, reduced: reduced || !!window.__noRise, changed: () => { needsRender = true; }, onEnter: way => leaveStory(way) });
+  // Automated runs (checks, measurements) see the finished building in the exploration layer unless they ask for the
+  // story (__story) or the rise (__playRise).
+  const automated = navigator.webdriver || window.__autoBegin || /[?&]auto\b/.test(location.search);
+  if (automated && !window.__story) window.__noStory = true;
+  if (automated && !window.__playRise) window.__noRise = true;
+  if (!window.__noStory) { controls.enabled = false; portfolio.show(); }
+  renderer.render(scene, camera);
+  // One tap to begin (owner, 2026-10-18: full screen by default). Browsers only allow full screen, and sound, from a
+  // tap, click or key, so the loader ends on an Enter button; that one gesture goes full screen, starts the ambience
+  // and starts the building rising. Automated runs (and our test scripts) skip it.
+  if (automated) begin(false);
+  else { $('#loader').classList.add('gate'); $('#loading-status').textContent = ''; const go = $('#begin'); go.hidden = false; go.focus({ preventScroll: true }); go.onclick = () => begin(true); }
   loadWeather();
   drawPlan(); resize(); requestAnimationFrame(animate);
 }
@@ -605,6 +619,28 @@ async function compileShadowShaders() {
 }
 let previous = performance.now(), frames = 0, hallLit = false, hallFanSpeed = 1;
 let rise, riseDust, riseStart = 0; // the arrival: the building rising out of the land
+const RISE_RATE = .62; // the rise's own clock runs slower than wall time: about eleven seconds, with weight
+let portfolio = null; // the story layer (portfolio.js), shown first
+function goFullscreen() { // the whole page, so the story scrolls in full screen too; iPhone Safari has no API for it
+  const el = document.documentElement, ask = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!document.fullscreenElement && ask) try { const r = ask.call(el, { navigationUI: 'hide' }); r?.catch?.(() => {}); } catch {}
+}
+function begin(gesture) {
+  if (gesture) { goFullscreen(); resumeDefaultSound(); }
+  if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; } else riseStart = performance.now() + 750; // the arrival, once the loader has faded
+  if (window.__noStory) leaveStory('explore'); else portfolio.play(RISE_LENGTH / RISE_RATE, .75);
+  $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700); needsRender = true;
+}
+function leaveStory(way) {
+  portfolio.hide(); scrollTo(0, 0); controls.enabled = true; camera.fov = 43; camera.updateProjectionMatrix();
+  controls.target.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(30)); controls.update();
+  if (way === 'walk') enterAvatar(); else selectChapter(0);
+  renderer.domElement.focus({ preventScroll: true }); needsRender = true;
+}
+function showStory() {
+  if (avatar?.active) leaveAvatar(); if (entranceWalk?.active) leaveHall(false);
+  setPanorama(false); stopJourney(); setOrbit(false); transition = null; controls.enabled = false; portfolio.show(); needsRender = true;
+}
 let westFittings = null, dispensers = [], casements = [], clickables = [], roomUpdates = [], interiors = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
 function animate(now) {
   requestAnimationFrame(animate);
@@ -614,7 +650,9 @@ function animate(now) {
   const modalOpen = !!document.querySelector('dialog[open]');
   if (modalOpen) return;
   panoramaLook.update(Math.min(frameDuration / 1000, .1));
-  if (avatar?.active) {
+  if (portfolio?.active) {
+    if (portfolio.update(Math.min(frameDuration / 1000, .1))) needsRender = true;
+  } else if (avatar?.active) {
     avatar.update(Math.min(frameDuration / 1000, .1)); needsRender = true;
     if (frames % 6 === 0) $('#avatar-readout').textContent = avatar.text().replace(/^Avatar: /, '');
     // The panel steps out of the way while walking, turning or looking, and returns once the guide stands still.
@@ -646,7 +684,7 @@ function animate(now) {
   if (liveClock && now - lastClockSync > 15000) { lastClockSync = now; setHour(localHour(), { manual: false }); updateMoon(); }
   if (Date.now() - moonState.updatedAt > 30000) updateMoon();
   if (riseStart && !rise.done) { // the building rising: every frame, with its shadows
-    const t = (now - riseStart) / 1000; rise.set(t); riseDust.set(t); riseDust.material.uniforms.uLight.value = 1 - .8 * sunlight.night;
+    const t = Math.max(-1, (now - riseStart) / 1000 * RISE_RATE); rise.set(t); riseDust.set(t); riseDust.material.uniforms.uLight.value = 1 - .8 * sunlight.night;
     if (frames % 2 === 0) renderer.shadowMap.needsUpdate = true; needsRender = true;
     if (rise.done) { renderer.shadowMap.needsUpdate = true; riseDust.set(1e6); }
   }
@@ -663,7 +701,7 @@ function animate(now) {
     }
   }
   // Orbit speed follows wall time, including slower devices; damping is for pointer input.
-  if (!entranceWalk?.active && !panorama && !avatar?.active) controls.update(Math.min(frameDuration / 1000, 1));
+  if (!entranceWalk?.active && !panorama && !avatar?.active && !portfolio?.active) controls.update(Math.min(frameDuration / 1000, 1));
   const windSpeed = updateWind(landscape, weatherState, dt, reduced);
   hallFanSpeed += ((hallSwitch.fan ? 1 : 0) - hallFanSpeed) * Math.min(1, dt * (hallSwitch.fan ? .8 : .35)); // spins up, coasts down
   if (!reduced && hallFanSpeed > .002) architecture.interior.fan.rotation.y += hallFanSpeed * 12 * dt;
@@ -730,7 +768,7 @@ function animate(now) {
   send(); setInterval(() => { if (!document.hidden) send(); }, 30000); // keeps 'online now' current on the dashboard
   addEventListener('pagehide', send);
 })();
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, get rise() { return rise; }, get riseDust() { return riseDust; }, playRise() { riseStart = performance.now(); rise.set(0); }, RISE_LENGTH, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, get rise() { return rise; }, get portfolio() { return portfolio; }, get riseDust() { return riseDust; }, playRise() { riseStart = performance.now(); rise.set(0); }, RISE_LENGTH, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;
@@ -812,11 +850,11 @@ document.querySelectorAll('[data-hour]').forEach(b => b.onclick = () => setHour(
 $('#motion').onchange = e => { drift = e.target.checked; interactive = !drift; };
 $('#quality').onchange = e => { quality = e.target.value; frameSamples.length = 0; resolutionCap = Infinity; cadence = cadenceFloor = 1; if (renderer) { setRatio(quality === 'high' ? Math.min(devicePixelRatio, 2) : quality === 'low' ? .9 : defaultPixelRatio()); needsRender = true; } };
 $('#capture').onclick = () => { if (!renderer) return; renderer.render(scene, camera); renderer.domElement.toBlob(blob => { if (!blob) return toast('Could not save the photograph.'); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'instrument-technology.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast('Your campus photograph is ready.'); }); };
-$('#fullscreen').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('#experience').requestFullscreen(); } catch { toast('Full screen is unavailable in this browser.'); } };
+$('#fullscreen').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else goFullscreen(); } catch { toast('Full screen is unavailable in this browser.'); } };
 document.addEventListener('fullscreenchange', () => { $('#fullscreen').innerHTML = icon(document.fullscreenElement ? 'minimize' : 'maximize'); $('#fullscreen').setAttribute('aria-label', document.fullscreenElement ? 'Exit full screen' : 'Full screen'); refreshIcons(); });
 window.addEventListener('resize', resize);
 renderer?.domElement.addEventListener('keydown', e => {
-  if (entranceWalk?.active || avatar?.active) return;
+  if (entranceWalk?.active || avatar?.active || portfolio?.active) return;
   if (['+', '=', '-', 'Home', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
   if (e.key === '+' || e.key === '=') $('#zoom-in').click();
   if (e.key === '-') $('#zoom-out').click();
@@ -834,6 +872,7 @@ renderer?.domElement.addEventListener('webglcontextlost', e => { e.preventDefaul
 renderer?.domElement.addEventListener('webglcontextrestored', () => location.reload());
 
 $('#about').onclick = () => { stopJourney(); $('#about-dialog').showModal(); };
+$('#to-story').onclick = () => showStory();
 document.querySelectorAll('.close-dialog').forEach(b => b.onclick = () => b.closest('dialog').close());
 document.querySelectorAll('dialog').forEach(d => {
   d.addEventListener('click', e => { if (e.target !== d) return; const r = d.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close(); });

@@ -1,15 +1,23 @@
 import * as T from 'three';
+import Lenis from 'lenis';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { SplitText } from 'gsap/SplitText';
 import * as C from './portfolio-content.js';
+import './portfolio.css';
+
+gsap.registerPlugin(ScrollTrigger, SplitText);
 
 // The portfolio layer (docs/portfolio-layer.md): the first thing a visitor sees. A normal scrolling document over the
 // fixed live campus; every chapter is a camera waypoint, the scroll position is damped onto a curve through them (the
 // pattern of mengto.github.io/kage). It opens on the building rising out of the land (rise.js), then the wordmark
 // rises from the lawn, and it ends by handing the visitor to the exploration or avatar layer.
+// Lenis smooths the scroll itself (so the camera follows an already-smooth position); GSAP runs the arrival timeline,
+// SplitText splits the headings into masked words (keeping an accessible label) and ScrollTrigger plays each once.
 
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-// Headings arrive word by word the first time they are seen; the visible words carry no meaning of their own.
-const words = text => `<span class="pf-sr">${esc(text)}</span><span class="pf-words" aria-hidden="true">${esc(text).split(' ').map((w, i) => `<span class="pf-w"><span style="--i:${i}">${w}</span></span>`).join(' ')}</span>`;
+const words = esc; // headings are plain text; SplitText splits them at run time
 const tel = n => `<a href="tel:${n.replace(/[^0-9+]/g, '')}">${esc(n)}</a>`;
 
 function markup() {
@@ -107,12 +115,13 @@ function markup() {
 // "INSTRUMENT" standing on the front lawn: one plane per glyph, painted with the display face, rising out of the
 // ground after the building and dissolving as the camera passes through it on the way to the porch.
 async function buildWordmark(scene) {
-  const word = 'INSTRUMENT', height = 4.2, z = 25, group = new T.Group(); group.name = 'Portfolio wordmark'; scene.add(group);
+  // on the lawn across the drive, right of the copy
+  const word = 'INSTRUMENT', height = 2.9, z = 15.5, offsetX = 6.9, group = new T.Group(); group.name = 'Portfolio wordmark'; scene.add(group);
   try { await document.fonts.load('700 200px "Instrument Sans"'); } catch {}
   const glyphs = [], measure = document.createElement('canvas').getContext('2d'); measure.font = '700 400px "Instrument Sans"';
   const widths = [...word].map(ch => measure.measureText(ch).width / 400 * height * 1.04), gap = height * .1;
   const total = widths.reduce((a, b) => a + b, 0) + gap * (word.length - 1);
-  let x = -total / 2;
+  let x = offsetX - total / 2;
   [...word].forEach((ch, i) => {
     const w = widths[i], c = document.createElement('canvas'); c.width = Math.ceil(w / height * 512); c.height = 512;
     const g = c.getContext('2d'); g.font = '700 400px "Instrument Sans"'; g.textBaseline = 'alphabetic'; g.textAlign = 'center';
@@ -138,7 +147,7 @@ export function createPortfolio({ scene, camera, reduced, onEnter, changed }) {
 
   function measure() {
     maxScroll = Math.max(1, document.documentElement.scrollHeight - vh());
-    anchors = sections.map((el, i) => i === 0 ? 0 : i === sections.length - 1 ? Math.min(maxScroll, el.offsetTop + el.offsetHeight * .5 - vh() * .5) : Math.max(0, Math.min(maxScroll, el.offsetTop + el.offsetHeight * .5 - vh() * .5)));
+    anchors = sections.map((el, i) => i === 0 ? 0 : Math.max(0, Math.min(maxScroll, el.offsetTop))); // a chapter's view is reached as its heading arrives near the top
     for (let i = 1; i < anchors.length; i++) anchors[i] = Math.max(anchors[i], anchors[i - 1] + 1);
     // the ruler's ticks: one every 2% of the document, a longer one every 10%
     root.querySelector('.pf-ticks').innerHTML = Array.from({ length: 51 }, (_, k) => `<i style="--at:${k * 2}%"${k % 5 ? '' : ' class="l"'}></i>`).join('');
@@ -169,41 +178,68 @@ export function createPortfolio({ scene, camera, reduced, onEnter, changed }) {
   }
 
   const needle = root.querySelector('.pf-needle'), majors = [...root.querySelectorAll('.pf-major')];
-  function onScroll() { rig.prog = progressFor(scrollY); }
-  addEventListener('scroll', onScroll, { passive: true });
+  // Lenis owns the scroll (wheel, keys and touch all go through it); GSAP's ticker drives it, so ScrollTrigger and the
+  // camera read the same smoothed position on the same frame.
+  const lenis = new Lenis({ autoRaf: false, lerp: reduced ? 1 : .085, wheelMultiplier: .9, touchMultiplier: 1.4, syncTouch: false });
+  const tick = time => lenis.raf(time * 1000);
+  gsap.ticker.add(tick); gsap.ticker.lagSmoothing(0);
+  function onScroll() { rig.prog = progressFor(lenis.animatedScroll); }
+  lenis.on('scroll', () => { onScroll(); ScrollTrigger.update(); });
   addEventListener('resize', () => { measure(); onScroll(); });
+  new ResizeObserver(() => { measure(); onScroll(); }).observe(root.querySelector('.pf-doc')); // opening a <details> changes the anchors
   addEventListener('pointermove', e => { if (!active || e.pointerType === 'touch') return; rig.tmx = e.clientX / vw() * 2 - 1; rig.tmy = -(e.clientY / vh() * 2 - 1); }, { passive: true });
   root.addEventListener('click', e => {
     const door = e.target.closest('[data-enter]'); if (door) { onEnter(door.dataset.enter); return; }
     const jump = e.target.closest('a[href^="#"]'); if (!jump) return;
     const el = document.getElementById(jump.getAttribute('href').slice(1)); if (!el) return;
-    e.preventDefault(); const i = sections.indexOf(el); scrollTo({ top: i >= 0 ? anchors[i] : el.offsetTop, behavior: reduced ? 'auto' : 'smooth' });
+    e.preventDefault(); const i = sections.indexOf(el); lenis.scrollTo(i >= 0 ? anchors[i] : el.offsetTop, { duration: reduced ? 0 : 1.8, easing: x => 1 - Math.pow(1 - x, 4) });
   });
-  // First sight of a heading plays its words in; after that it simply stays.
-  const seen = new IntersectionObserver(entries => { for (const en of entries) if (en.isIntersecting) { en.target.classList.add('in'); seen.unobserve(en.target); } }, { threshold: .35 });
-  root.querySelectorAll('.pf-sec').forEach(s => seen.observe(s));
+  // Headings arrive word by word, masked, the first time they come into view; the hero waits for the arrival.
+  const reveals = new Map();
+  if (!reduced) document.fonts.ready.then(() => root.querySelectorAll('.pf-display').forEach(h => {
+    const split = SplitText.create(h, { type: 'words', mask: 'words', aria: 'auto' });
+    gsap.set(split.words, { yPercent: 110 });
+    const play = () => gsap.to(split.words, { yPercent: 0, duration: 1.25, ease: 'expo.out', stagger: .055 });
+    reveals.set(h, play);
+    if (!h.closest('#arrival')) ScrollTrigger.create({ trigger: h, start: 'top 82%', once: true, onEnter: play });
+  })).then(() => root.classList.add('split')); // headings stay hidden until they are split (no flash of the finished text)
+  // Body copy in each chapter follows its heading: a short lift, no stagger theatre.
+  if (!reduced) root.querySelectorAll('.pf-sec:not(#arrival) .pf-copy > :not(.pf-display)').forEach(el => gsap.from(el, { autoAlpha: 0, y: 18, duration: 1, ease: 'power3.out', scrollTrigger: { trigger: el, start: 'top 88%', once: true } }));
 
   buildWordmark(scene).then(w => { wordmark = w; for (const g of w.glyphs) g.mesh.position.y = g.base - 5; changed(); });
 
   measure(); onScroll(); rig.smooth = rig.prog;
+  // The arrival: one GSAP timeline over the rise. The camera dollies in from far down the drive on a long lens, the
+  // wordmark rises from the lawn as the signs land, then the hero copy. Scrolling is held until the building stands.
+  function play(riseLength, delay = 0) {
+    if (reduced) { rig.intro = 1; wordT = 99; root.classList.add('arrived', 'split'); return; }
+    lenis.stop(); root.classList.remove('arrived');
+    const tl = gsap.timeline({ onComplete: () => { lenis.start(); root.classList.add('arrived'); } });
+    tl.delay(delay);
+    tl.fromTo(rig, { intro: 0 }, { intro: 1, duration: riseLength + 1.2, ease: 'power2.inOut' }, 0)
+      .call(() => { wordT = 0; }, null, riseLength - .9)
+      .call(() => reveals.get(root.querySelector('#arrival .pf-display'))?.(), null, riseLength - .2)
+      .from('#arrival .pf-copy > :not(.pf-display), .pf-bar, .pf-scale, .pf-cue', { autoAlpha: 0, y: 14, duration: 1.1, ease: 'power3.out', stagger: .08 }, riseLength + .2);
+  }
   return {
+    play, lenis,
     root,
     get active() { return active; },
     // The arrival clock (0..1 over the rise) and the wordmark's own clock in seconds (it starts near the rise's end).
     setIntro(x) { rig.intro = x; },
     startWordmark() { if (wordT < 0) wordT = 0; },
-    show() { active = true; document.documentElement.classList.add('portfolio-mode'); root.hidden = false; measure(); onScroll(); },
-    hide() { active = false; document.documentElement.classList.remove('portfolio-mode'); root.hidden = true; if (wordmark) wordmark.group.visible = false; },
+    show() { active = true; document.documentElement.classList.add('portfolio-mode'); root.hidden = false; lenis.start(); measure(); onScroll(); ScrollTrigger.refresh(); },
+    hide() { active = false; lenis.stop(); document.documentElement.classList.remove('portfolio-mode'); root.hidden = true; if (wordmark) wordmark.group.visible = false; },
     update(dt) {
       if (!active) return false;
       const before = rig.smooth;
-      rig.smooth = reduced ? rig.prog : T.MathUtils.damp(rig.smooth, rig.prog, 3.2, dt);
+      rig.smooth = reduced ? rig.prog : T.MathUtils.damp(rig.smooth, rig.prog, 9, dt); // Lenis already eased it: just take the edge off
       if (Math.abs(rig.smooth - rig.prog) < 1e-4) rig.smooth = rig.prog;
       rig.mx = T.MathUtils.damp(rig.mx, reduced ? 0 : rig.tmx, 2, dt); rig.my = T.MathUtils.damp(rig.my, reduced ? 0 : rig.tmy, 2, dt);
       apply();
       // the scale: needle on the document position, the current chapter's tick lit
       needle.style.setProperty('--at', `${(rig.smooth / (cams.length - 1) * 100).toFixed(3)}%`);
-      const current = Math.round(rig.smooth); if (current !== lastActive) { majors.forEach((m, k) => m.classList.toggle('on', k === current)); lastActive = current; }
+      const current = Math.round(rig.smooth); if (current !== lastActive) { majors.forEach((m, k) => m.classList.toggle('on', k === current)); root.classList.toggle('wide', ['heritage', 'guide'].includes(C.chapters[current]?.id)); lastActive = current; }
       let moving = Math.abs(before - rig.smooth) > 1e-5 || Math.abs(rig.mx - rig.tmx) > 1e-3 || Math.abs(rig.my - rig.tmy) > 1e-3 || rig.intro < 1;
       if (wordmark) {
         if (wordT >= 0 && wordT < 3) { wordT += dt; moving = true; }

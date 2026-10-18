@@ -1,0 +1,17 @@
+{
+  "name": "Instrument Technology, Andhra University",
+  "short_name": "Instrument Tech",
+  "description": "The Department of Instrument Technology, Andhra University: its story, and a walk through the building.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#13212d",
+  "theme_color": "#13212d",
+  "icons": [
+    { "src": "/media/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/media/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/media/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
