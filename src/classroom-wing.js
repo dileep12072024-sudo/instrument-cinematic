@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { groundSpine } from './footprint.js';
 import { buildClassThree } from './classroom-three.js';
 import { buildClassTwo } from './classroom-two.js';
+import { buildClassFour } from './classroom-four.js';
 
 // Heights are reference-based estimates; the entrance and junction both descend into the wing.
 const flightRise = groundSpine.rightFloor - groundSpine.hallFloor;
@@ -264,15 +265,16 @@ export function buildClassroomWing(parent, m) {
   floor(passageCentre, -19.15, passageLength, 2.3, classroom.lowerFloor);
   box(passageCentre, sideCeiling, -19.15, passageLength, .12, 2.5, ceilingPlaster);
   const sideDoor = doors[0], sideLeft = sideDoor - .55, sideRight = sideDoor + .55;
-  for (const [a, b] of [[start, sideLeft], [sideRight, end]]) box((a + b) / 2, classroom.lowerFloor + .475, -20.4, b - a, .95, .18, plaster);
+  const ivLeft = doors[1] - .55, ivRight = doors[1] + .55; // Class IV's doorway (it was a door drawn on a solid wall)
+  for (const [a, b] of [[start, sideLeft], [sideRight, ivLeft], [ivRight, end]]) box((a + b) / 2, classroom.lowerFloor + .475, -20.4, b - a, .95, .18, plaster);
   box(passageCentre, (classroom.lowerFloor + 2.37 + sideCeiling) / 2, -20.4, passageLength, sideCeiling - classroom.lowerFloor - 2.37, .18, plaster);
   let roomEdge = start;
   for (const x of grilles) {
     box((roomEdge + x - .75) / 2, classroom.lowerFloor + 1.66, -20.4, x - .75 - roomEdge, 1.42, .18, plaster);
     roomEdge = x + .75;
   }
-  for (const [a, b] of [[roomEdge, sideLeft], [sideRight, end]]) box((a + b) / 2, classroom.lowerFloor + 1.66, -20.4, b - a, 1.42, .18, plaster);
-  box(sideDoor, classroom.lowerFloor + 2.36, -20.4, 1.16, .02, .18, plaster);
+  for (const [a, b] of [[roomEdge, sideLeft], [sideRight, ivLeft], [ivRight, end]]) box((a + b) / 2, classroom.lowerFloor + 1.66, -20.4, b - a, 1.42, .18, plaster);
+  for (const x of doors) box(x, classroom.lowerFloor + 2.36, -20.4, 1.16, .02, .18, plaster);
   // Window wall sits 0.3 m inside the west wing's east face, whose wall and blue pilasters otherwise show through.
   const SW = classroomPassage.windowWall;
   box(passageCentre, classroom.lowerFloor + .54, SW, passageLength, 1.08, .16, plaster);
@@ -443,6 +445,7 @@ export function buildClassroomWing(parent, m) {
   const push = label('PUSH', -.12, 1.08, .03, .16, .07, '#f5f5f0', '#111'); leaf.attach(push); push.position.set(-.12, 1.08, .03); push.rotation.set(0, 0, 0);
   buildClassThree(group, { plaster, wood, aluminium, glass: clearGlass, fan: m.fan }, classroom.lowerFloor);
   buildClassTwo(group, { plaster, wood, aluminium, glass: clearGlass, fan: m.fan }, classroom.lowerFloor);
+  buildClassFour(group, { plaster, wood, aluminium, glass: clearGlass, fan: m.fan }, classroom.lowerFloor);
   for (const [material, geometries] of batches) {
     const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = mesh.receiveShadow = true; group.add(mesh); geometries.forEach(g => g.dispose());
   }

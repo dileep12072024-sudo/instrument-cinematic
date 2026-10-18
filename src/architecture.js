@@ -5,6 +5,7 @@ import { buildEntranceHall } from './entrance-hall.js';
 import { buildClassroomWing, classroom, classroomPassage } from './classroom-wing.js';
 import { classThree } from './classroom-three.js';
 import { classTwo } from './classroom-two.js';
+import { classFour } from './classroom-four.js';
 import { buildWestWing, westWing } from './west-wing.js';
 import { buildTerraces } from './terraces.js';
 import { stairs, terraceLevels } from './stair-layout.js';
@@ -250,11 +251,13 @@ export function buildArchitecture(scene) {
       // storey trim still run over them (owner, 2026-10-17: they had been lost with the old wall).
       if (f === 1 && (type === 'west-end' || type === 'west' && rotation === Math.PI / 2)) { facadeTrim(f); continue; }
       if (f === 1 && onlyFloor === null && type === 'west-outer' && rotation === -Math.PI / 2) {
-        facadeTrim(f, classroom.originZ - classThree.maxX - cz); // over the classroom-owned stretch too
-        // Both classrooms own their outer windows and lowered sill/room slabs.
-        for (const [a, c] of [[cz - width / 2, classroom.originZ - classThree.maxX]]) {
-          face(cx, (a + c) / 2, rotation, c - a, height, Math.max(1, Math.round((c - a) / 3.5)), type, closedGround, openGround, 1);
-        }
+        facadeTrim(f); // Class III and Class IV own this storey's wall and windows (classroom-three/four.js)
+        continue;
+      }
+      if (f === 1 && onlyFloor === null && type === 'west-outer' && rotation === Math.PI) {
+        // Rear face: Class IV owns its three bays (world x -34 to -25); the rear room keeps the original fourth bay.
+        facadeTrim(f, -3);
+        face(cx + 4.5, cz, rotation, 3, height, 1, type, closedGround, openGround, 1);
         continue;
       }
       if (f === 1 && type === 'low-corridor' && rotation === 0) {
@@ -540,7 +543,8 @@ export function buildArchitecture(scene) {
       } else if (type === 'west' && y === 4) {
         const left = x - w / 2, right = x + w / 2, passageLeft = -24.5, rear = classroom.originZ - classroomPassage.end, front = 3.25;
         const roomRear = classroom.originZ - classThree.maxX;
-        box((left + passageLeft) / 2, y - .07, (-d / 2 + roomRear) / 2, passageLeft - left, .2, roomRear + d / 2, m.roof);
+        // Class IV's floor is lowered with the classrooms' (it had kept the old storey slab).
+        box((left + passageLeft) / 2, classroom.lowerFloor - .12, (-d / 2 + roomRear) / 2, passageLeft - left, .16, roomRear + d / 2, m.roof);
         box((passageLeft + right) / 2, y - .07, (-d / 2 + rear) / 2, right - passageLeft, .2, rear + d / 2, m.roof);
         // Class II's entire floor is lowered, not just a pocket behind its door.
         box(x, classroom.lowerFloor - .12, (front + d / 2) / 2, w, .16, d / 2 - front, m.roof);
@@ -686,9 +690,11 @@ export function buildArchitecture(scene) {
       [-34.07, 'x', -5.13, 3.25, -1, [.15, 2.2, 4.25, 6.3].map(lx => classroom.originZ - lx), 1.48],
       [-21.97, 'x', 3.35, 15.03, 1, [-9.8, -6.7, -3.6].map(lx => classroom.originZ - lx), 1.55],
       [15.03, 'z', -34.03, -21.97, 1, [-27.85, -25.05, -22.25, -19.4].map(lz => classroom.originX + lz), 1.65],
+      [-34.07, 'x', -15.07, -5.13, -1, classFour.longWindows.map(lx => classroom.originZ - lx), classFour.windowWidth], // Class IV
+      [-15.07, 'z', -34.07, -24.7, -1, classFour.endWindows.map(lz => classroom.originX + lz), classFour.windowWidth],
     ];
     for (const [c, axis, from, to, sign, centres, w] of skins) {
-      const q = u => axis === 'x' && sign > 0 ? -u : u; // rotated a quarter turn toward +x the plane's local x runs along -z
+      const q = u => (axis === 'x' ? sign > 0 : sign < 0) ? -u : u; // where the turned plane's local x runs against the world axis
       const shape = new T.Shape(); shape.moveTo(q(from), base); shape.lineTo(q(to), base); shape.lineTo(q(to), top); shape.lineTo(q(from), top); shape.closePath();
       for (const u of centres) { const hole = new T.Path(); hole.moveTo(q(u - w / 2), sill); hole.lineTo(q(u + w / 2), sill); hole.lineTo(q(u + w / 2), head); hole.lineTo(q(u - w / 2), head); hole.closePath(); shape.holes.push(hole); }
       const g = new T.ShapeGeometry(shape); const p = g.attributes.position, uv = g.attributes.uv;
