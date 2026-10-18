@@ -188,14 +188,23 @@ function adaptResolution(interval, now) {
   const average = frameSamples.slice().sort((a, b) => a - b)[20], ratio = renderer.getPixelRatio(); // median: one-off stalls do not count
   const budget = cadence * 1000 / 60, best = defaultPixelRatio();
   const change = () => { frameSamples.length = 0; lastResolutionChange = now; needsRender = true; };
+  // The story's camera moves with the scroll, so it sheds sharpness before frames, down to Kage's floor (.55 of the
+  // display's pixels): skipped frames read as a stutter in the walk, softness during it does not.
+  const story = portfolio?.active;
   if (average > budget * (cadence > 1 ? 1.12 : 1.2)) {
-    if (cadence < 2) { cadence = cadenceFloor = 2; return change(); }
+    if (cadence < 2 && !story) { cadence = cadenceFloor = 2; return change(); }
     // Phones have few CSS pixels; below ~1.1 they turn visibly soft, so they shed frames before sharpness.
-    const floor = small() ? Math.min(1.1, best) : .8;
+    const floor = story ? .55 * Math.min(devicePixelRatio, 1.5) : small() ? Math.min(1.1, best) : .8;
     // One step straight to the estimated ratio: every resize stalls ~0.15 s here, and four small steps in a row read
     // as stutter right after the scene appears (cost ~ pixels, so scale the pixel ratio by the square root).
     if (ratio > floor + .01) { resolutionCap = Math.max(floor, Math.min(ratio * .88, ratio * Math.sqrt(budget / average) * .95)); setRatio(resolutionCap); return change(); }
+    if (cadence < 2) { cadence = cadenceFloor = 2; return change(); }
     if (cadence < 3) { cadence = cadenceFloor = 3; return change(); }
+  } else if (story && cadence > 1 && now - lastResolutionChange > 6000) {
+    // The story moves between heavy outdoor views and light interiors. The samples are render intervals, which at a
+    // slower pace say nothing about whether a faster one fits, so it tries one: frames on pace for six seconds step up,
+    // and the rule above steps back if it does not hold.
+    cadence--; cadenceFloor = Math.min(cadenceFloor, cadence); return change();
   } else if (now - lastResolutionChange > 20000) {
     const up = Math.min(best, resolutionCap, ratio / .88);
     if (up > ratio + .01) { setRatio(up); return change(); }
@@ -580,7 +589,7 @@ async function boot() {
   ready = true; window.__portrait.ready = true; readyAt = performance.now();
   // The portfolio layer comes first: the story of the department over the live campus, then the doors into it.
   document.body.append($('#loader')); // above every layer: #experience is fixed (its own stacking context), the story sits over it
-  portfolio = createPortfolio({ scene, camera, reduced: reduced || !!window.__noRise, changed: () => { needsRender = true; }, onEnter: way => leaveStory(way) });
+  portfolio = createPortfolio({ scene, camera, renderer, reduced: reduced || !!window.__noRise, changed: () => { needsRender = true; }, onEnter: way => leaveStory(way) });
   // Automated runs (checks, measurements) see the finished building in the exploration layer unless they ask for the
   // story (__story) or the rise (__playRise).
   const automated = navigator.webdriver || window.__autoBegin || /[?&]auto\b/.test(location.search);
@@ -625,10 +634,12 @@ function goFullscreen() { // the whole page, so the story scrolls in full screen
   const el = document.documentElement, ask = el.requestFullscreen || el.webkitRequestFullscreen;
   if (!document.fullscreenElement && ask) try { const r = ask.call(el, { navigationUI: 'hide' }); r?.catch?.(() => {}); } catch {}
 }
+function openDoors() { doorsOpen = true; $('#door span').textContent = 'Close the doors'; $('#door').setAttribute('aria-pressed', 'true'); }
 function begin(gesture) {
   if (gesture) { goFullscreen(); resumeDefaultSound(); }
   if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; } else riseStart = performance.now() + 750; // the arrival, once the loader has faded
-  if (window.__noStory) leaveStory('explore'); else portfolio.play(RISE_LENGTH / RISE_RATE, .75);
+  // the story walks in through the front doors
+  if (window.__noStory) leaveStory('explore'); else { openDoors(); portfolio.play(RISE_LENGTH / RISE_RATE, .75); }
   $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700); needsRender = true;
 }
 function leaveStory(way) {
@@ -639,7 +650,7 @@ function leaveStory(way) {
 }
 function showStory() {
   if (avatar?.active) leaveAvatar(); if (entranceWalk?.active) leaveHall(false);
-  setPanorama(false); stopJourney(); setOrbit(false); transition = null; controls.enabled = false; portfolio.show(); needsRender = true;
+  setPanorama(false); stopJourney(); setOrbit(false); transition = null; controls.enabled = false; openDoors(); portfolio.show(); needsRender = true;
 }
 let westFittings = null, dispensers = [], casements = [], clickables = [], roomUpdates = [], interiors = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
 function animate(now) {
@@ -651,7 +662,7 @@ function animate(now) {
   if (modalOpen) return;
   panoramaLook.update(Math.min(frameDuration / 1000, .1));
   if (portfolio?.active) {
-    if (portfolio.update(Math.min(frameDuration / 1000, .1))) needsRender = true;
+    if (portfolio.update(Math.min(frameDuration / 1000, .1), { light: 1 - .8 * sunlight.night })) needsRender = true;
   } else if (avatar?.active) {
     avatar.update(Math.min(frameDuration / 1000, .1)); needsRender = true;
     if (frames % 6 === 0) $('#avatar-readout').textContent = avatar.text().replace(/^Avatar: /, '');
@@ -750,6 +761,7 @@ function animate(now) {
     // A room's fans and switches are drawn only from inside it (each is several draw calls; from outside they are behind walls or patterned glass).
     for (const { bounds, parts } of interiors) { const inside = bounds.distanceToPoint(camera.position) < 1.5; for (const p of parts) p.visible = inside; }
     renderer.render(scene, camera);
+    portfolio?.afterRender(); // the story's live windows onto other rooms
     if (++frames % 60 === 0) drawPlan();
     if (quality === 'auto' && !reduced && frames > 12 && interval < 250) adaptResolution(interval, now);
     needsRender = false; lastRendered = now;

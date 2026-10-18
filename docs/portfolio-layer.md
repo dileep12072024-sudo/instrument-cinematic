@@ -115,3 +115,44 @@ in as a student) → exploration layer.
   `window.__story` / `window.__playRise`. iPhone Safari has no full-screen API for pages: the web app manifest
   (`display: fullscreen`) and Apple meta tags make "Add to Home Screen" open without browser bars.
 - Measured on the deployed build, laptop on battery: full story scroll median 30 fps (p90 67 ms).
+
+## Plan v2 (2026-10-18, owner: "same as Kage, but the camera goes inside to the real places")
+
+The restored layer (b82bb49, a0fc151) is the base: Enter gate, the rise, the 3D wordmark, Lenis, the live campus.
+What changes, mapped one to one from Kage's own code (`mengto.github.io/kage`, read in full):
+
+| Kage | This layer |
+| --- | --- |
+| Fixed canvas, normal document, `section[data-cam]` waypoints, scroll → progress → camera, damped (5.2) | Same, but the camera **walks the building's walkable track** between waypoints (eye curve through corridor centres, stairs, steps), never through walls. Each chapter **holds at its door or board** while it is read; the walk happens in the scroll between chapters, its length proportional to the real distance. |
+| Hand-held pointer parallax, quieter after the hero | Same; scaled down indoors (0.08 m, 1.5°). |
+| Tall frames: rig steps back, fov opens | Indoors there is no room to step back: fov opens, the door is framed in the upper half. |
+| Preloader: mark, hairline, "Raising… NN%" | The site's loader restyled the same way; ends on Enter (full screen). |
+| Arrival dolly + wordmark rising behind the grass | The rise (building out of the land) + INSTRUMENT on the lawn. |
+| Cursor: 26 px ring, lerp .18, grows to 52 px with a faint fill over anything `[data-cursor]` | Same ring, our colours; plus **wisps**: motes that trail the pointer in camera space, emitted by distance travelled. |
+| Hero chips 01–04: hover lifts the number, lights it, sets the scene focus | Chips for the four main stops; hover **turns the floating window to that place, live**, and warms the light. |
+| Peek: floating live viewport over the hero | "Entrance hall, right now": a live render of the hall; hover pushes the lens in. |
+| Cards: three live viewports, hover pushes each camera in | Laboratories: Process Control, Device Fabrication, Biomedical Instrumentation, live. |
+| Lessons rows: number, title, time; hover draws a bar, shifts, sets focus | **Faculty rows**: name, designation, area, room; hover shows that person's door, live, in the lens window. |
+| Nav links roll to an alternate line on hover; active underline; hide on scroll down; burger sheet on phones | Same; the alternate line is where the place is ("Ground floor, west wing"). |
+| Rail of dots, vignette, grain, leaf fall, word-by-word masked headings, staggered reveals, hero exit sequence | Same mechanisms. Leaves only outdoors. No foreground cut-outs: the building's own walls and doorframes are the foreground. |
+| Accent: vermilion moon | Accent: the marigold of the garlands on every door. Ink is the night sky; text is the limewash. |
+| Type: light grotesk, uppercase display | Instrument Sans (the department's own word), uppercase display, sentence-case body. |
+
+**Real time:** the scene is the live sky (time, sun, moon, weather of Visakhapatnam); the hero shows a live status line
+(local time, sky, weather) that updates.
+
+**Chapters and places** (ground floor first, then up the stairs):
+0 Hero, outside under the real sky → 1 Heritage, the entrance-hall boards → 2 Admissions, the office at the end of the
+west corridor → 3 Laboratories, the west wing (Process Control ahead) → 4 Finding your way, up the stairs to the
+library on the landing → 5 Head of the Department, Dr. P. Swapna's door in the classroom wing (Dr. A. Kamala Kumari
+next door, classrooms II–IV beyond) → 6 Faculty and staff, the east first-floor corridor (Prof. M. Ramesh Patnaik,
+Prof. Y. Srinivasa Rao, Prof. A. Bhujanga Rao; Device Fab Lab at the end) → 7 Step inside: out over the building,
+the doors into the exploration and avatar layers, credits → footer.
+
+**Content:** every faculty member on the hall board with designation and research area; rooms where the building
+shows them; the full list of 21 heads; department staff; Ph.D awardees; programmes, admissions, PEOs; labs and
+research; student guide with every help line. No Telugu (owner, second review).
+
+**E2E test** (`ic-gpu/pf-e2e.mjs`, real GPU, Chrome incognito): boot and loader, Enter gate, rise, every chapter's
+hold frame and two frames of each walk, nav link jumps, rail, chip hover (cursor grows, lens changes), card hover
+(push), faculty row hover, burger sheet at 390×844, reduced motion, keyboard Tab order, no console errors, fps.
