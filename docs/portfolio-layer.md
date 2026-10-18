@@ -101,17 +101,3 @@ Chapters (true sequence: a walk through the building and through time):
 Ph.D, PEOs) → 3 People (faculty, heads, staff) → 4 Labs and research (camera through the courtyards to each lab) →
 5 Student guide (first week, where things are, who to call) → 6 "Enter the campus" (two doors: explore freely / walk
 in as a student) → exploration layer.
-
-## Built (2026-10-18)
-
-- Libraries (owner's reference video, "Day 1: finding the best front-end libraries"): **Lenis 1.3.26** (smooth scroll;
-  the camera follows its already-smoothed position) and **GSAP 3.15.0** with ScrollTrigger and SplitText (the arrival
-  timeline, masked word reveals with accessible labels, once-only section reveals). React Bits was not used: it is a
-  React component library and this site is plain JavaScript; its text and image effects are done with GSAP instead.
-  Versions pinned exactly, each at least two weeks old when added.
-- Enter gate: browsers allow full screen (and sound) only from a tap, click or key, so the loader ends on one **Enter**
-  button that goes full screen, starts the ambience and starts the rise. Automated runs skip it (navigator.webdriver,
-  `window.__autoBegin` or `?auto`) and see the finished building in the exploration layer unless they set
-  `window.__story` / `window.__playRise`. iPhone Safari has no full-screen API for pages: the web app manifest
-  (`display: fullscreen`) and Apple meta tags make "Add to Home Screen" open without browser bars.
-- Measured on the deployed build, laptop on battery: full story scroll median 30 fps (p90 67 ms).
