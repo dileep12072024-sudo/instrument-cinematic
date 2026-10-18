@@ -80,6 +80,7 @@ export function roomControls(room, { name, box: [x0, x1, y0, y1, z0, z1], panelR
   room.traverse(o => { if (o.isMesh) for (const mat of [o.material].flat()) lights.patch(mat); });
   const fanToggles = toggles.slice(panelRows.length), speed = fanRows.map(() => 1);
   room.userData.clickables = clickables;
+  room.userData.interior = { bounds, parts: [...fanRows.flat(), switches] }; // main.js draws these only from inside
   room.userData.update = dt => {
     let changed = lights.update(dt);
     fanRows.forEach((row, k) => { const target = fanToggles[k].on ? 1 : 0; speed[k] += (target - speed[k]) * Math.min(1, dt * (target ? .8 : .35)); // spin up, coast down

@@ -158,8 +158,8 @@ export function buildFirstFloorEast(parent, m) {
   const hiVent = (matrix, x, y) => { // plywood board over a high vent, a little askew (as on the corridor walls)
     const g = P.rbox(.62, .48, .015, .004, 0, 0, 0); g.rotateZ((rand() - .5) * .08); g.translate(x, y, .012); put(g, ply, matrix.clone());
   };
-  const tubes = [], conduit = (a, b) => bar(a, b, .013, pvc);
-  const tube = (matrix, x, y) => { put(new T.BoxGeometry(1.22, .05, .06).translate(x, y, .04), boxGrey, matrix.clone()); const lamp = new T.CylinderGeometry(.016, .016, 1.16, 10); lamp.rotateZ(Math.PI / 2); lamp.translate(x, y - .035, .07); const mat = tubeOn.clone(); put(lamp, mat, matrix.clone()); tubes.push({ matrix, x, y, mat }); };
+  const tubes = [], tubeMats = new Map(), conduit = (a, b) => bar(a, b, .013, pvc);
+  const tube = (matrix, x, y) => { put(new T.BoxGeometry(1.22, .05, .06).translate(x, y, .04), boxGrey, matrix.clone()); const lamp = new T.CylinderGeometry(.016, .016, 1.16, 10); lamp.rotateZ(Math.PI / 2); lamp.translate(x, y - .035, .07); if (!tubeMats.has(matrix)) tubeMats.set(matrix, tubeOn.clone()); const mat = tubeMats.get(matrix); put(lamp, mat, matrix.clone()); tubes.push({ matrix, x, y, mat }); }; // one material per circuit (each wall's tubes switch together)
   const switchBox = (matrix, x, y, cord = true) => {
     put(P.rbox(.14, .14, .05, .008, x, y, .025), boxGrey, matrix.clone());
     if (cord) put(new T.TubeGeometry(new T.CatmullRomCurve3([[x + .03, y - .07, .05], [x + .06, y - .45, .07], [x + .02, y - .62, .06], [x - .02, y - .45, .06], [x + .01, y - .07, .05]].map(p => new T.Vector3(...p))), 20, .004, 4, false), skirting, matrix.clone());

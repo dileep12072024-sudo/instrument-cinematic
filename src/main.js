@@ -458,7 +458,7 @@ async function boot() {
     { get: () => hallSwitch.fan, set: on => { hallSwitch.fan = on; } },
     { get: () => hallSwitch.porch, set: on => { hallSwitch.porch = on; architecture.materials.porchTube.emissiveIntensity = on ? 2 : .05; updateLighting(hour); } }] });
   architecture.group.traverse(o => { if (o.userData.casements) casements.push(o.userData.casements); // windows that open
-    if (o.userData.clickables) clickables.push(...o.userData.clickables); if (o.userData.update) roomUpdates.push(o.userData.update); }); // switches, fans, room lights
+    if (o.userData.clickables) clickables.push(...o.userData.clickables); if (o.userData.update) roomUpdates.push(o.userData.update); if (o.userData.interior) interiors.push(o.userData.interior); }); // switches, fans, room lights
   { // A tap or click (not a drag) on a water machine within reach starts it pouring.
     const canvas = renderer.domElement, ray = new THREE.Raycaster(), at = new THREE.Vector2(); let down = null;
     canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
@@ -596,7 +596,7 @@ async function compileShadowShaders() {
   }
 }
 let previous = performance.now(), frames = 0, hallLit = false, hallFanSpeed = 1;
-let westFittings = null, dispensers = [], casements = [], clickables = [], roomUpdates = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
+let westFittings = null, dispensers = [], casements = [], clickables = [], roomUpdates = [], interiors = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
 function animate(now) {
   requestAnimationFrame(animate);
   const frameDuration = now - previous;
@@ -695,6 +695,8 @@ function animate(now) {
     if (westFittings) westFittings.visible = westBox.distanceToPoint(camera.position) < 30; // far away they are sub-pixel
     // Every draw call costs CPU and GPU-process time on ANGLE: ~170 tiny ones made every few frames late (p90 50 ms).
     for (const [o, s] of smallParts) o.visible = s.radius > .005 * s.center.distanceTo(camera.position);
+    // A room's fans and switches are drawn only from inside it (each is several draw calls; from outside they are behind walls or patterned glass).
+    for (const { bounds, parts } of interiors) { const inside = bounds.distanceToPoint(camera.position) < 1.5; for (const p of parts) p.visible = inside; }
     renderer.render(scene, camera);
     if (++frames % 60 === 0) drawPlan();
     if (quality === 'auto' && !reduced && frames > 12 && interval < 250) adaptResolution(interval, now);
