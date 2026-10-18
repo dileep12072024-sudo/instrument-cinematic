@@ -83,14 +83,10 @@ export function buildSpineInterior(parent, m) {
       extrude(shape, 0, 0, 0, depth, material, 0);
     });
   }
+  // Antique-brass aldrop with a round padlock (owner's references 75, 76), centred on x.
+  const { brass: hwBrass, steel: hwSteel } = P.hardware();
   function latch(x, y, z, width = .40) {
-    tube([[x - width / 2, y, z], [x + width / 2, y, z]], .012, m.metal);
-    for (const dx of [-width * .38, .05, width * .38]) {
-      box(x + dx, y, z - .014, .028, .085, .014, m.metal);
-      tube([[x + dx, y - .02, z], [x + dx, y + .02, z]], .017, m.metal);
-    }
-    tube([[x + .05, y - .055, z], [x + .04, y - .024, z], [x + .075, y - .024, z], [x + .09, y - .055, z]], .006, m.metal);
-    const lock = new T.CylinderGeometry(.029, .029, .023, 16); lock.rotateX(Math.PI / 2); lock.translate(x + .065, y - .078, z); add(lock, m.metal);
+    const a = P.aldrop(width); a.brass.translate(x - width / 2, y, z - .024); add(a.brass, hwBrass); if (a.steel) { a.steel.translate(x - width / 2, y, z - .024); add(a.steel, hwSteel); }
   }
   function panelDoor(x, bottom, z, width, height, rows = 7) {
     frame(x, bottom + height / 2, z + .012, width + .12, height + .08, .062, .10, blue);
@@ -160,7 +156,7 @@ export function buildSpineInterior(parent, m) {
     for (const d of WEST_DOORS) {
       const z = front + .1; // leaf just inside the corridor face, swinging into the room
       put(P.doorFrame(d.w, 2.1, .16), frameWood, d.x, y, front);
-      const { leaf, metal } = P.flushLeaf(d.w - .02, 2.08, -1); put(leaf, d.office ? office : laminate, d.x + d.w / 2 - .01, y + .01, front - .02); put(metal, brass, d.x + d.w / 2 - .01, y + .01, front - .02);
+      const { leaf, metal, steel } = P.flushLeaf(d.w - .02, 2.08, -1); put(leaf, d.office ? office : laminate, d.x + d.w / 2 - .01, y + .01, front - .02); put(metal, P.hardware().brass, d.x + d.w / 2 - .01, y + .01, front - .02); put(steel, P.hardware().steel, d.x + d.w / 2 - .01, y + .01, front - .02);
       put(P.rbox(d.w, .012, .16, .004), marble, d.x, y + .006, front); // flush marble sill in the doorway, no step (owner)
       { const g = new T.PlaneGeometry(d.w, 2.1); put(g, dim, d.x, y + 1.05, front - .4); } // one-sided: seen from the corridor only
       if (d.garland) for (let i = 0; i <= 16; i++) { const t = i / 16; put(new T.SphereGeometry(.035, 6, 4), i % 2 ? marigold : marigoldRed, d.x - d.w / 2 - .05 + t * (d.w + .1), y + 2.2 - Math.sin(t * Math.PI) * .14, front + .12); }

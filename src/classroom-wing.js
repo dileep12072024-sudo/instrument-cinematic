@@ -1,4 +1,5 @@
 import * as T from 'three';
+import * as P from './props.js';
 import { patternedGlass } from './props.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { groundSpine } from './footprint.js';
@@ -72,6 +73,7 @@ export function buildClassroomWing(parent, m) {
   const screens = new Map();
   // Pressed patterned glass (owner: no window here is clear): translucent, blurred, patterned.
   const clearGlass = new T.MeshStandardMaterial({ name: 'Classroom patterned glass', map: patternedGlass(), transparent: true, opacity: .82, roughness: .45, depthWrite: false, side: T.DoubleSide });
+  const { brass: hwBrass, steel: hwSteel } = P.hardware();
   const doorGlass = new T.MeshStandardMaterial({ color: '#899d97', roughness: .27, metalness: .1, envMapIntensity: .5 });
   function floor(x, z, w, d, y, material = stone) {
     const g = new T.PlaneGeometry(w, d); g.rotateX(-Math.PI / 2); g.translate(x, y, z);
@@ -106,10 +108,7 @@ export function buildClassroomWing(parent, m) {
       for (const s of [-1, 1]) { box(x + s * .218, bottom + 1.72, front, .036, .40, .032, wood); box(x, bottom + 1.72 + s * .182, front, .47, .036, .032, wood); }
     }
     tube([[x + width * .32, bottom + .85, front], [x + width * .32, bottom + 1.05, front]], .011, aluminium);
-    tube([[x + .05, bottom + .70, front + .02], [x + .43, bottom + .70, front + .02]], .012, aluminium);
-    for (const dx of [.09, .24, .40]) box(x + dx, bottom + .70, front, .026, .085, .022, aluminium);
-    tube([[x + .29, bottom + .65, front], [x + .30, bottom + .60, front], [x + .34, bottom + .65, front]], .008, aluminium);
-    const lock = new T.CylinderGeometry(.035, .035, .018, 12); lock.rotateX(Math.PI / 2); lock.translate(x + .315, bottom + .59, front); add(lock, aluminium);
+    { const a = P.aldrop(.38); for (const [g, mat] of [[a.brass, hwBrass], [a.steel, hwSteel]]) if (g) { g.translate(x + .05, bottom + .70, front - .024); add(g, mat); } } // aldrop and padlock (owner's references 75, 76)
     if (name) label(name, x, bottom + (plateAbove ? 1.98 : 1.40), front + .02, .52, .11, '#182220', '#eeeedd').name = `Door sign: ${name}`;
     if (open) { // swing the leaf about its left hinge, into the corridor
       const hinge = new T.Matrix4().makeTranslation(x - width / 2, 0, z).multiply(new T.Matrix4().makeRotationY(-open)).multiply(new T.Matrix4().makeTranslation(-(x - width / 2), 0, -z));

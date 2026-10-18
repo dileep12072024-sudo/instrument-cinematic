@@ -179,9 +179,14 @@ export function panelLeaf(lw, h, panels = 4, dir = 1, t = .045) {
     for (const z of [-1, 1]) paint.push(rbox(pw - .07, ph - .07, t * .3, .012, X(lw / 2), y, z * t * .2)); // raised field
   }
   for (const y of [.22, h / 2, h - .22]) { metal.push(new T.CylinderGeometry(.011, .011, .1, 10).translate(0, y, t / 2 + .004)); metal.push(rbox(.05, .1, .003, .001, X(.025), y, t / 2 + .002)); }
-  for (const z of [-1, 1]) { const handle = new T.TorusGeometry(.04, .007, 8, 16, Math.PI); handle.rotateZ(Math.PI / 2 * dir); handle.translate(X(lw - .07), h * .47, z * (t / 2 + .03)); metal.push(handle);
-    metal.push(rbox(.03, .14, .004, .001, X(lw - .07), h * .47, z * (t / 2 + .002))); }
-  metal.push(rbox(.03, .12, .012, .003, X(lw - .06), h - .2, t / 2 + .008), member([X(lw - .06), h - .16, t / 2 + .014], [X(lw - .06), h - .26, t / 2 + .014], .006, .006, 8));
+  for (const z of [-1, 1]) { // knurled pull handle on both faces: a round grip on two posts with rose plates (reference 76)
+    const zz = z * (t / 2), out = z * .045;
+    metal.push(member([X(lw - .07), h * .47 - .1, zz + out], [X(lw - .07), h * .47 + .1, zz + out], .008, .008, 10));
+    for (const dy of [-.09, .09]) { metal.push(member([X(lw - .07), h * .47 + dy, zz], [X(lw - .07), h * .47 + dy, zz + out], .007, .007, 8)); metal.push(rbox(.03, .04, .004, .002, X(lw - .07), h * .47 + dy, zz + z * .002)); }
+  }
+  { // tower bolt: barrel on a back plate, round bolt with its knob
+    metal.push(rbox(.04, .16, .004, .002, X(lw - .06), h - .21, t / 2 + .002), member([X(lw - .06), h - .14, t / 2 + .012], [X(lw - .06), h - .3, t / 2 + .012], .007, .007, 10));
+    metal.push(member([X(lw - .06), h - .24, t / 2 + .012], [X(lw - .085), h - .24, t / 2 + .03], .004, .004, 6), new T.SphereGeometry(.008, 10, 8).translate(X(lw - .09), h - .24, t / 2 + .033)); }
   return { paint: merge(paint), metal: merge(metal) };
 }
 // Door frame: jambs and head with a moulded architrave on the passage side.
@@ -210,7 +215,7 @@ export function grilleLeaf(lw, h, dir = 1, arched = true) {
     for (let y = .2; y < h - .05; y += .16) iron.push(rbox(lw, .016, .007, .002, X(lw / 2), y, .006));
   }
   for (const y of [.2, h - .2]) iron.push(new T.CylinderGeometry(.012, .012, .09, 10).translate(0, y, 0));
-  lock.push(rbox(.045, .05, .018, .006, X(lw - .03), h * .48, .03), new T.TorusGeometry(.016, .004, 6, 14, Math.PI).translate(X(lw - .03), h * .48 + .025, .03));
+  { const p = padlock(.028); for (const g of [p.steel, p.brass]) { g.translate(X(lw - .03), h * .48 + .03, .03); lock.push(g); } } // round padlock on the hasp (reference 75)
   return { iron: merge(iron), lock: merge(lock) };
 }
 
@@ -267,9 +272,9 @@ export function flushLeaf(lw, h, dir = 1, t = .04) {
   for (const y of [.2, h / 2, h - .2]) metal.push(new T.CylinderGeometry(.01, .01, .09, 10).translate(0, y, t / 2 + .003));
   for (const z of [-1, 1]) metal.push(member([X(lw - .07), h * .45 - .06, z * (t / 2 + .025)], [X(lw - .07), h * .45 + .06, z * (t / 2 + .025)], .007, .007, 8),
     member([X(lw - .07), h * .45 - .06, z * (t / 2 + .002)], [X(lw - .07), h * .45 - .06, z * (t / 2 + .025)], .006, .006, 6), member([X(lw - .07), h * .45 + .06, z * (t / 2 + .002)], [X(lw - .07), h * .45 + .06, z * (t / 2 + .025)], .006, .006, 6));
-  metal.push(rbox(.1, .035, .006, .002, X(lw - .03), h * .52, t / 2 + .003), rbox(.04, .05, .018, .006, X(lw + .01), h * .52 - .04, t / 2 + .02), new T.TorusGeometry(.014, .004, 6, 14, Math.PI).translate(X(lw + .01), h * .52 - .015, t / 2 + .02));
+  const steel = []; { const a = aldrop(.34); const at = (g, list) => { if (dir < 0) g.scale(-1, 1, 1); g.translate(X(lw - .3), h * .52, t / 2); list.push(g); }; at(a.brass, metal); if (a.steel) at(a.steel, steel); } // aldrop with its padlock (references 75, 76)
   metal.push(rbox(.025, .14, .012, .003, X(lw - .05), h - .25, t / 2 + .006));
-  return { leaf, metal: merge(metal) };
+  return { leaf, metal: merge(metal), steel: merge(steel) }; // steel: the padlock body (polished)
 }
 // Wall-mounted oscillating fan (Class III video 14-39 s: on the pillars and walls). Returns a group whose
 // userData.rotor spins about its local z and userData.head sweeps about y; the fan faces local +z.
@@ -333,4 +338,49 @@ export function engraveLine(g, W, H, text, cx, cy, cap, width, font, weight = ''
   const size = cap * H / .72; g.font = `${weight} ${size}px ${font}`.trim(); g.textAlign = 'center'; g.textBaseline = 'alphabetic';
   const measured = g.measureText(text)?.width, sx = width && measured ? width * W / measured : 1; // no text metrics in headless checks
   g.save(); g.translate(cx * W, cy * H + cap * H / 2); g.scale(sx, 1); g.fillText(text, 0, 0); g.restore();
+}
+
+// ---------------------------------------------------------------- door hardware (owner's references, 2026-10-18)
+// Round "double locking" padlock (reference image 75): a polished steel disc body with a raised shield on its face,
+// a round-section U shackle, a brass keyway. Origin at the shackle's top, hanging down; faces +z. { steel, brass }.
+export function padlock(r = .032) {
+  const t = r * .55, steel = [], brass = [];
+  const body = new T.CylinderGeometry(r, r, t, 32); body.rotateX(Math.PI / 2); body.translate(0, -r * 2.1, 0); steel.push(body);
+  const rim = new T.TorusGeometry(r * .97, r * .06, 6, 32); rim.translate(0, -r * 2.1, t / 2); steel.push(rim);
+  const shield = new T.Shape(); shield.moveTo(-r * .62, r * .45); shield.quadraticCurveTo(0, r * .7, r * .62, r * .45); shield.quadraticCurveTo(r * .55, -r * .3, 0, -r * .72); shield.quadraticCurveTo(-r * .55, -r * .3, -r * .62, r * .45);
+  const face = new T.ExtrudeGeometry(shield, { depth: r * .08, bevelEnabled: true, bevelSize: r * .03, bevelThickness: r * .03, bevelSegments: 2, curveSegments: 10 });
+  face.translate(0, -r * 2.05, t / 2); steel.push(face);
+  const shackle = new T.TorusGeometry(r * .55, r * .14, 8, 20, Math.PI); shackle.translate(0, -r * .55, 0); steel.push(shackle);
+  for (const s of [-1, 1]) steel.push(member([s * r * .55, -r * .55, 0], [s * r * .55, -r * 1.3, 0], r * .14, r * .14, 8));
+  const key = new T.CylinderGeometry(r * .16, r * .16, r * .1, 14); key.rotateX(Math.PI / 2); key.translate(0, -r * 2.45, t / 2 + r * .1); brass.push(key);
+  brass.push(rbox(r * .07, r * .28, r * .06, r * .02, 0, -r * 2.62, t / 2 + r * .1));
+  return { steel: merge(steel), brass: merge(brass) };
+}
+// Aldrop (sliding door bolt, reference image 76) in antique brass: a round bar in two diamond-knurled clamps on the leaf,
+// its knob, a keeper on the other leaf (or frame), and a hasp staple carrying a padlock. Bar along +x from the origin,
+// length L; faces +z. { brass, steel } (the padlock's steel included).
+export function aldrop(L = .36, { lock = true } = {}) {
+  const brass = [], r = .009;
+  brass.push(member([0, 0, .024], [L, 0, .024], r, r, 12));
+  const clamp = (x, w = .045) => { brass.push(rbox(w, .06, .014, .004, x, 0, .007), rbox(w * .8, .04, .02, .006, x, 0, .018));
+    for (const y of [-.02, .02]) { const s = new T.CylinderGeometry(.004, .004, .004, 8); s.rotateX(Math.PI / 2); s.translate(x, y, .015); brass.push(s); } }; // screws
+  clamp(.04); clamp(L * .45); clamp(L - .02, .035); // keeper at the far end
+  brass.push(member([L * .2, 0, .024], [L * .2, -.045, .03], .006, .006, 8)); const knob = new T.SphereGeometry(.011, 12, 8); knob.translate(L * .2, -.05, .03); brass.push(knob);
+  const staple = new T.TorusGeometry(.012, .0035, 6, 14, Math.PI); staple.rotateZ(-Math.PI / 2); staple.rotateY(Math.PI / 2); staple.translate(L * .62, 0, .04); brass.push(staple);
+  const out = { brass: merge(brass), steel: null };
+  if (lock) { const p = padlock(); p.steel.translate(L * .62, -.012, .045); p.brass.translate(L * .62, -.012, .045); out.steel = p.steel; out.brass = merge([out.brass, p.brass]); }
+  return out;
+}
+// Shared hardware finishes: antique brass (aldrops, handles) and polished padlock steel.
+let hardwareMats;
+export function hardware() {
+  return hardwareMats ??= { brass: new T.MeshStandardMaterial({ name: 'Antique brass door hardware', map: antiqueBrassTexture(), color: '#c9a95a', metalness: .85, roughness: .38 }),
+    steel: new T.MeshStandardMaterial({ name: 'Polished padlock steel', color: '#d9dcdc', metalness: 1, roughness: .16, envMapIntensity: 1.2 }) };
+}
+// Diamond-knurled antique brass, the finish of the reference hardware.
+export function antiqueBrassTexture() {
+  return canvasTexture(128, 128, (g, w, h) => {
+    g.fillStyle = '#9c8240'; g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 8) for (let x = (y / 8) % 2 ? 4 : 0; x < w; x += 8) { g.fillStyle = 'rgba(40,30,10,.55)'; g.beginPath(); g.moveTo(x, y + 4); g.lineTo(x + 4, y); g.lineTo(x + 8, y + 4); g.lineTo(x + 4, y + 8); g.closePath(); g.fill(); g.fillStyle = 'rgba(240,215,140,.35)'; g.fillRect(x + 3, y + 2, 2, 1); }
+  });
 }

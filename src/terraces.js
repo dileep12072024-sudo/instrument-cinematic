@@ -232,11 +232,11 @@ export function buildTerraces(parent, m) {
     for (const [left, right] of [[-3.78, dl], [dr, 3.78]]) box((left + right) / 2, (y0 + y1) / 2, 3.55, right - left, y1 - y0, .16, m.wall);
     box((dl + dr) / 2, (dh + y1) / 2, 3.55, dr - dl, y1 - dh, .16, m.wall);
     const white = new T.MeshStandardMaterial({ name: 'White painted door', map: P.paintTexture('#efeee8', { rust: 0, chips: .25, primer: '#b8b0a0' }), roughness: .5 });
-    const brass = new T.MeshStandardMaterial({ name: 'Door hardware', color: '#b9b4a6', metalness: .7, roughness: .35 });
+    const { brass, steel } = P.hardware();
     const at = new T.Matrix4().makeRotationY(Math.PI).setPosition((dl + dr) / 2, y0, 3.47); // faces the landing (-z)
     const frame = P.doorFrame(1.02, 2.12, .16); frame.applyMatrix4(at); add(frame, white);
-    const { leaf, metal } = P.flushLeaf(1.0, 2.1, -1); const hinge = new T.Matrix4().makeTranslation(.5, .01, -.02).premultiply(at);
-    leaf.applyMatrix4(hinge); metal.applyMatrix4(hinge); add(leaf, white); add(metal, brass); }
+    const { leaf, metal, steel: lockBody } = P.flushLeaf(1.0, 2.1, -1); const hinge = new T.Matrix4().makeTranslation(.5, .01, -.02).premultiply(at);
+    for (const g of [leaf, metal, lockBody]) g.applyMatrix4(hinge); add(leaf, white); add(metal, brass); add(lockBody, steel); }
 
   // The west/classroom roof is the lower open terrace.
   floor(-13.05, levels.leftStrip, 0, 16, 6.5);

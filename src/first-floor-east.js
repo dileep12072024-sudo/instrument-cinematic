@@ -53,7 +53,7 @@ export function buildFirstFloorEast(parent, m, { level = 1 } = {}) {
   const skirting = new T.MeshStandardMaterial({ name: 'Dark skirting', color: '#3a2c2a', roughness: .5 });
   const frameWood = new T.MeshStandardMaterial({ name: 'Door frames', map: P.woodTexture(second ? '#2e1a11' : '#6a4022', { vertical: true }), roughness: .6 });
   const laminate = new T.MeshStandardMaterial({ name: 'Wood-grain door laminate', map: P.woodTexture(second ? '#5a3522' : '#b0763e', { vertical: true, worn: second ? 0 : 1 }), roughness: second ? .35 : .5 }); // level 2: premium coffee brown
-  const brass = new T.MeshStandardMaterial({ name: 'Door hardware', color: '#b9b4a6', metalness: .7, roughness: .35 });
+  const { brass, steel: lockSteel } = P.hardware();
   const green = new T.MeshStandardMaterial({ name: 'Green painted window', color: '#2f4a3c', roughness: .55, metalness: .2 });
   const greenGlass = new T.MeshStandardMaterial({ name: 'Window glass, green-tinted', map: P.patternedGlass('#6f8f80'), transparent: true, opacity: .85, roughness: .4, depthWrite: false });
   const gateSteel = new T.MeshStandardMaterial({ name: 'Grey-green gate steel', color: '#3e4f4c', roughness: .55, metalness: .4 });
@@ -87,9 +87,9 @@ export function buildFirstFloorEast(parent, m, { level = 1 } = {}) {
   function roomDoor(matrix, decor = {}) {
     const { sign, garland, signal, vision, notice } = second ? {} : decor; // level 2 is plain
     put(P.doorFrame(door.w - .04, door.h, .16), frameWood, matrix.clone().multiply(new T.Matrix4().makeTranslation(0, F, -.04)));
-    const { leaf, metal } = P.flushLeaf(door.w - .06, door.h - .02, -1);
+    const { leaf, metal, steel } = P.flushLeaf(door.w - .06, door.h - .02, -1);
     const hinge = matrix.clone().multiply(new T.Matrix4().makeTranslation((door.w - .06) / 2, F + .01, -.06));
-    put(leaf, laminate, hinge.clone()); put(metal, brass, hinge.clone());
+    put(leaf, laminate, hinge.clone()); put(metal, brass, hinge.clone()); put(steel, lockSteel, hinge.clone());
     if (vision) { // small glazed vision panel in a light timber bead (the lab door by the landing gate)
       put(P.rbox(.42, .32, .03, .005, 0, F + 1.6, -.03), frameWood, matrix.clone()); put(new T.BoxGeometry(.34, .24, .01).translate(0, F + 1.6, -.015), greenGlass, matrix.clone());
     }
@@ -155,7 +155,7 @@ export function buildFirstFloorEast(parent, m, { level = 1 } = {}) {
     if (hinged) { // one welded grille leaf swung back against the wall (the wing passage's gate)
       const { iron, lock } = P.grilleLeaf(w - .1, h, 1, false);
       const hinge = M.clone().multiply(new T.Matrix4().makeTranslation(-w / 2 + .05, F + .02, .04)).multiply(new T.Matrix4().makeRotationY(-Math.PI * .47));
-      put(iron, gateSteel, hinge.clone()); put(lock, brass, hinge.clone()); return;
+      put(iron, gateSteel, hinge.clone()); put(lock, lockSteel, hinge.clone()); return;
     }
     for (const [x0, dir] of [[-w / 2 + .07, 1], [w / 2 - .07, -1]]) { // folded collapsible stacks
       for (let j = 0; j < 9; j++) put(new T.BoxGeometry(.012, h, .03).translate(x0 + dir * j * .028, F + .03 + h / 2, .03), gateSteel, M.clone());
@@ -232,7 +232,7 @@ export function buildFirstFloorEast(parent, m, { level = 1 } = {}) {
   for (const d of east) {
     const M = frameAt('z', PR, -1, d.z);
     roomDoor(M, d);
-    if (d.gate) { const { iron, lock } = P.grilleLeaf(door.w - .08, door.h - .05, 1, false); const hinge = M.clone().multiply(new T.Matrix4().makeTranslation(-door.w / 2 + .04, F + .02, .06)).multiply(new T.Matrix4().makeRotationY(-.12)); put(iron, gateSteel, hinge.clone()); put(lock, brass, hinge.clone()); }
+    if (d.gate) { const { iron, lock } = P.grilleLeaf(door.w - .08, door.h - .05, 1, false); const hinge = M.clone().multiply(new T.Matrix4().makeTranslation(-door.w / 2 + .04, F + .02, .06)).multiply(new T.Matrix4().makeRotationY(-.12)); put(iron, gateSteel, hinge.clone()); put(lock, lockSteel, hinge.clone()); }
   }
   for (const z of eastWin) barredWindow(frameAt('z', PR, -1, z));
   const Me = frameAt('z', PR, -1, 0);

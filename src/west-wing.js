@@ -118,9 +118,9 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     for (const g of parts.letters) add(g.applyMatrix4(place), m.blue);
   }
   // Leaf of a panelled door, built about its hinge (props.js): stiles, rails, raised panels, hinges, pull and bolt.
-  function doorLeaf(side, lw, h, panels, material) { const { paint, metal } = P.panelLeaf(lw, h, panels, -side); add(paint, material); add(metal, steel); }
+  function doorLeaf(side, lw, h, panels, material) { const { paint, metal } = P.panelLeaf(lw, h, panels, -side); add(paint, material); add(metal, P.hardware().brass); }
   // Welded iron grille leaf about its hinge (props.js): flat-bar frame, round bars, arched head or grid, padlock.
-  function grilleLeaf(side, lw, h, arched) { const { iron, lock } = P.grilleLeaf(lw, h, -side, arched); add(iron, grille); add(lock, steel); }
+  function grilleLeaf(side, lw, h, arched) { const { iron, lock } = P.grilleLeaf(lw, h, -side, arched); add(iron, grille); add(lock, P.hardware().steel); }
   // Wooden double door (panelled) closing an opening at u, optionally behind an iron grille gate. A leaf or gate that is
   // open is folded back flat against the passage wall beside the opening (outward, as the junction lab door is filmed).
   function labDoor(u, w, h, { grilleGate = true, arched = true, gateOpen = false, gateLeaves = 2, open = false, garland = false, panels = 4, material = doorWood } = {}) {
@@ -129,6 +129,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
       placed(hinge, () => doorLeaf(side, w / 2 - .01, h, panels, material));
     }
     put(P.doorFrame(w, h, .1), material, u, F, 0);
+    if (!open) { const a = P.aldrop(.36); for (const [g, mat] of [[a.brass, P.hardware().brass], [a.steel, P.hardware().steel]]) put(g, mat, u - .18, at(1.0), -.035); } // aldrop and padlock across the meeting stiles (references 75, 76)
     if (grilleGate) for (const side of gateLeaves === 2 ? [-1, 1] : [1]) {
       const lw = gateLeaves === 2 ? w / 2 : w;
       const hinge = new T.Matrix4().makeRotationY(gateOpen ? side * (Math.PI - .06) : 0).setPosition(u + side * w / 2, F, gateOpen ? .1 : .075);

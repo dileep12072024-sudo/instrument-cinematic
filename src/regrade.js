@@ -93,10 +93,21 @@ export function regradeGround(group) {
     }
     pos.needsUpdate = true; mesh.geometry.computeVertexNormals(); mesh.geometry.computeBoundingBox(); mesh.geometry.computeBoundingSphere();
   }
-  let moved = 0; const box = new T.Box3(), c = new T.Vector3();
+  let moved = 0; const box = new T.Box3(), c = new T.Vector3(), size = new T.Vector3();
+  // The earth's own shift at (x, z): what its vertices just received, so anything lying on it can follow exactly.
+  const groundAt = (x, z) => { const i = Math.floor((x - x0) / cell), j = Math.floor((z - z0) / cell); return i < 0 || j < 0 || i >= w || j >= h ? NaN : ground[j * w + i]; };
+  const shiftAt = (x, z) => { const g = groundAt(x, z); if (Number.isNaN(g)) return at(x, z); return Math.min(g + at(x, z), under(x, z) - .03, belowWing(x, z)) - g; };
   for (const o of group.children) {
     if (!FOLLOWERS.test(o.userData.source_object || '') && !o.userData.tree) continue;
-    box.setFromObject(o); box.getCenter(c);
+    box.setFromObject(o); box.getCenter(c); box.getSize(size);
+    if (!o.userData.tree && Math.max(size.x, size.z) > 3) { // a ground cover spread over the earth (grass): it drapes, vertex by vertex
+      // (moved as one piece by its centre's change, the grass floated up to a metre over the lowered left plain: owner, 2026-10-18)
+      o.updateMatrixWorld(true);
+      o.traverse(mesh => { if (!mesh.isMesh) return; const pos = mesh.geometry.attributes.position; inverse.copy(mesh.matrixWorld).invert();
+        for (let i = 0; i < pos.count; i++) { p.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld); p.y += shiftAt(p.x, p.z); p.applyMatrix4(inverse); pos.setXYZ(i, p.x, p.y, p.z); }
+        pos.needsUpdate = true; mesh.geometry.computeBoundingBox(); mesh.geometry.computeBoundingSphere(); });
+      moved++; continue;
+    }
     const d = at(c.x, c.z); if (Math.abs(d) < .002) continue;
     o.position.y += d; o.updateMatrix(); moved++;
   }
