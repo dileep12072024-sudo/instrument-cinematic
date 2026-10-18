@@ -227,3 +227,11 @@ building the exploration layer now.
 - 7eaa97a perf: room fans/switches drawn only from inside. Draw calls ~382 at the arrival view; 15-20 fps on battery.
 - Open: queue item 8 (switchboard positions everywhere per references); first-floor wing passage west wall shows the
   existing facade windows where the video shows a teal wall then screens; north stub end-door and lab-door plate text unreadable.
+
+## Progress, 2026-10-18 (second list: images 74-76)
+- ae37d4e stair half-landings reach the rear wall (0.6 m slot closed); stair-top roof = corrugated sheet on brown purlins,
+  blue steel roof door shut, top windows without grille (111313); second floor east junction (plain, coffee-brown doors,
+  first-floor-east.js level 2); second floor wall + white door over the library door (terraces.js).
+- a2197e2 Bermuda grass drapes per vertex over the regraded earth (was floating up to 1 m on the left plain);
+  door hardware from refs 75/76: P.padlock, P.aldrop, P.hardware() materials, knurled handles and tower bolts in panelLeaf.
+- Not done: debris in the stair-top room (owner said avoid); switchboard placement pass (queue item 8) still open.
