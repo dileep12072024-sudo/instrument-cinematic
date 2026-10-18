@@ -18,8 +18,11 @@ export const firstEast = {
   passage: { left: 22.16, right: 24.37, north: 7.85, south: -11.2 },
 };
 
-export function buildFirstFloorEast(parent, m) {
-  const group = new T.Group(); group.name = 'First floor east corridor and wing passage'; parent.add(group);
+// level 2 (owner, 2026-10-18): the second floor's junction, built like the first floor's but plain (no signs, plates,
+// garlands or paint) with premium coffee-brown doors; its corridor up to the junction is terraces.js's.
+export function buildFirstFloorEast(parent, m, { level = 1 } = {}) {
+  const second = level === 2;
+  const group = new T.Group(); group.name = second ? 'Second floor east junction and wing passage' : 'First floor east corridor and wing passage'; parent.add(group);
   const batches = new Map();
   const add = (g, material) => { const c = g.index ? g.toNonIndexed() : g; for (const n of Object.keys(c.attributes)) if (!['position', 'normal', 'uv'].includes(n)) c.deleteAttribute(n); if (!c.attributes.uv) c.setAttribute('uv', new T.Float32BufferAttribute(new Float32Array(c.attributes.position.count * 2), 2)); if (!batches.has(material)) batches.set(material, []); batches.get(material).push(c); };
   const box = (x, y, z, w, h, d, material) => { const g = new T.BoxGeometry(w, h, d); g.translate(x, y, z); add(g, material); };
@@ -28,14 +31,17 @@ export function buildFirstFloorEast(parent, m) {
   let seed = 111121; const rand = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
   const canvas = (w, h, paint, repeat = false) => { const c = document.createElement('canvas'); c.width = w; c.height = h; paint(c.getContext('2d'), w, h); const t = new T.CanvasTexture(c); t.colorSpace = T.SRGBColorSpace; t.anisotropy = 8; if (repeat) t.wrapS = t.wrapT = T.RepeatWrapping; return t; };
 
-  const { floor: F, ceiling: C, corridor: [Z0, Z1], start, gateX, passage: { left: PL, right: PR, north: PN, south: PS } } = firstEast;
+  const { corridor: [Z0, Z1], start, gateX, passage: { left: PL, right: PR, north: PN, south: PS } } = firstEast;
+  const F = second ? 8 + groundSpine.rightFloor : firstEast.floor, C = second ? 11.72 : firstEast.ceiling, slabTop = second ? 8.03 : 4.03, lintel = second ? 11.7 : 7.78;
   // Materials, from the frames: mauve-brown streaked vitrified tiles, white-washed plaster grimy at the foot, dark skirting.
   const tileMap = canvas(512, 512, (g, w, h) => {
     g.fillStyle = '#7a6460'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 260; i++) { const x = rand() * w; g.fillStyle = rand() > .5 ? `rgba(190,165,150,${.06 + rand() * .12})` : `rgba(60,42,40,${.05 + rand() * .1})`; g.fillRect(x, 0, 1 + rand() * 4, h); } // the streaks run one way
     g.strokeStyle = 'rgba(45,32,30,.55)'; g.lineWidth = 2; for (let k = 0; k <= 2; k++) { g.beginPath(); g.moveTo(0, k * h / 2); g.lineTo(w, k * h / 2); g.moveTo(k * w / 2, 0); g.lineTo(k * w / 2, h); g.stroke(); }
   }, true);
-  const tiles = new T.MeshStandardMaterial({ name: 'First floor east streaked tiles', map: tileMap, roughness: .3, envMapIntensity: .5 });
+  const tiles = second // the second floor carries on its corridor's pale tiles (terraces.js)
+    ? new T.MeshStandardMaterial({ name: 'Second floor east tiles', map: canvas(256, 256, (g, w, h) => { g.fillStyle = '#e1e1d8'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(150,150,140,.6)'; g.lineWidth = 2; g.strokeRect(0, 0, w, h); }, true), roughness: .3, metalness: .03 })
+    : new T.MeshStandardMaterial({ name: 'First floor east streaked tiles', map: tileMap, roughness: .3, envMapIntensity: .5 });
   const plasterMap = canvas(512, 512, (g, w, h) => {
     g.fillStyle = '#ece9df'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 5000; i++) { g.fillStyle = `rgba(110,105,92,${.01 + rand() * .035})`; g.fillRect(rand() * w, rand() * h, 1 + rand() * 6, 1 + rand() * 6); }
@@ -45,8 +51,8 @@ export function buildFirstFloorEast(parent, m) {
   const teal = new T.MeshStandardMaterial({ name: 'Teal painted wall', color: '#5f8a8c', map: plasterMap, roughness: .8 });
   const ceilingMat = new T.MeshStandardMaterial({ name: 'First floor east ceiling', color: '#f1efe7', roughness: .95, emissive: '#bdbab0', emissiveIntensity: .25 });
   const skirting = new T.MeshStandardMaterial({ name: 'Dark skirting', color: '#3a2c2a', roughness: .5 });
-  const frameWood = new T.MeshStandardMaterial({ name: 'Door frames', map: P.woodTexture('#6a4022', { vertical: true }), roughness: .6 });
-  const laminate = new T.MeshStandardMaterial({ name: 'Wood-grain door laminate', map: P.woodTexture('#b0763e', { vertical: true, worn: 1 }), roughness: .5 });
+  const frameWood = new T.MeshStandardMaterial({ name: 'Door frames', map: P.woodTexture(second ? '#2e1a11' : '#6a4022', { vertical: true }), roughness: .6 });
+  const laminate = new T.MeshStandardMaterial({ name: 'Wood-grain door laminate', map: P.woodTexture(second ? '#5a3522' : '#b0763e', { vertical: true, worn: second ? 0 : 1 }), roughness: second ? .35 : .5 }); // level 2: premium coffee brown
   const brass = new T.MeshStandardMaterial({ name: 'Door hardware', color: '#b9b4a6', metalness: .7, roughness: .35 });
   const green = new T.MeshStandardMaterial({ name: 'Green painted window', color: '#2f4a3c', roughness: .55, metalness: .2 });
   const greenGlass = new T.MeshStandardMaterial({ name: 'Window glass, green-tinted', map: P.patternedGlass('#6f8f80'), transparent: true, opacity: .85, roughness: .4, depthWrite: false });
@@ -78,7 +84,8 @@ export function buildFirstFloorEast(parent, m) {
     ? new T.Matrix4().makeRotationY(face > 0 ? 0 : Math.PI).setPosition(u, 0, line)
     : new T.Matrix4().makeRotationY(face > 0 ? Math.PI / 2 : -Math.PI / 2).setPosition(line, 0, u);
   const door = { w: 1.0, h: 2.15 };
-  function roomDoor(matrix, { sign, garland, signal, vision, notice } = {}) {
+  function roomDoor(matrix, decor = {}) {
+    const { sign, garland, signal, vision, notice } = second ? {} : decor; // level 2 is plain
     put(P.doorFrame(door.w - .04, door.h, .16), frameWood, matrix.clone().multiply(new T.Matrix4().makeTranslation(0, F, -.04)));
     const { leaf, metal } = P.flushLeaf(door.w - .06, door.h - .02, -1);
     const hinge = matrix.clone().multiply(new T.Matrix4().makeTranslation((door.w - .06) / 2, F + .01, -.06));
@@ -169,15 +176,17 @@ export function buildFirstFloorEast(parent, m) {
 
   // ------------------------------------------------------------------ east corridor (x start..gateX, z Z0..Z1)
   const stepRise = (F - stairs.first) / 3;
-  box((3.8 + start) / 2, stairs.first - .01, (Z0 + Z1) / 2, start - 3.8 + .04, .02, Z1 - Z0 + .16, tiles); // threshold in the landing wall
-  for (let i = 0; i < 3; i++) box(start + .14 + i * .28, stairs.first + (i + 1) * stepRise / 2, (Z0 + Z1) / 2, .28, (i + 1) * stepRise, Z1 - Z0 + .1, tiles);
-  const fill = (x0, x1, z0, z1) => { const g = new T.BoxGeometry(x1 - x0, F - 4.03, z1 - z0); g.translate((x0 + x1) / 2, (F + 4.03) / 2, (z0 + z1) / 2);
+  if (!second) box((3.8 + start) / 2, stairs.first - .01, (Z0 + Z1) / 2, start - 3.8 + .04, .02, Z1 - Z0 + .16, tiles); // threshold in the landing wall
+  if (!second) for (let i = 0; i < 3; i++) box(start + .14 + i * .28, stairs.first + (i + 1) * stepRise / 2, (Z0 + Z1) / 2, .28, (i + 1) * stepRise, Z1 - Z0 + .1, tiles);
+  const fill = (x0, x1, z0, z1) => { const g = new T.BoxGeometry(x1 - x0, F - slabTop, z1 - z0); g.translate((x0 + x1) / 2, (F + slabTop) / 2, (z0 + z1) / 2);
     const uv = g.attributes.uv, p = g.attributes.position; for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / 1.2, p.getZ(i) / 1.2); add(g, tiles); };
-  fill(start + .84, PR + .05, Z0 - .05, Z1 + .08); // corridor and lobby
+  fill(second ? gateX - .05 : start + .84, PR + .05, Z0 - .05, Z1 + .08); // corridor (first floor) and lobby
   fill(PL - .05, PR + .05, PS - .05, Z0 - .05); fill(PL - .05, PR + .05, Z1 + .08, PN + .05); // the wing passage, south and north
   const ceil = (x0, x1, z0, z1) => box((x0 + x1) / 2, C - .015, (z0 + z1) / 2, x1 - x0, .03, z1 - z0, ceilingMat);
-  ceil(start, PR, Z0, Z1); ceil(PL, PR, PS, Z0); ceil(PL, PR, Z1, PN);
+  ceil(second ? gateX : start, PR, Z0, Z1); ceil(PL, PR, PS, Z0); ceil(PL, PR, Z1, PN);
 
+  const Mz0 = frameAt('x', Z0, 1, 0);
+  if (!second) {
   // Room side, from the landing: lab door (vision panel, black plate, notice), green barred window, Prof. M. Ramesh
   // Patnaik, Prof. Y. Srinivasa Rao (meter boxes above), a plain door, Prof. A. Bhujanga Rao, GENTS TOILETS (111121).
   const doorsZ0 = [
@@ -196,18 +205,18 @@ export function buildFirstFloorEast(parent, m) {
     if (d.gents) plate(M, 'GENTS\nTOILETS', 0, F + door.h + .22, .012, .34, .2, '#f2f1ea', '#222');
   }
   for (const x of winZ0) barredWindow(frameAt('x', Z0, 1, x));
-  const Mz0 = frameAt('x', Z0, 1, 0);
   for (const x of [6.4, 8.3, 10.6, 13.0, 15.2, 17.6, 20.8]) hiVent(Mz0, x, F + 2.75);
   for (const x of [7.6, 12.9, 18.0]) tube(Mz0, x, F + 2.55);
   for (const x of [10.5, 15.2, 18.6]) switchBox(Mz0, x, F + 1.42);
   meters(Mz0, 11.2, F + 2.45); meters(Mz0, 20.5, F + 2.4);
   for (const y of [C - .25, C - .3, C - .35]) conduit([start + .1, y, Z0 + .03], [gateX, y, Z0 + .03]);
+  }
   // Landing gate (in the opening of the stair block's wall) and the east-end gate into the lobby.
-  gate(frameAt('z', 4.0, 1, (Z0 + Z1) / 2), Z1 - Z0, stairs.first + 2.25, 7.78, { base: stairs.first });
-  gate(frameAt('z', gateX, 1, (Z0 + Z1) / 2), Z1 - Z0 + .16, F + 2.2, 7.78);
+  if (!second) gate(frameAt('z', 4.0, 1, (Z0 + Z1) / 2), Z1 - Z0, stairs.first + 2.25, 7.78, { base: stairs.first });
+  gate(frameAt('z', gateX, 1, (Z0 + Z1) / 2), Z1 - Z0 + .16, F + 2.2, lintel);
   // The corridor's facade side: plain plaster under the screens with its skirting (the screens are architecture.js's).
-  box((start + gateX) / 2, F + .06, Z1 - .006, gateX - start, .12, .012, skirting);
-  for (let x = 7.6; x < gateX - 1; x += 3.6) box(x, (F + C) / 2, Z1 - .02, .36, C - F, .04, plaster); // plaster faces of the piers between screens
+  if (!second) box((start + gateX) / 2, F + .06, Z1 - .006, gateX - start, .12, .012, skirting);
+  if (!second) for (let x = 7.6; x < gateX - 1; x += 3.6) box(x, (F + C) / 2, Z1 - .02, .36, C - F, .04, plaster); // plaster faces of the piers between screens
 
   // ------------------------------------------------------------------ the wing passage (x PL..PR)
   // East wall: DEVICE FAB LAB ahead of the corridor; north stub: a garlanded door; south: green barred windows, doors,
@@ -227,7 +236,7 @@ export function buildFirstFloorEast(parent, m) {
   }
   for (const z of eastWin) barredWindow(frameAt('z', PR, -1, z));
   const Me = frameAt('z', PR, -1, 0);
-  meters(Me, (Z0 + Z1) / 2 - 1.05, F + 2.35); // left of DEVICE FAB LAB (frames 40-44)
+  if (!second) meters(Me, (Z0 + Z1) / 2 - 1.05, F + 2.35); // left of DEVICE FAB LAB (frames 40-44)
   for (const z of [(Z0 + Z1) / 2, 5.6, -2.7, -7.1]) put(new T.BoxGeometry(.9, .3, .02).translate(z, F + 2.95, .01), green, Me.clone()); // high vents over the doors
   for (const z of [4.4, -1.8, -6.0]) tube(Me, z, F + 2.6);
   for (const z of [-3.9, -8.2]) switchBox(Me, z, F + 1.42, false);
@@ -237,24 +246,24 @@ export function buildFirstFloorEast(parent, m) {
   for (const y of [C - .25, C - .3]) conduit([PR - .03, y, PS], [PR - .03, y, PN]);
   // West side of the passage: the wall behind the corridor's rooms, painted teal (frames 59-64); the outer wall and its
   // windows south of it, and the screened bay north of the lobby, are the facade's (architecture.js).
-  box(PL + .005, (F + C) / 2, (-3.25 + Z0 - .05) / 2, .01, C - F, Z0 - .05 + 3.25, teal);
+  if (!second) box(PL + .005, (F + C) / 2, (-3.25 + Z0 - .05) / 2, .01, C - F, Z0 - .05 + 3.25, teal);
   box(PL + .012, F + .06, (PS + Z0) / 2, .012, .12, Z0 - PS, skirting); box(PL + .012, F + .06, (Z1 + PN) / 2, .012, .12, PN - Z1, skirting);
   // Gate from the lobby into the south passage (one grille leaf swung back), and the passage ends.
   gate(frameAt('x', Z0 - .02, -1, (PL + PR) / 2), PR - PL, F + 2.2, C - .02, { hinged: true });
   wall('x', PS, 1, PL - .1, PR + .1, [{ at: (PL + PR) / 2, w: door.w + .06, bottom: F - .2, top: F + door.h + .06 }]);
   { const M = frameAt('x', PS, 1, (PL + PR) / 2); roomDoor(M, { sign: 'BIO MEDICAL\nINSTRUMENTATION\nLAB', garland: true });
-    plate(M, 'BIOMEDICAL\nLABORATORY', 0, F + door.h + .3, .012, .36, .18, '#f2f1ea', '#222'); put(new T.BoxGeometry(1.1, .32, .02).translate(0, F + 2.95, .01), green, M.clone());
-    put(P.rbox(.32, .26, .14, .01, .85, F + 2.45, .07), ply, M.clone()); } // the brown junction box beside it
+    if (!second) plate(M, 'BIOMEDICAL\nLABORATORY', 0, F + door.h + .3, .012, .36, .18, '#f2f1ea', '#222'); put(new T.BoxGeometry(1.1, .32, .02).translate(0, F + 2.95, .01), green, M.clone());
+    if (!second) put(P.rbox(.32, .26, .14, .01, .85, F + 2.45, .07), ply, M.clone()); } // the brown junction box beside it
   wall('x', PN, -1, PL - .1, PR + .1, [{ at: (PL + PR) / 2, w: door.w + .06, bottom: F - .2, top: F + door.h + .06 }]);
   { const M = frameAt('x', PN, -1, (PL + PR) / 2); roomDoor(M, { sign: 'LAB' }); put(new T.BoxGeometry(.9, .3, .02).translate(0, F + 2.95, .01), green, M.clone()); }
 
   for (const [material, list] of batches) { const mesh = new T.Mesh(P.merge(list), material); mesh.receiveShadow = true; mesh.castShadow = material !== greenGlass; mesh.layers.enable(1); group.add(mesh); }
 
   // Working lights: each tube on the corridor or passage circuit, switched from the boxes by the gates (roomlights.js).
-  const circuits = [
-    { name: 'First floor east corridor', box: new T.Box3(new T.Vector3(start - .2, F - .3, Z0 - .2), new T.Vector3(gateX + .2, C + .2, Z1 + .3)), board: { at: Mz0, x: 6.4 } },
-    { name: 'First floor east wing passage', box: new T.Box3(new T.Vector3(PL - .3, F - .3, PS - .2), new T.Vector3(PR + .2, C + .2, PN + .2)), board: { at: Me, x: 1.6 } },
-  ];
+  const circuits = (second ? [1] : [0, 1]).map(k => [
+    { name: second ? 'Second floor east corridor' : 'First floor east corridor', box: new T.Box3(new T.Vector3(start - .2, F - .3, Z0 - .2), new T.Vector3(gateX + .2, C + .2, Z1 + .3)), board: { at: Mz0, x: 6.4 } },
+    { name: second ? 'Second floor east wing passage' : 'First floor east wing passage', box: new T.Box3(new T.Vector3(PL - .3, F - .3, PS - .2), new T.Vector3(PR + .2, C + .2, PN + .2)), board: { at: Me, x: 1.6 } },
+  ][k]);
   for (const c of circuits) {
     const lights = createRoomLights(c.name, c.box), mine = tubes.filter(t => c.box.containsPoint(new T.Vector3(t.x, t.y, 0).applyMatrix4(t.matrix)));
     const fittings = mine.map(t => lights.add(new T.Vector3(t.x, t.y - .1, .3).applyMatrix4(t.matrix), 4, level => { t.mat.emissiveIntensity = 1.6 * Math.max(level, .03); }));

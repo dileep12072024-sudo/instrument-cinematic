@@ -302,13 +302,13 @@ export function buildArchitecture(scene) {
         continue;
       }
       if (f === 2 && type === 'corridor' && rotation === 0) continue;
-      if (f === 1 && onlyFloor === null && type === 'room' && cx > 0 && rotation === -Math.PI / 2 && closedGround === 'rear-half') {
+      if ((f === 1 || f === 2) && onlyFloor === null && type === 'room' && cx > 0 && rotation === -Math.PI / 2 && closedGround === 'rear-half') { // (second floor too: owner, 2026-10-18)
         // East wing, first floor, courtyard side (Right/First floor - right wing.mp4): the outer stretch keeps its windows;
         // behind the east corridor's rooms a plain wall, and the corridor itself opens into the wing's passage.
         const outer = cz - width / 2, rooms = -3.25;
-        face(cx, (outer + rooms) / 2, rotation, rooms - outer, height, 4, type, closedGround, openGround, 1);
-        box(cx, 6, (rooms + groundSpine.roomFront) / 2, .32, 4, groundSpine.roomFront - rooms, m.wall);
-        box(cx, 7.89, (groundSpine.roomFront + 3.25) / 2, .32, .22, 3.25 - groundSpine.roomFront, m.wall);
+        face(cx, (outer + rooms) / 2, rotation, rooms - outer, height, 4, type, closedGround, openGround, f);
+        box(cx, f * 4 + 2, (rooms + groundSpine.roomFront) / 2, .32, 4, groundSpine.roomFront - rooms, m.wall);
+        box(cx, f * 4 + 3.89, (groundSpine.roomFront + 3.25) / 2, .32, .22, 3.25 - groundSpine.roomFront, m.wall);
         continue;
       }
       if (f === 1 && onlyFloor === null && type === 'room' && cx < 0 && rotation === Math.PI / 2) {
@@ -397,7 +397,7 @@ export function buildArchitecture(scene) {
             }
           }
         } else if (corridor && f === floors - 1) {
-          b(x, openingY, -1.1, ow, openingH, .15, m.dark);
+          if (type !== 'gate-return') b(x, openingY, -1.1, ow, openingH, .15, m.dark); // (the wing bay's second floor is built inside: first-floor-east.js)
           b(x, openingY - openingH / 2 + .18, -.08, ow, .38, .25, m.wall);
           b(x, openingY - openingH / 2 + .52, .04, ow, .045, .05, m.metal);
           for (let k = -1; k <= 1; k++) b(x + k * ow / 3, openingY - openingH / 2 + .34, .04, .04, .48, .05, m.metal);
@@ -756,6 +756,7 @@ export function buildArchitecture(scene) {
 
   buildTerraces(group, m);
   buildFirstFloorEast(group, m);
+  buildFirstFloorEast(group, m, { level: 2 });
   for (const { pivot } of doors) pivot.traverse(object => { if (object.isMesh) object.layers.enable(1); });
   return { group, doors, materials: m, interior, classroomFans: ['II', 'III'].flatMap(n => group.getObjectsByProperty('name', `Class ${n} ceiling fan rotor`)) };
 }

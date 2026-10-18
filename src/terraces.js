@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { stairs, terraceCovers, terraceLevels as levels } from './stair-layout.js';
+import * as P from './props.js';
 import { rbox, granitePlaque, engraveLine } from './props.js';
 
 export function buildTerraces(parent, m) {
@@ -27,7 +28,8 @@ export function buildTerraces(parent, m) {
   const cap = roof.clone(); cap.name = 'Projecting weathered terrace coping'; cap.color.set('#777a70');
   const wall = m.wall.clone(); wall.name = 'Weathered terrace plaster'; wall.color.set('#f0efdf'); wall.bumpScale = .008;
   const steel = new T.MeshStandardMaterial({ color: '#373d38', metalness: .55, roughness: .62 });
-  const sheet = new T.MeshStandardMaterial({ color: '#c9d4d0', metalness: .12, roughness: .82, side: T.DoubleSide });
+  const sheet = new T.MeshStandardMaterial({ name: 'Corrugated galvanised sheet', color: '#dfe3e1', metalness: .25, roughness: .5, emissive: '#3a3d3c', side: T.DoubleSide });
+  const purlin = new T.MeshStandardMaterial({ name: 'Brown angle-iron purlins', map: P.paintTexture('#5a3a26', { rust: .6, chips: .3 }), roughness: .6 });
   const white = new T.MeshStandardMaterial({ name: 'Terrace tanks and PVC pipework', color: '#e3e4dc', roughness: .64 });
   const black = new T.MeshStandardMaterial({ color: '#252b2b', roughness: .74 });
   const tile = new T.MeshStandardMaterial({ color: '#e1e1d8', roughness: .3, metalness: .03 });
@@ -125,10 +127,14 @@ export function buildTerraces(parent, m) {
   }
   function canopy(x, y, z, width, depth, slope = 0) {
     const starts = new Map([...batches].map(([material, gs]) => [material, gs.length]));
-    // Continuous sheet beneath the raised ribs keeps the roof weather-tight.
-    box(x, y, z, width, .045, depth, sheet);
-    for (let dx = -width / 2; dx <= width / 2; dx += .22) box(x + dx, y + .025, z, .038, .04, depth, sheet);
-    for (const dz of [-depth / 2 + .12, 0, depth / 2 - .12]) box(x, y - .11, z + dz, width, .16, .075, steel);
+    // Corrugated galvanised sheet (a sine profile across the span, seen from below as on the stair roof, 111313 at 69-108 s)
+    // on brown angle-iron purlins every 1.2 m.
+    { const g = new T.PlaneGeometry(width, depth, Math.round(width / .019), 1); g.rotateX(Math.PI / 2); const p = g.attributes.position;
+      for (let i = 0; i < p.count; i++) p.setY(i, Math.sin(p.getX(i) / .076 * Math.PI) * .018);
+      g.translate(x, y, z); add(g, sheet); } // double-sided: one sheet serves above and below
+    for (let dz = -depth / 2 + .1; dz <= depth / 2 - .05; dz += 1.2) {
+      box(x, y - .045, z + dz, width, .006, .065, purlin); box(x, y - .075, z + dz - .03, width, .065, .006, purlin); // L section
+    }
     for (const [material, gs] of batches) for (const g of gs.slice(starts.get(material) || 0)) {
       const p = g.attributes.position;
       for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) + (p.getZ(i) - z) * slope);
@@ -220,6 +226,17 @@ export function buildTerraces(parent, m) {
   for (const [left, right] of [[-3.78, -3.12], [-1.98, 3.78]]) box((left + right) / 2, 5.95, 3.55, right - left, 3.81, .16, m.wall);
   box(-2.55, 7.24, 3.55, 1.14, 1.24, .16, m.wall);
   libraryWall();
+  // Second floor, over the library (owner, 2026-10-18; 111313): a plain wall on the library's line with a white door
+  // directly above the library door, no decoration.
+  { const y0 = stairs.second, y1 = 11.79, dl = -3.12, dr = -1.98, dh = y0 + 2.2;
+    for (const [left, right] of [[-3.78, dl], [dr, 3.78]]) box((left + right) / 2, (y0 + y1) / 2, 3.55, right - left, y1 - y0, .16, m.wall);
+    box((dl + dr) / 2, (dh + y1) / 2, 3.55, dr - dl, y1 - dh, .16, m.wall);
+    const white = new T.MeshStandardMaterial({ name: 'White painted door', map: P.paintTexture('#efeee8', { rust: 0, chips: .25, primer: '#b8b0a0' }), roughness: .5 });
+    const brass = new T.MeshStandardMaterial({ name: 'Door hardware', color: '#b9b4a6', metalness: .7, roughness: .35 });
+    const at = new T.Matrix4().makeRotationY(Math.PI).setPosition((dl + dr) / 2, y0, 3.47); // faces the landing (-z)
+    const frame = P.doorFrame(1.02, 2.12, .16); frame.applyMatrix4(at); add(frame, white);
+    const { leaf, metal } = P.flushLeaf(1.0, 2.1, -1); const hinge = new T.Matrix4().makeTranslation(.5, .01, -.02).premultiply(at);
+    leaf.applyMatrix4(hinge); metal.applyMatrix4(hinge); add(leaf, white); add(metal, brass); }
 
   // The west/classroom roof is the lower open terrace.
   floor(-13.05, levels.leftStrip, 0, 16, 6.5);
@@ -303,9 +320,18 @@ export function buildTerraces(parent, m) {
   box(0, 15.06, 1.40, 1.24, 1, .18, m.wall);
   for (const x of [-4.05, 4.05]) for (const z of [-6.85, 1.32]) box(x, 14.05, z, .10, 3, .32, m.blue);
   const topCover = terraceCovers[0]; canopy(topCover.x, topCover.top - .04, topCover.z, topCover.width, topCover.depth, .018);
-  const blueDoor = new T.Group(); blueDoor.name = 'Open blue roof-access door'; blueDoor.position.set(.61, stairs.top, 1.51); blueDoor.rotation.y = -Math.PI * .48; group.add(blueDoor);
-  const panel = new T.Mesh(new T.BoxGeometry(1.18, 2.45, .06), m.blue); panel.position.set(-.59, 1.225, 0); blueDoor.add(panel);
-  const handle = new T.Mesh(new T.BoxGeometry(.03, .2, .06), m.metal); handle.position.set(-1.04, 1.13, -.06); blueDoor.add(handle);
+  // Roof-access door at the head of the last flight (111313 at 94-108 s): a blue pressed-steel door, shut, in a steel frame.
+  { const blueSteel = new T.MeshStandardMaterial({ name: 'Blue painted steel door', map: P.paintTexture('#1d5aa6', { rust: .25, chips: .4, primer: '#9a9a90' }), roughness: .45, metalness: .3 });
+    const frameSteel = new T.MeshStandardMaterial({ name: 'Door frame steel', color: '#2b3a4a', roughness: .5, metalness: .4 });
+    const blueDoor = new T.Group(); blueDoor.name = 'Blue roof-access door (shut)'; blueDoor.position.set(.59, stairs.top, 1.33); group.add(blueDoor);
+    const at = (g, mat) => { const mesh = new T.Mesh(g, mat); blueDoor.add(mesh); return mesh; };
+    at(P.rbox(1.16, 2.4, .045, .006, -.59, 1.2, 0), blueSteel);
+    for (const y of [.35, 1.2, 2.05]) at(P.rbox(1.02, .55, .012, .01, -.59, y, -.028), blueSteel); // pressed panels, stair side
+    at(P.doorFrame(1.18, 2.42, .1).translate(-.59, 0, .02), frameSteel);
+    at(P.member([-1.07, 1.02, -.05], [-1.07, 1.22, -.05], .01, .01, 8), m.metal); // pull handle
+    at(P.rbox(.03, .16, .012, .003, -1.07, 1.12, -.03), m.metal);
+    at(P.rbox(.025, .22, .02, .004, -.95, 1.9, -.035), m.metal); // tower bolt
+  }
   // Beyond the corner steps, the raised terrace meets the enclosure wall directly.
   floor(13.02, levels.rightStrip, -.88, 17.96, 4.74);
   floor(13.47, levels.rightStrip, 2.37, 17.06, 1.76);

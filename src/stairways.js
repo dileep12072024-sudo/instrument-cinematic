@@ -37,8 +37,11 @@ export function buildStairways(parent, m) {
       flight(side * 2.67, 2.02, f.start ?? stairs.front, stairs.rear, f.base, f.half, f.sideSteps, material);
       parapet(side * 1.55, f.start ?? stairs.front, stairs.rear, f.base, f.half, level === 0);
     }
-    box(0, f.half - .1, stairs.landingZ, 7.55, .2, 2.1, material);
-    box(0, f.half - .22, stairs.landingZ, 7.55, .04, 2.1, m.wall);
+    // Half landing from the flights' rear to the rear wall's inner face (-6.8): it stopped 0.6 short, a slot down to the
+    // ground floor (owner image 74, 2026-10-18).
+    const landingFront = stairs.landingZ + 1.05, landingBack = -6.8, landingMid = (landingFront + landingBack) / 2, landingDepth = landingFront - landingBack;
+    box(0, f.half - .1, landingMid, 7.55, .2, landingDepth, material);
+    box(0, f.half - .22, landingMid, 7.55, .04, landingDepth, m.wall);
     flight(0, 2.9, stairs.rear, stairs.returnEnd, f.half, f.top, f.returnSteps, material);
     for (const side of [-1, 1]) parapet(side * 1.53, stairs.rear, stairs.returnEnd, f.half, f.top);
   });
@@ -78,8 +81,10 @@ export function buildStairways(parent, m) {
       box((left + a) / 2, sill + height / 2, -6.9, a - left, height, .2, m.wall);
       // Glazed casements at the outer face, opening outward (owner, 2026-10-17); the grille sits inside them.
       casements.add(new T.Matrix4().makeRotationY(Math.PI).setPosition(x, sill, -7.0), width, height, { rows: 3, cols: 1 });
-      for (let dx = -width / 2 + .14; dx < width / 2; dx += .14) box(x + dx, sill + height / 2, -6.84, .014, height, .018, gatePaint);
-      for (let yy = sill + .30; yy < sill + height; yy += .30) box(x, yy, -6.84, width, .014, .018, gatePaint);
+      if (sill < 10) { // the top landing's windows have no grille (111313 at 57-88 s)
+        for (let dx = -width / 2 + .14; dx < width / 2; dx += .14) box(x + dx, sill + height / 2, -6.84, .014, height, .018, gatePaint);
+        for (let yy = sill + .30; yy < sill + height; yy += .30) box(x, yy, -6.84, width, .014, .018, gatePaint);
+      }
       for (const dx of [-width / 2, 0, width / 2]) if (dx !== 0) box(x + dx, sill + height / 2, -6.98, .045, height, .065, aluminium);
       for (const y of [sill, sill + height]) box(x, y, -6.98, width, .045, .065, aluminium);
       left = b;
