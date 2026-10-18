@@ -1,5 +1,6 @@
 import * as T from 'three';
 import * as P from './props.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { groundSpine } from './footprint.js';
 import { stairs } from './stair-layout.js';
 import { createRoomLights, makeSwitchboard } from './roomlights.js';
@@ -24,7 +25,7 @@ export function buildFirstFloorEast(parent, m, { level = 1 } = {}) {
   const second = level === 2;
   const group = new T.Group(); group.name = second ? 'Second floor east junction and wing passage' : 'First floor east corridor and wing passage'; parent.add(group);
   const batches = new Map();
-  const add = (g, material) => { const c = g.index ? g.toNonIndexed() : g; for (const n of Object.keys(c.attributes)) if (!['position', 'normal', 'uv'].includes(n)) c.deleteAttribute(n); if (!c.attributes.uv) c.setAttribute('uv', new T.Float32BufferAttribute(new Float32Array(c.attributes.position.count * 2), 2)); if (!batches.has(material)) batches.set(material, []); batches.get(material).push(c); };
+  const add = (g, material) => { const c = g.index ? g.toNonIndexed() : g; for (const n of Object.keys(c.attributes)) if (!['position', 'normal', 'uv', 'aPiece'].includes(n)) c.deleteAttribute(n); if (!c.attributes.uv) c.setAttribute('uv', new T.Float32BufferAttribute(new Float32Array(c.attributes.position.count * 2), 2)); if (!batches.has(material)) batches.set(material, []); batches.get(material).push(c); };
   const box = (x, y, z, w, h, d, material) => { const g = new T.BoxGeometry(w, h, d); g.translate(x, y, z); add(g, material); };
   const put = (g, material, matrix) => { g.applyMatrix4(matrix); add(g, material); };
   const bar = (a, b, r, material) => add(P.member(a, b, r, r, 6), material);
@@ -257,7 +258,7 @@ export function buildFirstFloorEast(parent, m, { level = 1 } = {}) {
   wall('x', PN, -1, PL - .1, PR + .1, [{ at: (PL + PR) / 2, w: door.w + .06, bottom: F - .2, top: F + door.h + .06 }]);
   { const M = frameAt('x', PN, -1, (PL + PR) / 2); roomDoor(M, { sign: 'LAB' }); put(new T.BoxGeometry(.9, .3, .02).translate(0, F + 2.95, .01), green, M.clone()); }
 
-  for (const [material, list] of batches) { const mesh = new T.Mesh(P.merge(list), material); mesh.receiveShadow = true; mesh.castShadow = material !== greenGlass; mesh.layers.enable(1); group.add(mesh); }
+  for (const [material, list] of batches) { const mesh = new T.Mesh(mergeGeometries(list), material); /* not P.merge: that makes one piece of a whole batch */ mesh.receiveShadow = true; mesh.castShadow = material !== greenGlass; mesh.layers.enable(1); group.add(mesh); }
 
   // Working lights: each tube on the corridor or passage circuit, switched from the boxes by the gates (roomlights.js).
   const circuits = (second ? [1] : [0, 1]).map(k => [

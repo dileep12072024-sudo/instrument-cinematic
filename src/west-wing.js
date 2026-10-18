@@ -627,7 +627,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   // Bake walls and screens with world-scale UVs (grime band at the floor), then merge everything by material.
   for (const g of walls) { const p = g.attributes.position, uv = g.attributes.uv; for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + p.getZ(i)) / 2.2, (p.getY(i) - F) / 3.3); add(g, plaster); }
   for (const [material, list] of batches) {
-    const mesh = new T.Mesh(mergeGeometries(list.map(g => { const c = g.clone(); for (const name of Object.keys(c.attributes)) if (!['position', 'normal', 'uv'].includes(name)) c.deleteAttribute(name); if (!c.attributes.uv) c.setAttribute('uv', new T.Float32BufferAttribute(new Float32Array(c.attributes.position.count * 2), 2)); return c; })), material);
+    const mesh = new T.Mesh(mergeGeometries(list.map(g => { const c = g.clone(); for (const name of Object.keys(c.attributes)) if (!['position', 'normal', 'uv', 'aPiece'].includes(name)) c.deleteAttribute(name); if (!c.attributes.uv) c.setAttribute('uv', new T.Float32BufferAttribute(new Float32Array(c.attributes.position.count * 2), 2)); return c; })), material);
     mesh.name = material.name || 'West wing part'; mesh.castShadow = !material.transparent && material !== dark && material !== tube; mesh.receiveShadow = true;
     (structure.has(material) ? group : fittings).add(mesh);
   }

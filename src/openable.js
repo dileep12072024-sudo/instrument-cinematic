@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // the opening, glazed, with glazing bars. A tap (main.js) opens or closes a window. To keep draw calls low, a cluster of
 // windows draws as two merged meshes while every leaf is closed and the camera is far; near (or once opened) each leaf
 // is its own pivot. Window frame: local x along the wall, y up, +z outward; origin at the bottom centre of the opening.
-const keep = ['position', 'normal', 'uv'];
+const keep = ['position', 'normal', 'uv', 'aPiece'];
 const clean = g => { const c = g.index ? g.toNonIndexed() : g; for (const n of Object.keys(c.attributes)) if (!keep.includes(n)) c.deleteAttribute(n); return c; };
 
 function leafGeometry(lw, h, dir, bars) { // hinge at origin, leaf toward x = dir * lw, outer face at z = 0
