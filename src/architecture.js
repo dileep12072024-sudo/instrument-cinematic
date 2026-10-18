@@ -6,9 +6,11 @@ import { buildClassroomWing, classroom, classroomPassage } from './classroom-win
 import { classThree } from './classroom-three.js';
 import { classTwo } from './classroom-two.js';
 import { classFour } from './classroom-four.js';
+import { buildFirstFloorEast } from './first-floor-east.js';
 import { buildWestWing, westWing } from './west-wing.js';
 import { buildTerraces } from './terraces.js';
 import { stairs, terraceLevels } from './stair-layout.js';
+import * as P from './props.js';
 
 let seed = 1937;
 const random = () => ((seed = (1664525 * seed + 1013904223) >>> 0) / 4294967296);
@@ -181,6 +183,27 @@ export function buildArchitecture(scene) {
     for (const g of [parts.screen, parts.sill]) batches.get(m.screen).push(g.clone().applyMatrix4(move));
     for (const g of parts.letters) batches.get(m.blue).push(g.clone().applyMatrix4(move));
   }
+  // Pierced concrete screen of round (octagonal) holes in staggered rows, cast about 9 cm thick.
+  function roundScreen(x, y, w, h, transform) {
+    const key = `round:${w}:${h}`;
+    if (!screenTemplates.has(key)) {
+      const shape = new T.Shape(); shape.moveTo(-w / 2, -h / 2); shape.lineTo(w / 2, -h / 2); shape.lineTo(w / 2, h / 2); shape.lineTo(-w / 2, h / 2); shape.closePath();
+      const pitch = .145, rows = Math.floor((h - .06) / (pitch * .87)), r = .056;
+      for (let row = 0; row < rows; row++) {
+        const cy = -h / 2 + .06 + (row + .5) * (h - .12) / rows, shift = row % 2 ? pitch / 2 : 0;
+        for (let cxh = -w / 2 + .07 + shift; cxh < w / 2 - .07; cxh += pitch) {
+          const hole = new T.Path(); for (let k = 0; k < 8; k++) { const a = (k + .5) * Math.PI / 4; k ? hole.lineTo(cxh + Math.cos(a) * r, cy + Math.sin(a) * r) : hole.moveTo(cxh + Math.cos(a) * r, cy + Math.sin(a) * r); }
+          hole.closePath(); shape.holes.push(hole);
+        }
+      }
+      const g = new T.ExtrudeGeometry(shape, { depth: .09, bevelEnabled: false, curveSegments: 1 }); g.translate(0, 0, -.045);
+      const flat = g.toNonIndexed(); for (const n of Object.keys(flat.attributes)) if (!['position', 'normal', 'uv'].includes(n)) flat.deleteAttribute(n);
+      const uv = flat.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 2, uv.getY(i) / 2);
+      screenTemplates.set(key, flat);
+    }
+    const move = new T.Matrix4().makeTranslation(x, y, 0).premultiply(transform);
+    if (!batches.has(m.screen)) batches.set(m.screen, []); batches.get(m.screen).push(screenTemplates.get(key).clone().applyMatrix4(move));
+  }
   function box(x, y, z, w, h, d, material, parent = null) {
     const geo = new T.BoxGeometry(w, h, d); matrix.makeTranslation(x, y, z); geo.applyMatrix4(matrix);
     if (parent) geo.applyMatrix4(parent);
@@ -268,7 +291,7 @@ export function buildArchitecture(scene) {
         continue;
       }
       // The filmed upstairs classroom passage supplies the west tower opening and return windows.
-      if (type === 'tower-side' && (f === 1 && cx < 0 || f === 2)) {
+      if (type === 'tower-side' && (f === 1 || f === 2)) { // first floor: the classroom wing (west) and the east corridor's gate (first-floor-east.js)
         const bottom = f * floorH, top = (f + 1) * floorH;
         for (const [a, c] of [[-7, 1.083333], [3.25, 7]]) {
           box(cx, (bottom + top) / 2, (a + c) / 2, .32, top - bottom, c - a, m.wall);
@@ -279,6 +302,15 @@ export function buildArchitecture(scene) {
         continue;
       }
       if (f === 2 && type === 'corridor' && rotation === 0) continue;
+      if (f === 1 && onlyFloor === null && type === 'room' && cx > 0 && rotation === -Math.PI / 2 && closedGround === 'rear-half') {
+        // East wing, first floor, courtyard side (Right/First floor - right wing.mp4): the outer stretch keeps its windows;
+        // behind the east corridor's rooms a plain wall, and the corridor itself opens into the wing's passage.
+        const outer = cz - width / 2, rooms = -3.25;
+        face(cx, (outer + rooms) / 2, rotation, rooms - outer, height, 4, type, closedGround, openGround, 1);
+        box(cx, 6, (rooms + groundSpine.roomFront) / 2, .32, 4, groundSpine.roomFront - rooms, m.wall);
+        box(cx, 7.89, (groundSpine.roomFront + 3.25) / 2, .32, .22, 3.25 - groundSpine.roomFront, m.wall);
+        continue;
+      }
       if (f === 1 && onlyFloor === null && type === 'room' && cx < 0 && rotation === Math.PI / 2) {
         // The original end partition separates the corridor from the owner-confirmed rear room.
         const rear = classroom.originZ - classroomPassage.end + .02, front = 3.25;
@@ -344,9 +376,14 @@ export function buildArchitecture(scene) {
         } else if (solid) {
           b(x, openingY, 0, ow, openingH, .32, m.wall);
         } else if (lattice) {
-          if ((f !== 0 || !type.includes('corridor')) && !(type === 'low-corridor' && f === 1 && rotation === 0) && !(f === 0 && (type === 'west' || passageEnd))) b(x, openingY, -.27, ow, openingH, .05, m.dark);
+          // The first-floor east corridor and its wing bay are built inside (first-floor-east.js): round-holed concrete
+          // screens, open to the light, as filmed (111121 and the right-wing video), not the dark-backed diagonal lattice.
+          const roundHoles = f === 1 && (type === 'corridor' && rotation === 0 || type === 'gate-return');
+          if (!roundHoles && (f !== 0 || !type.includes('corridor')) && !(type === 'low-corridor' && f === 1 && rotation === 0) && !(f === 0 && (type === 'west' || passageEnd))) b(x, openingY, -.27, ow, openingH, .05, m.dark);
           if (f === 0) { // (the washing bay's end screen now uses the full opening: owner, it had been cut short)
             concreteScreen(x, openingY, ow, openingH, transform);
+          } else if (roundHoles) {
+            roundScreen(x, openingY, ow, openingH, transform);
           } else {
             // Clipped diagonal strips form the pierced diamond screens visible in the photos.
             for (const slope of [-1, 1]) for (let offset = -ow / 2 - openingH / 2; offset <= ow / 2 + openingH / 2; offset += .27) {
@@ -477,14 +514,18 @@ export function buildArchitecture(scene) {
             for (const zz of [rear, rear + (3.25 - rear) / 6, rear + (3.25 - rear) / 3, end].filter(zz => zz <= end)) {
               box(left - .05, 2, zz, .45, 4, .30, m.blue);
             }
-            // Strong Room APLA's outer wall (owner image 70, 2026-10-18): one window in each bay at the passage windows'
-            // size, blue frame, grille and sill, its wooden leaves shut.
+            // Strong Room APLA's outer wall (owner image 70 and screenshot 223756, 2026-10-18): one window in each bay at the
+            // passage windows' size, frame, grille and sill; its two shut leaves are panelled timber in the west wing lab
+            // doors' blue-grey paint and shape (props.panelLeaf), facing out.
             const frameGrey = m.strongRoomFrame ??= new T.MeshStandardMaterial({ name: 'Strong Room window frames, worn blue-grey', color: '#93a7ac', roughness: .48 });
+            m.strongRoomLeaf ??= new T.MeshStandardMaterial({ name: 'Strong Room window leaves, blue-grey paint', map: P.paintTexture('#617a82', { rust: 0, chips: .5, primer: '#b0a088' }), roughness: .58 });
             for (const wz of [-14.85, -12.2]) {
               const wy = groundSpine.rightFloor + 1.48, ww = 1.56, wh = 1.72, face = left - .16;
-              box(face, wy, wz, .03, wh, ww, m.entranceWood); // two leaves, closed
-              for (const s of [-1, 1]) for (const dy of [-.43, .43]) box(face - .02, wy + dy, wz + s * ww / 4, .012, .62, ww / 2 - .16, m.entranceWood); // raised panels
-              box(face - .022, wy, wz, .02, wh, .04, m.entranceWood); // meeting stiles
+              for (const [hz, dir] of [[wz - ww / 2, 1], [wz + ww / 2, -1]]) { // hinged at the jambs, meeting in the middle
+                const { paint, metal } = P.panelLeaf(ww / 2 - .005, wh, 2, dir, .045);
+                const place = new T.Matrix4().makeRotationY(-Math.PI / 2).setPosition(face + .01, wy - wh / 2, hz);
+                for (const [g, mat] of [[paint, m.strongRoomLeaf], [metal, m.strongRoomIron ??= new T.MeshStandardMaterial({ name: 'Strong Room window hinges and catches', color: '#6f7270', metalness: .6, roughness: .45 })]]) { const c = g.index ? g.toNonIndexed() : g; c.applyMatrix4(place); if (!batches.has(mat)) batches.set(mat, []); batches.get(mat).push(c); }
+              }
               for (const s of [-1, 1]) { box(face - .03, wy, wz + s * (ww / 2 + .04), .06, wh + .16, .08, frameGrey); box(face - .03, wy + s * (wh / 2 + .04), wz, .06, .08, ww + .16, frameGrey); }
               for (let row = 0; row < 12; row++) box(face - .065, wy - wh / 2 + .055 + row * (wh - .11) / 11, wz, .014, .014, ww, m.metal); // grille
               box(face - .09, wy - wh / 2 - .065, wz, .2, .055, ww + .16, m.wall); // sill
@@ -708,12 +749,13 @@ export function buildArchitecture(scene) {
     const mesh = new T.Mesh(mergeGeometries(geometries), material); mesh.castShadow = material !== m.weather && material !== m.entranceGlazing; mesh.receiveShadow = true; mesh.layers.enable(1); group.add(mesh);
     geometries.forEach(g => g.dispose());
   }
-  screenTemplates.forEach(parts => [parts.screen, parts.sill, ...parts.letters].forEach(g => g.dispose()));
+  screenTemplates.forEach(parts => (parts.isBufferGeometry ? [parts] : [parts.screen, parts.sill, ...parts.letters]).forEach(g => g.dispose()));
   const interior = buildEntranceHall(group, m);
   buildClassroomWing(group, { ...m, tread: interior.floor.material, fan: interior.fan });
   buildWestWing(group, m, classroom.lowerFloor - .2);
 
   buildTerraces(group, m);
+  buildFirstFloorEast(group, m);
   for (const { pivot } of doors) pivot.traverse(object => { if (object.isMesh) object.layers.enable(1); });
   return { group, doors, materials: m, interior, classroomFans: ['II', 'III'].flatMap(n => group.getObjectsByProperty('name', `Class ${n} ceiling fan rotor`)) };
 }
