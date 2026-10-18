@@ -31,7 +31,7 @@ export const hallWindows = {
 // Proportions inferred from the continuous Strong Room approach, not survey lengths.
 export const seminarPassage = {
   x: 23.25, width: 2.24, end: -11.2, pierZ: -9.8,
-  terminalX: 24.5, hallDoorZ: -3.25, labEnd: 7.85,
+  terminalX: 24.5, hallDoorZ: -8.3, labEnd: 7.85, // the hall's second door comes after the passage window at -6.4 (owner, 2026-10-18)
   // Keep the full reveal beyond the adjoining spine's rear wall, including its thickness.
   windowZ: [-4.4, -6.85, -9.35], windowWidth: 1.56,
 };

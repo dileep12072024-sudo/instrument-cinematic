@@ -174,7 +174,8 @@ export function buildClassThree(parent, m, floorY) {
   }
   // Wall-mounted fans, their surface wiring, and switches visible in the room video.
   const wallRotors = [];
-  for (const [x, z, direction] of [[.45, frontZ - .23, -1], [5.7, frontZ - .23, -1], [4.25, backZ + .28, 1]]) {
+  // The back-wall fan and its switch sit on the pier between the windows at 4.25 and 6.3, not over a window (owner, 2026-10-18).
+  for (const [x, z, direction] of [[.45, frontZ - .23, -1], [5.7, frontZ - .23, -1], [5.2, backZ + .28, 1]]) {
     const y = ceiling - .64;
     box(x, y - .12, z - direction * .11, .10, .28, .08, cream);
     for (const radius of [.09, .16, .23]) {

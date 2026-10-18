@@ -474,6 +474,18 @@ export function buildArchitecture(scene) {
             for (const zz of [rear, rear + (3.25 - rear) / 6, rear + (3.25 - rear) / 3, end].filter(zz => zz <= end)) {
               box(left - .05, 2, zz, .45, 4, .30, m.blue);
             }
+            // Strong Room APLA's outer wall (owner image 70, 2026-10-18): one window in each bay at the passage windows'
+            // size, blue frame, grille and sill, its wooden leaves shut.
+            const frameGrey = m.strongRoomFrame ??= new T.MeshStandardMaterial({ name: 'Strong Room window frames, worn blue-grey', color: '#93a7ac', roughness: .48 });
+            for (const wz of [-14.85, -12.2]) {
+              const wy = groundSpine.rightFloor + 1.48, ww = 1.56, wh = 1.72, face = left - .16;
+              box(face, wy, wz, .03, wh, ww, m.entranceWood); // two leaves, closed
+              for (const s of [-1, 1]) for (const dy of [-.43, .43]) box(face - .02, wy + dy, wz + s * ww / 4, .012, .62, ww / 2 - .16, m.entranceWood); // raised panels
+              box(face - .022, wy, wz, .02, wh, .04, m.entranceWood); // meeting stiles
+              for (const s of [-1, 1]) { box(face - .03, wy, wz + s * (ww / 2 + .04), .06, wh + .16, .08, frameGrey); box(face - .03, wy + s * (wh / 2 + .04), wz, .06, .08, ww + .16, frameGrey); }
+              for (let row = 0; row < 12; row++) box(face - .065, wy - wh / 2 + .055 + row * (wh - .11) / 11, wz, .014, .014, ww, m.metal); // grille
+              box(face - .09, wy - wh / 2 - .065, wz, .2, .055, ww + .16, m.wall); // sill
+            }
           }
         } else {
           face(x + side * w / 2, z, side * Math.PI / 2, d, h, Math.max(2, Math.round(d / 3.5)), type === 'tower' ? 'tower-side' : type === 'west' ? 'west-outer' : 'room', type === 'tower' ? 'all' : false);

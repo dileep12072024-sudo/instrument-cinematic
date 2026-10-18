@@ -119,7 +119,8 @@ export function buildClassTwo(parent, m, floorY) {
     const path = new T.CatmullRomCurve3([[-1.45, floorY + 2.55, -19.9], [-1.5, floorY + 2.3 - i * .10, -19.78], [-1.48, floorY + 2.18 - i * .10, -20.04], [-1.45, floorY + 2.55, -19.9]].map(p => new T.Vector3(...p)));
     add(new T.TubeGeometry(path, 20, .004, 5, false), steel);
   }
-  for (const x of [-3.2, -6.7, -10.2]) {
+  // Switch boxes on the piers between the corridor-side windows (photo 122723), never on a window (owner, 2026-10-18).
+  for (const x of [-8.25, -5.15, -2.0]) {
     box(x, floorY + 1.5, frontZ - .09, .23, .11, .035, cream);
     rod([x, floorY + 1.55, frontZ - .08], [x, ceiling, frontZ - .08], .008, seam);
   }

@@ -200,8 +200,9 @@ export function buildClassroomWing(parent, m) {
   box(W, y + 1.82, .3, .16, 1.48, .34, plaster);
   for (let i = 0; i <= 5; i++) box(W, y + 1.82, -i * 3.6, .16, 1.48, .64, plaster);
   for (let i = 0; i < 5; i++) window(W + .085, y + 1.82, -1.8 - i * 3.6, 2.96, Math.PI / 2);
-  const roomDark = new T.MeshStandardMaterial({ name: 'Unlit room interior', color: '#191714', roughness: 1 });
-  const openings = [2.3, 5.8, 9.2, 16.2]; // last front is beside the lower junction, not halfway along the blank wall
+  // Room doors along the corridor: a room at 2.3, Dr.A. Kamala Kumari's (5.8) and Dr.P. Swapna's (9.2) rooms, then the girls'
+  // washroom and, beside the lower junction, the boys' washroom (owner, 2026-10-18; 103849 at 0-3 s).
+  const openings = [2.3, 5.8, 9.2, 11.4, 16.2];
   group.userData.mainDoorOffsets = openings;
   let previous = 0;
   for (const u of openings) {
@@ -210,8 +211,7 @@ export function buildClassroomWing(parent, m) {
     box(1.10, (y + 2.4 + ceiling) / 2, -u, .16, ceiling - y - 2.4, 1.16, plaster);
     // Each door is a closed room front; the films do not establish the room interiors.
     const before = new Set(group.children), first = new Map([...batches].map(([m, a]) => [m, a.length]));
-    door(0, y, 0, 1.02, '', false, { open: u < 6 ? Math.PI * .5 : 0, panelled: true });
-    if (u < 6) box(0, y + 1.25, -.6, 1.12, 2.5, 1.0, roomDark); // unlit room beyond the open door
+    door(0, y, 0, 1.02, '', false, { panelled: true }); // closed (owner, 2026-10-18)
     const matrix = new T.Matrix4().makeRotationY(-Math.PI / 2); matrix.setPosition(1.04, 0, -u);
     for (const [material, gs] of batches) for (let j = first.get(material) || 0; j < gs.length; j++) gs[j].applyMatrix4(matrix);
     for (const child of group.children) if (!before.has(child)) child.applyMatrix4(matrix);
