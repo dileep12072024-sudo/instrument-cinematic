@@ -10,7 +10,7 @@ export function mergeStatic(root) {
   root.traverse(o => {
     if (o === root || !o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || Array.isArray(o.material)) return;
     const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(toRoot.clone().multiply(o.matrixWorld));
-    for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'aPiece'].includes(name)) g.deleteAttribute(name);
+    for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
     if (!g.attributes.uv) g.setAttribute('uv', new T.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
     const b = batches.get(o.material) || { geometries: [], cast: false, receive: false, layers: o.layers.mask };
     b.geometries.push(g); b.cast ||= o.castShadow; b.receive ||= o.receiveShadow; batches.set(o.material, b);
