@@ -1,6 +1,7 @@
 import * as T from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { pieces, tagPiece } from './merge-pieces.js';
 
 // Modelled furniture and fittings (owner, 2026-10-17: "nothing may look like Roblox cubes"). Every builder returns
 // geometry in its own local frame (x right, y up, z toward the viewer / front) with rounded edges, real proportions and
@@ -9,12 +10,13 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const keep = ['position', 'normal', 'uv'];
 export function merge(list) {
-  return mergeGeometries(list.map(g => {
+  const merged = mergeGeometries(list.map(g => {
     const c = g.index ? g.toNonIndexed() : g;
     for (const n of Object.keys(c.attributes)) if (!keep.includes(n)) c.deleteAttribute(n);
     if (!c.attributes.uv) c.setAttribute('uv', new T.Float32BufferAttribute(new Float32Array(c.attributes.position.count * 2), 2));
     return c;
   }));
+  return pieces.tagging ? tagPiece(merged) : merged; // a prop rises as one piece (rise.js), not part by part
 }
 export function rbox(w, h, d, r, x = 0, y = 0, z = 0) {
   const g = new RoundedBoxGeometry(w, h, d, 2, Math.max(.0005, Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4, d / 2 - 1e-4)));

@@ -18,6 +18,8 @@ import { regradeGround, rectangularAprons } from './regrade.js';
 import { createEntranceWalk } from './entrance-walk.js';
 import { createPanoramaLook } from './panorama-look.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
+import { pieces } from './merge-pieces.js';
+import { createRise, createRiseDust, RISE_LENGTH } from './rise.js';
 import './style.css';
 
 const $ = s => document.querySelector(s);
@@ -448,8 +450,10 @@ async function boot() {
   });
   $('#loading-status').textContent = 'Reconstructing the architecture';
   await new Promise(resolve => requestAnimationFrame(resolve));
+  pieces.tagging = true; // every merged wall, slab and pane keeps its own centre, for the rise (rise.js)
   architecture = buildArchitecture(scene);
   architecture.mergedDrawCalls = mergeStaticDetail(architecture.group); // ~400 fewer draw calls
+  pieces.tagging = false;
   westFittings = architecture.group.getObjectByName('West wing fittings');
   dispensers = architecture.group.getObjectByName('West wing ground floor (video-built)')?.userData.dispensers || [];
   // The hall's switch box on the east wall (entrance photos): wall tubes, ceiling fan, porch tube light.
@@ -521,6 +525,9 @@ async function boot() {
   } catch { console.warn('Sky map unavailable. Using daylight fallback.'); }
   performance.mark('sky-ready');
   updateLighting(hour);
+  // The building rises out of the land on arrival (rise.js): patched before any shader compiles, so it costs no stall.
+  rise = createRise(); rise.attach(architecture.group, scene); rise.set(-1);
+  riseDust = createRiseDust(footprint, (x, z) => puddles.heightAt(x, z)); scene.add(riseDust.points);
   $('#loading-status').textContent = 'Reflecting the courtyards';
   const glass = [architecture.materials.glass, architecture.materials.rearGlass, architecture.materials.entranceReflectiveGlass];
   glass.forEach(material => { material.visible = false; });
@@ -570,6 +577,7 @@ async function boot() {
     for (const d of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, .01], [0, -1, .01]]) { camera.lookAt(ahead.copy(camera.position).add(new THREE.Vector3(...d))); renderer.render(scene, camera); }
     camera.quaternion.copy(facing); }
   ready = true; window.__portrait.ready = true; readyAt = performance.now();
+  if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; } else riseStart = performance.now(); // the arrival
   renderer.render(scene, camera); $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700);
   loadWeather();
   drawPlan(); resize(); requestAnimationFrame(animate);
@@ -596,6 +604,7 @@ async function compileShadowShaders() {
   }
 }
 let previous = performance.now(), frames = 0, hallLit = false, hallFanSpeed = 1;
+let rise, riseDust, riseStart = 0; // the arrival: the building rising out of the land
 let westFittings = null, dispensers = [], casements = [], clickables = [], roomUpdates = [], interiors = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
 function animate(now) {
   requestAnimationFrame(animate);
@@ -636,6 +645,11 @@ function animate(now) {
   }
   if (liveClock && now - lastClockSync > 15000) { lastClockSync = now; setHour(localHour(), { manual: false }); updateMoon(); }
   if (Date.now() - moonState.updatedAt > 30000) updateMoon();
+  if (riseStart && !rise.done) { // the building rising: every frame, with its shadows
+    const t = (now - riseStart) / 1000; rise.set(t); riseDust.set(t); riseDust.material.uniforms.uLight.value = 1 - .8 * sunlight.night;
+    if (frames % 2 === 0) renderer.shadowMap.needsUpdate = true; needsRender = true;
+    if (rise.done) { renderer.shadowMap.needsUpdate = true; riseDust.set(1e6); }
+  }
   if (Math.abs(hour - targetHour) > .005) { hour = THREE.MathUtils.damp(hour, targetHour, 4, dt); updateLighting(hour); }
   for (const d of architecture.doors) {
     const a = doorsOpen ? d.openAngle : 0;
@@ -716,7 +730,7 @@ function animate(now) {
   send(); setInterval(() => { if (!document.hidden) send(); }, 30000); // keeps 'online now' current on the dashboard
   addEventListener('pagehide', send);
 })();
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, get rise() { return rise; }, get riseDust() { return riseDust; }, playRise() { riseStart = performance.now(); rise.set(0); }, RISE_LENGTH, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;

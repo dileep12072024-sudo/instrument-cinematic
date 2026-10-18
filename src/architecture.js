@@ -197,7 +197,7 @@ export function buildArchitecture(scene) {
         }
       }
       const g = new T.ExtrudeGeometry(shape, { depth: .09, bevelEnabled: false, curveSegments: 1 }); g.translate(0, 0, -.045);
-      const flat = g.toNonIndexed(); for (const n of Object.keys(flat.attributes)) if (!['position', 'normal', 'uv'].includes(n)) flat.deleteAttribute(n);
+      const flat = g.toNonIndexed(); for (const n of Object.keys(flat.attributes)) if (!['position', 'normal', 'uv', 'aPiece'].includes(n)) flat.deleteAttribute(n);
       const uv = flat.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 2, uv.getY(i) / 2);
       screenTemplates.set(key, flat);
     }
@@ -710,9 +710,9 @@ export function buildArchitecture(scene) {
   box(0, .18, 6.85, 7.5, .09, .45, mat('#343d3c', { roughness: .25 }));
   m.porchTube = new T.MeshStandardMaterial({ name: 'Porch tube light', color: '#fffde7', emissive: '#fffde7', emissiveIntensity: 2 });
   box(0, 3.36, 7.32, 1.8, .065, .065, m.porchTube);
-  const sign = new T.Mesh(new T.PlaneGeometry(9.8, .35), mat('white', { map: textMap('DEPARTMENT OF INSTRUMENT TECHNOLOGY', '#eee9da', '#96372e'), roughness: .9 }));
+  const sign = new T.Mesh(new T.PlaneGeometry(9.8, .35), mat('white', { name: 'Porch sign', map: textMap('DEPARTMENT OF INSTRUMENT TECHNOLOGY', '#eee9da', '#96372e'), roughness: .9 }));
   sign.position.set(0, 3.7, 10.901); group.add(sign);
-  const upperSign = new T.Mesh(new T.PlaneGeometry(6.8, .36), new T.MeshStandardMaterial({ map: textMap('INSTRUMENT TECHNOLOGY', '#dfddd3', '#858880'), roughness: .9 }));
+  const upperSign = new T.Mesh(new T.PlaneGeometry(6.8, .36), new T.MeshStandardMaterial({ name: 'Upper facade sign', map: textMap('INSTRUMENT TECHNOLOGY', '#dfddd3', '#858880'), roughness: .9 }));
   upperSign.position.set(0, 9.65, 7.17); group.add(upperSign);
   for (const x of [-21.8, -4.3, 4.3, 21.8]) {
     const height = x < 0 ? 8.3 : 12.3;
