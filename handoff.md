@@ -218,3 +218,12 @@ building the exploration layer now.
 - 3ffae80 side-passage end door, Class IV IV YEAR paper + STRONG ROOM board, wall phones, faculty blade signs (real names).
 - Open for owner: Class II/III doors are open in the model, closed in the 130612 video; stored furniture before the end door omitted;
   the washing-bay "AquaPure" RO unit carries invented branding (no source to read it from).
+
+## Progress, 2026-10-18 (owner's six-point list + images 72, 73)
+- 094e085 corridor room doors closed, girls' washroom door, switch boxes off the windows, Strong Room windows, seminar door at z -8.3.
+- 5dc4b65 Class IV interior (src/classroom-four.js); its outer windows lowered to classroom sills like Class II/III.
+- 1c945fc first-floor east corridor + wing passage (src/first-floor-east.js); round-hole screens on that floor's facade.
+- e29f7ed west wing: washing-bay screen full height, table/grille overlap, Control Systems boxes, all windows timber, doors shut.
+- 7eaa97a perf: room fans/switches drawn only from inside. Draw calls ~382 at the arrival view; 15-20 fps on battery.
+- Open: queue item 8 (switchboard positions everywhere per references); first-floor wing passage west wall shows the
+  existing facade windows where the video shows a teal wall then screens; north stub end-door and lab-door plate text unreadable.
