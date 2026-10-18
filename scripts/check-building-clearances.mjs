@@ -186,10 +186,9 @@ for (const leaf of scene.getObjectsByProperty('name', 'Open classroom entrance l
   const hinge = leaf.getWorldPosition(new T.Vector3()), bounds = new T.Box3().setFromObject(leaf);
   assert.ok(bounds.max.x < hinge.x + .03 && bounds.min.x < hinge.x - .8, 'Classroom doors push into the left wing');
 }
-const blue = scene.getObjectByName('Open blue roof-access door');
-assert.ok(blue.position.x > .5 && new T.Box3().setFromObject(blue).min.x > .5, 'Blue door is right-hinged viewed from the terrace');
+const blue = scene.getObjectByName('Blue roof-access door (shut)'); // shut in its frame (111313 at 94-108 s, owner 2026-10-18)
 const blueBounds = new T.Box3().setFromObject(blue);
-assert.ok(blueBounds.min.z < blue.position.z - 1 && blueBounds.max.z < blue.position.z + .04, 'Blue door pulls toward the stair landing, not out onto the terrace');
+assert.ok(blueBounds.max.x - blueBounds.min.x < 1.45 && blueBounds.max.z - blueBounds.min.z < .25, `Blue roof-access door stands shut in its doorway (${blueBounds.min.toArray().map(v => v.toFixed(2))} .. ${blueBounds.max.toArray().map(v => v.toFixed(2))})`);
 const tables = scene.getObjectsByProperty('name', 'Strong Room passage table');
 assert.equal(tables.length, 3);
 for (const table of tables) {
