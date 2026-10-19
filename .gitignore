@@ -4,3 +4,4 @@ artifacts/
 blender/sources/
 blender/*.blend1
 .wrangler/
+public/frames/

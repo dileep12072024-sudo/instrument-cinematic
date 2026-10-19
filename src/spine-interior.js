@@ -260,7 +260,7 @@ export function buildSpineInterior(parent, m) {
   onWall(px, passage.labEnd - .015, Math.PI, () => {
     panelDoor(0, base + .012, 0, .95, 2.14); ventilator(0, 3.47, 0);
   });
-  sign('ELECTRONICS LAB II', px, base + 2.41, passage.labEnd - .03, Math.PI, 1.1);
+  sign('MEASUREMENTS LAB', px, base + 2.41, passage.labEnd - .03, Math.PI, 1.1); // the room at the passage's end is the Measurements Lab (owner, 2026-10-19)
   group.userData.electronicsLabEntrance = { x: px, z: passage.labEnd };
   for (const side of [-1, 1]) {
     const runs = side < 0 ? [[end, front]] : [[end, passage.hallDoorZ - .54], [passage.hallDoorZ + .54, front]];

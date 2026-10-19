@@ -13,6 +13,7 @@ import { tagPiece } from './merge-pieces.js';
 
 const SHELL = 0, ENVELOPE = 1.45, FITOUT = 2.3, SIGNAGE = 3.3; // class delays, seconds: the signs land last, like the logo in the video
 const PER_STOREY = .55, PER_METRE_X = .038, PER_METRE_Z = .016, JITTER = .3, DURATION = .9, STOREY = 4;
+export const RISE_RATE = .62; // the rise's own clock runs slower than wall time: about eleven seconds, with weight
 export const RISE_LENGTH = SHELL + SIGNAGE + PER_STOREY * 3 + PER_METRE_X * 34 + PER_METRE_Z * 17 + JITTER + DURATION + .1;
 
 const envelope = /glass|glaz|door|leaf|leaves|timber|window|casement|screen|grille|gate|shutter|laminate|sidelight|frame/i;

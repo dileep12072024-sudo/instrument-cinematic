@@ -156,3 +156,26 @@ research; student guide with every help line. No Telugu (owner, second review).
 **E2E test** (`ic-gpu/pf-e2e.mjs`, real GPU, Chrome incognito): boot and loader, Enter gate, rise, every chapter's
 hold frame and two frames of each walk, nav link jumps, rail, chip hover (cursor grows, lens changes), card hover
 (push), faculty row hover, burger sheet at 390×844, reduced motion, keyboard Tab order, no console errors, fps.
+
+## Snapshots (2026-10-19)
+
+Owner: the live model took too long to load and its flight stuttered on the laptop; "the same, only fast". The story is
+now pre-rendered frames of exactly the live walk; the live 3D campus moved to `/campus/` (the story's doors open it, the
+model loader is accepted there). Undo: `/campus/?live` still plays the story live; restoring `index.html` to load
+`src/main.js` makes it the front page again.
+
+- `scripts/snapshots.mjs` drives Windows Chrome on the real GPU through `/campus/?live`: fixed date and hour (a clear
+  afternoon, or the full moon of 26 October 2026 at night), the story's own camera poses (`portfolio.renderPlan`,
+  `poseFor`), every frame shot from the scene (`__portrait.snapshot`), with a half-size depth image at each stop.
+  Four sets: day and night, landscape 1280x720 and portrait 720x1280; about 2,000 frames each, ~6 minutes each.
+- `scripts/snapshots-video.sh` encodes the arrival flight (30 fps) to `flight.mp4` (~4.5 MB, plays while it streams).
+- `src/story.js` (the front page): the flight video, then the walk scrubbed by the scroll (frames fetched nearest first
+  in the direction of travel), and at each stop the frame re-projected through its depth image as the hand moves: the
+  3D parallax of the live site. Leaves, the cursor's motes, IST, the photos (genie, cloth) and the description cards
+  (cloth) are drawn live over the frames by the same `portfolio.js`. Day or night by the hour in Visakhapatnam.
+- Battery: the page draws only when something changes; ambient motion runs at 30 fps; cloth sheets come to rest a few
+  seconds after the hand leaves them; a page left alone draws nothing.
+- Trees outdoors appear only as they cross the screen (after Kage's foreground trees): their opacity follows their
+  distance from the frame's centre, clear over the building, whole at the edges.
+- `public/frames/` is not in git (reproducible); `scripts/deploy-preview.sh` builds and deploys without the flight's
+  source frames.

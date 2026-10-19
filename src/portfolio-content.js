@@ -25,24 +25,32 @@ export const chapters = [
   { id: 'admissions', group: 'admissions', nav: 'Admissions', where: 'Department office, west corridor',
     route: [[.1, HALL, 3.4], [-2.6, HALL, 2.2], [-4.7, CORRIDOR, 2.17], [-10, CORRIDOR, 2.2], [-16.2, CORRIDOR, 2.3]],
     eye: [-18.6, CORRIDOR, 2.7], anchor: [-20.45, 1.15, 1.09], fov: 54 },
-  // the west wing: a passage running north-south below the corridor, the labs on its west wall
-  { id: 'lab-process', group: 'labs', nav: 'Process Control Lab', where: 'West wing, ground floor',
+  // the west wing: a passage running north-south below the corridor, the labs on its west wall. In order from the gate
+  // corner (owner, 2026-10-19): DCS, Process Control, Industrial Instruments (ahead of the corridor), Sensors and
+  // Transducers, Control Systems, Machines. The walk takes the one ahead, then the gate end, then the far end.
+  { id: 'lab-instruments', group: 'labs', nav: 'Industrial Instruments Lab', where: 'West wing, ground floor',
     route: [[-20.0, CORRIDOR, 2.35], [-20.9, CORRIDOR, 2.2]],
     eye: [-21.3, CORRIDOR - .2, 2.17], anchor: [-24.42, .45, 2.2], fov: 56 },
-  { id: 'lab-instruments', group: 'labs', nav: 'Industrial Instruments Lab', where: 'West wing, ground floor',
-    route: [[-21.9, CORRIDOR - .4, 2.1], [-22.6, WING, 1.6], [-23.0, WING, .6]],
-    eye: [-23.0, WING, -.7], anchor: [-24.3, .85, -2.45], fov: 56 },
-  { id: 'lab-control', group: 'labs', nav: 'Control Systems Laboratory', where: 'West wing, ground floor',
-    route: [[-23.0, WING, -2.6], [-23.0, WING, -4.6]],
-    eye: [-23.0, WING, -5.9], anchor: [-24.3, .85, -7.7], fov: 56 },
+  { id: 'lab-process', group: 'labs', nav: 'Process Control Lab', where: 'West wing, front passage',
+    route: [[-21.9, CORRIDOR - .4, 2.17], [-22.5, WING, 2.0]],
+    eye: [-22.75, WING, 1.55], anchor: [-24.4, 1.0, 4.15], fov: 56 },
   { id: 'lab-dcs', group: 'labs', nav: 'DCS Lab', where: 'West wing, by the gate',
-    route: [[-23.1, WING, -3.5], [-23.2, WING, 1.5], [-23.2, WING, 6.5], [-23.15, WING, 10.4]],
+    route: [[-23.0, WING, 3.4], [-23.15, WING, 6.5], [-23.15, WING, 10.2]],
     eye: [-23.1, WING, 12.0], anchor: [-24.3, .85, 14.3], fov: 56 },
+  { id: 'lab-sensors', group: 'labs', nav: 'Sensors and Transducers Lab', where: 'West wing, ground floor',
+    route: [[-23.15, WING, 9.5], [-23.15, WING, 5.5], [-23.05, WING, 2.6], [-23.0, WING, 1.4]],
+    eye: [-23.0, WING, .7], anchor: [-24.3, .85, -.95], fov: 56 },
+  { id: 'lab-control', group: 'labs', nav: 'Control Systems Laboratory', where: 'West wing, ground floor',
+    route: [[-23.0, WING, -.2]],
+    eye: [-23.0, WING, -1.1], anchor: [-24.3, .85, -2.75], fov: 56 },
+  { id: 'lab-machines', group: 'labs', nav: 'Machines Lab', where: 'West wing, ground floor',
+    route: [[-23.0, WING, -3.0], [-23.0, WING, -4.8]],
+    eye: [-23.0, WING, -5.9], anchor: [-24.3, .85, -7.7], fov: 56 },
   { id: 'lab-simulation', group: 'labs', nav: 'Simulation Lab', where: 'East corridor, ground floor',
-    route: [[-23.1, WING, 8], [-23.0, WING, 3.4], [-22.4, WING, 2.17], [-21.3, CORRIDOR, 2.17], [-16, CORRIDOR, 2.2], [-10, CORRIDOR, 2.2], [-4.7, CORRIDOR, 2.17],
+    route: [[-23.0, WING, -3.6], [-23.0, WING, .8], [-22.4, WING, 2.17], [-21.3, CORRIDOR, 2.17], [-16, CORRIDOR, 2.2], [-10, CORRIDOR, 2.2], [-4.7, CORRIDOR, 2.17],
       [-2.6, HALL, 2.2], [0, HALL, 2.8], [2.6, HALL, 2.3], [3.65, HALL, 2.167], [4.7, GROUND_E, 2.167]],
     eye: [7.4, GROUND_E, 2.55], anchor: [5.45, 1.75, 1.1], fov: 56 },
-  { id: 'lab-electronics', group: 'labs', nav: 'Electronics Lab II', where: 'East side, ground floor',
+  { id: 'lab-measurements', group: 'labs', nav: 'Measurements Lab', where: 'End of the Seminar Hall passage',
     route: [[10, GROUND_E, 2.2], [16, GROUND_E, 2.2], [21.6, GROUND_E, 2.2], [23.25, GROUND_E, 2.7]],
     eye: [23.25, GROUND_E, 4.8], anchor: [23.25, 1.85, 7.85], fov: 56 },
   { id: 'guide', group: 'guide', nav: 'Finding your way', where: 'Library, first-floor landing',
@@ -59,11 +67,15 @@ export const chapters = [
   { id: 'hod', group: 'faculty', nav: 'Head of Department', where: 'Classroom wing, first floor', person: 'swapna', sign: [-13.92, 6.12, 1.41],
     route: [[-9.6, CLASS, 2.3]],
     eye: [-11.4, CLASS, 2.5], anchor: [-13.45, 5.35, 1.2], fov: 54 },
-  { id: 'classrooms', group: 'classrooms', nav: 'Classrooms II and III', where: 'End of the classroom wing',
-    route: [[-14.5, CLASS, 2.2], [-18, CLASS, 2.17], [-20.7, CLASS, 2.17], [-21.64, LOWER, 2.17]],
-    eye: [-22.0, LOWER, 1.95], anchor: [-23.7, 3.9, 3.2], fov: 58 },
+  // the classrooms, down three steps at the end of the wing: each seen from its own doorway
+  { id: 'classroom-ii', group: 'classrooms', nav: 'Classroom II', where: 'End of the classroom wing',
+    route: [[-14.5, CLASS, 2.2], [-18, CLASS, 2.17], [-20.7, CLASS, 2.17], [-21.64, LOWER, 2.17], [-22.6, LOWER, 2.2], [-23.1, LOWER, 2.9]],
+    eye: [-23.15, LOWER, 4.4], anchor: [-29.5, 3.7, 9.6], fov: 60 },
+  { id: 'classroom-iii', group: 'classrooms', nav: 'Classroom III', where: 'End of the classroom wing',
+    route: [[-23.15, LOWER, 3.2], [-23.2, LOWER, 2.5], [-24.0, LOWER, 2.5]],
+    eye: [-25.2, LOWER, 2.5], anchor: [-31.5, 3.6, -1.2], fov: 60 },
   { id: 'classroom-iv', group: 'classrooms', nav: 'Classroom IV', where: 'Classroom wing, side passage',
-    route: [[-23.15, LOWER, 1.2], [-23.15, LOWER, -1.8]],
+    route: [[-24.2, LOWER, 2.4], [-23.2, LOWER, 1.4], [-23.15, LOWER, -1.8]],
     eye: [-23.15, LOWER, -4.3], anchor: [-24.2, 3.9, -6.73], fov: 56 },
   // the east corridor on the first floor: professors' rooms on the left, the labs at its end
   { id: 'fac-patnaik', group: 'faculty', nav: 'Prof. M. Ramesh Patnaik', where: 'East corridor, first floor', person: 'patnaik', sign: [9.92, 7.12, 1.35],
@@ -110,19 +122,22 @@ export const people = {
 // Each lab's own line, from the lab courses of the university's B.Tech (Instrumentation Engineering) scheme and the
 // department's research areas.
 export const labRooms = {
-  'lab-process': { title: 'Process Control Lab', lead: 'Straight ahead at the foot of the steps. The B.Tech\u2019s Process Control Lab: closed loops of level, flow, pressure and temperature, and a controller tuned to its best settings, judged by the quarter-decay ratio and the IAE, ISE and ITAE error criteria.' },
-  'lab-instruments': { title: 'Industrial Instruments Lab', lead: 'The Industrial Instruments Labs: the measuring instruments of a working plant, transmitters and transducers for pressure, flow, level and temperature, tested, compared and calibrated.' },
+  'lab-instruments': { title: 'Industrial Instruments Lab', lead: 'The double door straight ahead at the foot of the steps. The Industrial Instruments Labs: the measuring instruments of a working plant, transmitters and transducers for pressure, flow, level and temperature, tested, compared and calibrated.' },
+  'lab-process': { title: 'Process Control Lab', lead: 'The B.Tech\u2019s Process Control Lab: closed loops of level, flow, pressure and temperature, and a controller tuned to its best settings, judged by the quarter-decay ratio and the IAE, ISE and ITAE error criteria.' },
+  'lab-dcs': { title: 'DCS Lab', lead: 'The first door from the gate. Where the final-year DCS and PLC Lab is taught: distributed control systems and programmable logic controllers, the architecture that runs refineries and power stations.' },
+  'lab-sensors': { title: 'Sensors and Transducers Lab', lead: 'How a measured quantity becomes a signal: strain, displacement, temperature, pressure and light, each through its transducer, characterised and calibrated.' },
   'lab-control': { title: 'Control Systems Laboratory', lead: 'The Control Systems Lab: how real systems answer a step or a sine, what keeps them stable, and the controllers that shape them.' },
-  'lab-dcs': { title: 'DCS Lab', lead: 'Where the final-year DCS and PLC Lab is taught: distributed control systems and programmable logic controllers, the architecture that runs refineries and power stations. At the far end of the wing, by the gate.' },
+  'lab-machines': { title: 'Machines Lab', lead: 'The electrical machines behind every plant: DC machines, transformers and induction motors, run and tested at the bench.' },
   'lab-simulation': { title: 'Simulation Lab', lead: 'Instruments, plants and control loops modelled and tested on the computer before they are built.' },
-  'lab-electronics': { title: 'Electronics Lab II', lead: 'The electronic circuits behind every instrument: amplifiers, filters, converters and signal conditioning. At the end of the passage past the Seminar Hall.' },
+  'lab-measurements': { title: 'Measurements Lab', lead: 'At the end of the passage past the Seminar Hall. Electrical and electronic measurements: bridges, meters and oscilloscopes, and the error in every reading.' },
   'lab-devicefab': { title: 'Device Fab Lab', lead: 'Where sensors and devices are made: the bench for the department\u2019s research in sensors, MEMS and nanotechnology.' },
   'lab-biomedical': { title: 'Biomedical Instrumentation Lab', lead: 'The B.Tech\u2019s Biomedical Instrumentation Lab: instruments that read the body, the electrical signals of heart, muscle and brain, and how they are measured safely.' },
 };
 
 export const classroomRooms = {
-  classrooms: { title: 'Smart Classrooms II and III', lead: 'Down three steps at the end of the wing: Classroom II to the right, Classroom III ahead. Both were opened as smart classrooms, with projectors and boards at the teaching platform.' },
-  'classroom-iv': { title: 'Classroom IV', lead: 'Along the side passage, past the Strong Room. The last teaching room in the wing.' },
+  'classroom-ii': { title: 'Classroom II', lead: 'Down three steps at the end of the wing, on the right: a smart classroom with its benches facing the teaching platform, the boards and the projector.' },
+  'classroom-iii': { title: 'Classroom III', lead: 'Straight ahead at the foot of the steps. Opened with Classroom II as a smart classroom; the information plaque by its door records it.' },
+  'classroom-iv': { title: 'Classroom IV', lead: 'Along the side passage, past the Strong Room: the last teaching room in the wing.' },
 };
 
 export const hero = {
@@ -132,7 +147,7 @@ export const hero = {
   // the four floating tabs: each walks to the first stop of its group
   chips: [
     { n: '01', title: 'Heritage', text: 'The boards in the entrance hall.', group: 'heritage' },
-    { n: '02', title: 'Laboratories', text: 'Eight labs, each at its own door.', group: 'labs' },
+    { n: '02', title: 'Laboratories', text: 'Ten labs, each at its own door.', group: 'labs' },
     { n: '03', title: 'Faculty', text: 'Every professor, at their own room.', group: 'faculty' },
     { n: '04', title: 'Classrooms', text: 'At the end of the classroom wing.', group: 'classrooms' },
   ],
@@ -152,7 +167,7 @@ export const heritage = {
     { year: 2011, text: 'The renovated department is inaugurated on 8 May by Prof. Beela Satyanarayana, Vice-Chancellor.' },
     { year: 2015, text: 'The first floor of the east wing opens on 30 August.' },
   ],
-  stats: [['1937', 'Founded'], ['21', 'Heads of department'], ['8', 'Laboratories'], ['NBA', 'Accredited programmes']],
+  stats: [['1937', 'Founded'], ['21', 'Heads of department'], ['10', 'Laboratories'], ['NBA', 'Accredited programmes']],
   now: 'Andhra University holds NAAC A++ (CGPA 3.74, valid to 2030) and is ranked 23rd among Indian universities in NIRF 2025.',
 };
 
@@ -176,16 +191,18 @@ export const admissions = {
 
 export const labs = {
   title: 'Where the measuring happens.',
-  lead: 'The walk calls at every lab in turn. The west wing holds the industrial labs, the east side the simulation and electronics labs, and the device and biomedical labs are upstairs in the east wing.',
+  lead: 'The walk calls at every lab in turn. The west wing holds six labs, the east side the Simulation and Measurements labs, and the Device Fab and Biomedical labs are upstairs in the east wing.',
   list: [
-    { name: 'Process Control Lab', where: 'West wing, ground floor, ahead of the corridor' },
-    { name: 'Industrial Instruments Lab', where: 'West wing, ground floor' },
+    { name: 'Industrial Instruments Lab', where: 'West wing, ahead of the corridor' },
+    { name: 'Process Control Lab', where: 'West wing, front passage' },
+    { name: 'Sensors and Transducers Lab', where: 'West wing, ground floor' },
     { name: 'Control Systems Laboratory', where: 'West wing, ground floor' },
+    { name: 'Machines Lab', where: 'West wing, ground floor' },
     { name: 'DCS Lab', where: 'West wing, by the gate' },
     { name: 'Device Fab Lab', where: 'East wing, first floor, end of the corridor' },
     { name: 'Biomedical Instrumentation Lab', where: 'East wing, first floor, south passage' },
     { name: 'Simulation Lab', where: 'East corridor, ground floor' },
-    { name: 'Electronics Lab II', where: 'East side, ground floor, past the Seminar Hall' },
+    { name: 'Measurements Lab', where: 'End of the Seminar Hall passage' },
   ],
   research: ['Sensors and sensor networks', 'MEMS', 'Nanotechnology', 'Instrumentation and automation', 'Thin films, photo-elasticity and ultrasonics'],
   facts: [

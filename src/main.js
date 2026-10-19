@@ -19,7 +19,7 @@ import { createEntranceWalk } from './entrance-walk.js';
 import { createPanoramaLook } from './panorama-look.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
 import { pieces } from './merge-pieces.js';
-import { createRise, createRiseDust, RISE_LENGTH } from './rise.js';
+import { createRise, createRiseDust, RISE_LENGTH, RISE_RATE } from './rise.js';
 import { createPortfolio } from './portfolio.js';
 import './style.css';
 
@@ -167,10 +167,10 @@ entranceLight.shadow.normalBias = .008;
 entranceLight.shadow.autoUpdate = false;
 entranceLight.shadow.needsUpdate = true;
 scene.add(entranceLight);
-const litWindows = [];
+const litWindows = [], litWindowGroup = new THREE.Group(); litWindowGroup.name = 'Lit tower windows'; scene.add(litWindowGroup); // they rise with the tower (rise.js)
 const warm = new THREE.MeshStandardMaterial({ color: '#f1d6a7', emissive: '#ffbd6a', emissiveIntensity: 0, transparent: true, opacity: 0, depthWrite: false });
 for (const x of [-2, 2]) {
-  const p = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5), warm); p.position.set(x, 10.8, 7.02); scene.add(p); litWindows.push(p);
+  const p = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5), warm); p.position.set(x, 10.8, 7.02); litWindowGroup.add(p); litWindows.push(p);
 }
 const defaultPixelRatio = () => Math.min(devicePixelRatio, 1.35);
 const frameSamples = [];
@@ -455,13 +455,16 @@ async function boot() {
   // must feel quick). Automated runs (checks, measurements) see the finished building in the exploration layer unless
   // they ask for the story (__story) or the rise (__playRise).
   const automated = navigator.webdriver || window.__autoBegin || /[?&]auto\b/.test(location.search);
-  if (automated && !window.__story) window.__noStory = true;
+  // This page is the live campus (/campus/): the story is the pre-rendered one at the site's root (src/story.js), whose
+  // doors land here, ?explore for the free camera or ?walk for the guide. ?live still plays the story live, here.
+  const params = new URLSearchParams(location.search), liveStory = params.has('live') || window.__story;
+  if (!liveStory || (automated && !window.__story)) { window.__noStory = true; window.__noRise = true; window.__enterWay = params.has('walk') ? 'walk' : 'explore'; }
   if (automated && !window.__playRise) window.__noRise = true;
   document.body.append($('#loader')); // above every layer: #experience is fixed (its own stacking context), the story sits over it
   portfolio = createPortfolio({ scene, camera, renderer, reduced: reduced || !!window.__noRise, changed: () => { needsRender = true; }, onEnter: way => leaveStory(way) });
   // No gate (owner, 2026-10-19: the site ships as an app, so no full-screen request): the story shows at once, its hero
   // over the night while the campus is built, and the building rises as soon as it is ready.
-  if (!automated) { entered = true; controls.enabled = false; portfolio.wait(); $('#loader').hidden = true; }
+  if (!automated && !window.__noStory) { entered = true; controls.enabled = false; portfolio.wait(); $('#loader').hidden = true; }
   controls.minDistance = 13; controls.maxDistance = 260; controls.maxPolarAngle = Math.PI * .485; controls.minPolarAngle = .001; controls.enablePan = false; controls.zoomSpeed = .7; controls.rotateSpeed = .5;
   camera.position.fromArray(cameraFor(0)); controls.target.fromArray(chapters[0].target); controls.update();
   controls.addEventListener('start', () => { transition = null; interactive = true; stopJourney(); setOrbit(false); });
@@ -520,7 +523,7 @@ async function boot() {
     scene.environment = env.texture; scene.background = hdr; scene.backgroundBlurriness = .02; scene.backgroundRotation.y = 1.9; scene.environmentRotation.y = 1.9;
   } catch { console.warn('Sky map unavailable. Using daylight fallback.'); }
   performance.mark('sky-ready');
-  rise = createRise(); rise.attach(architecture.group); rise.set(-1); // patched before any shader compiles: no stall later
+  rise = createRise(); rise.attach(architecture.group); rise.attach(litWindowGroup); rise.set(-1); // patched before any shader compiles: no stall later
   landscape = await loadBlenderEnvironment(scene, group => { rectangularAprons(group); regradeGround(group); placeFacadeTrees(group); }, environmentDownload);
   const breathe = () => new Promise(resolve => requestAnimationFrame(resolve)); // let the loader paint between stages
   await breathe();
@@ -583,7 +586,7 @@ async function boot() {
   // One tap to begin (owner, 2026-10-18: full screen by default). Browsers only allow full screen, and sound, from a
   // tap, click or key, so the loader ends on an Enter button; that one gesture goes full screen, starts the ambience
   // and starts the building rising. Automated runs (and our test scripts) skip it.
-  if (automated || entered) begin(false); // in already: the building rises now
+  if (automated || entered || window.__noStory) begin(false); // in already: the building rises now (or the campus opens)
   else { $('#loader').classList.add('gate'); $('#loading-status').textContent = ''; const go = $('#begin'); go.hidden = false; go.focus({ preventScroll: true }); go.onclick = () => begin(true); }
   loadWeather();
   drawPlan(); resize(); requestAnimationFrame(animate);
@@ -616,7 +619,6 @@ function compileShadowShaders(root = scene) {
 }
 let previous = performance.now(), frames = 0, hallLit = false, hallFanSpeed = 1;
 let rise, riseDust, riseStart = 0, riseClock = 0; // the arrival: the building rising out of the land; its own clock
-const RISE_RATE = .62; // the rise's own clock runs slower than wall time: about eleven seconds, with weight
 let portfolio = null, entered = false; // the story layer (portfolio.js), shown first; entered: Enter pressed during the load
 function goFullscreen() { // the whole page, so the story scrolls in full screen too; iPhone Safari has no API for it
   const el = document.documentElement, ask = el.requestFullscreen || el.webkitRequestFullscreen;
@@ -628,7 +630,7 @@ function begin(gesture) {
   if (gesture) { goFullscreen(); resumeDefaultSound(); }
   if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; } else { riseStart = 1; riseClock = -.75 * RISE_RATE; } // the arrival, once the loader has faded
   // the story walks in through the front doors
-  if (window.__noStory) leaveStory('explore'); else { openDoors(); portfolio.play(RISE_LENGTH / RISE_RATE, .75); }
+  if (window.__noStory) leaveStory(window.__enterWay || 'explore'); else { openDoors(); portfolio.play(RISE_LENGTH / RISE_RATE, .75); }
   $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700); needsRender = true;
 }
 let reflectionFilter, explorationReady = null, explored = false;
@@ -696,8 +698,86 @@ function showStory() {
   setPanorama(false); stopJourney(); setOrbit(false); transition = null; controls.enabled = false; openDoors(); portfolio.show(); needsRender = true;
 }
 let westFittings = null, dispensers = [], casements = [], clickables = [], roomUpdates = [], interiors = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
+// What the camera can see: far small parts skipped, rooms' fittings only from inside (shared by the loop and snapshots).
+function cullForCamera() {
+  if (westFittings) westFittings.visible = westBox.distanceToPoint(camera.position) < 30; // far away they are sub-pixel
+  // Every draw call costs CPU and GPU-process time on ANGLE: ~170 tiny ones made every few frames late (p90 50 ms).
+  for (const [o, s] of smallParts) o.visible = s.radius > .005 * s.center.distanceTo(camera.position);
+  // A room's fans and switches are drawn only from inside it (each is several draw calls; from outside they are behind walls or patterned glass).
+  for (const { bounds, parts } of interiors) { const inside = bounds.distanceToPoint(camera.position) < 1.5; for (const p of parts) p.visible = inside; }
+}
+
+// Snapshots (portfolio/tools/snapshots.mjs drives this over the DevTools protocol): the story's frames, shot from the
+// real scene at the story's own camera poses, each with a depth image for the snapshot page's 3D parallax.
+let snapshotting = false;
+const snapshot = (() => {
+  let size = null, depthMaterial = null, faded = null;
+  // Outdoors the trees appear only as they cross the screen (owner, 2026-10-19, after Kage's foreground trees): a tree
+  // fragment's opacity follows its distance from the centre of the frame, almost nothing over the building, whole at
+  // the edges, so as the camera moves each tree sweeps in at the side instead of standing in front of the department.
+  const treeFade = { value: 0 }, frameSize = { value: new THREE.Vector2(1, 1) };
+  const fadeTrees = on => {
+    if (!faded) {
+      const mats = new Set();
+      scene.traverse(o => { if (o.isBatchedMesh && /Batched trees/.test(o.name)) mats.add(o.material); if (/tree belt/i.test(o.name)) o.traverse(m => { if (m.material) mats.add(m.material); }); });
+      faded = [...mats].map(m => [m, m.transparent]);
+      for (const [m] of faded) {
+        const before = m.onBeforeCompile, key = m.customProgramCacheKey;
+        m.customProgramCacheKey = () => (key && key !== THREE.Material.prototype.customProgramCacheKey ? key.call(m) : '') + '|edge-fade';
+        m.onBeforeCompile = (sh, r) => {
+          before?.call(m, sh, r);
+          Object.assign(sh.uniforms, { uTreeFade: treeFade, uFrame: frameSize });
+          sh.fragmentShader = 'uniform float uTreeFade; uniform vec2 uFrame;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `#include <opaque_fragment>
+            { vec2 q = gl_FragCoord.xy / uFrame - .5; q.x *= uFrame.x / uFrame.y;
+              float d = length(q) / length(vec2(.5 * uFrame.x / uFrame.y, .5)); // 0 at the centre, 1 in a corner
+              gl_FragColor.a *= mix(1., mix(.05, 1., smoothstep(.36, .8, d)), uTreeFade); }`);
+        };
+        m.needsUpdate = true;
+      }
+    }
+    treeFade.value = on ? 1 : 0;
+    for (const [m, t] of faded) if (m.transparent !== (on || t)) { m.transparent = on || t; m.needsUpdate = true; }
+  };
+  return {
+    setup({ w, h }) {
+      snapshotting = true; size = { w, h }; frameSize.value.set(w, h);
+      renderer.setPixelRatio(1); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+      controls.enabled = false;
+      for (const o of portfolio.overlays()) o.visible = false;
+      if (landscape) landscape.lodBias = 1;
+      depthMaterial = new THREE.MeshDepthMaterial({ side: THREE.DoubleSide });
+      depthMaterial.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('gl_FragColor = vec4( vec3( 1.0 - fragCoordZ ), opacity );',
+        '// view depth, log-scaled from 0.3 m (white) to 300 m (black)\n\t\tgl_FragColor = vec4( vec3( 1.0 - clamp( log( max( vHighPrecisionZW[ 1 ], 0.3 ) / 0.3 ) / log( 1000.0 ), 0.0, 1.0 ) ), 1.0 );'); };
+      return { aspect: w / h, riseLength: RISE_LENGTH / RISE_RATE };
+    },
+    plan: opts => portfolio.renderPlan(opts),
+    // item: from plan(); returns [colour webp data URL, depth webp data URL at half size, or null]
+    shoot(item, { quality = .8, shadows = false, moon = null, depth = false } = {}) {
+      const t = item.fly < 1 ? item.fly * (RISE_LENGTH + .6 * RISE_RATE) : 1e6;
+      rise.set(t); riseDust.set(t); riseDust.material.uniforms.uLight.value = 1 - .8 * sunlight.night;
+      fadeTrees(!!item.outdoor);
+      portfolio.poseFor(item, size.w / size.h);
+      if (moon) { const m = scene.getObjectByName('Photographic phased moon'); if (m) { m.position.copy(camera.position).addScaledVector(new THREE.Vector3(...moon.dir).normalize(), 240); m.lookAt(camera.position); m.scale.setScalar(moon.scale ?? 1); } }
+      landscape.updateTreeDetail(camera); cullForCamera();
+      if (shadows || item.fly < 1) renderer.shadowMap.needsUpdate = true;
+      renderer.render(scene, camera);
+      const colour = renderer.domElement.toDataURL('image/webp', quality);
+      if (!depth) return [colour, null];
+      // the depth image (the snapshot page's parallax): the faded trees are left out of it, so they do not warp
+      const hidden = item.outdoor ? faded.flatMap(([m]) => { const out = []; scene.traverse(o => { if (o.material === m && o.visible) { o.visible = false; out.push(o); } }); return out; }) : [];
+      const bg = scene.background, fog = scene.fog; scene.background = new THREE.Color(0); scene.fog = null; scene.overrideMaterial = depthMaterial;
+      renderer.render(scene, camera);
+      scene.overrideMaterial = null; scene.background = bg; scene.fog = fog; hidden.forEach(o => { o.visible = true; });
+      const half = document.createElement('canvas'); half.width = size.w / 2; half.height = size.h / 2;
+      half.getContext('2d').drawImage(renderer.domElement, 0, 0, half.width, half.height);
+      return [colour, half.toDataURL('image/webp', .9)];
+    },
+  };
+})();
+
 function animate(now) {
   requestAnimationFrame(animate);
+  if (snapshotting) return; // tools/snapshots.mjs owns the camera and the canvas
   const frameDuration = now - previous;
   const dt = Math.min(frameDuration / 1000, .06); previous = now;
   if (document.hidden || !ready) return;
@@ -802,11 +882,7 @@ function animate(now) {
     for (const d of dispensers) d.update(now, Math.min(interval / 1000, .1));
     for (const c of casements) if (c.update(camera, Math.min(interval / 1000, .1))) needsRender = true;
     for (const u of roomUpdates) if (u(Math.min(interval / 1000, .1))) needsRender = true;
-    if (westFittings) westFittings.visible = westBox.distanceToPoint(camera.position) < 30; // far away they are sub-pixel
-    // Every draw call costs CPU and GPU-process time on ANGLE: ~170 tiny ones made every few frames late (p90 50 ms).
-    for (const [o, s] of smallParts) o.visible = s.radius > .005 * s.center.distanceTo(camera.position);
-    // A room's fans and switches are drawn only from inside it (each is several draw calls; from outside they are behind walls or patterned glass).
-    for (const { bounds, parts } of interiors) { const inside = bounds.distanceToPoint(camera.position) < 1.5; for (const p of parts) p.visible = inside; }
+    cullForCamera();
     renderer.render(scene, camera);
     portfolio?.afterRender(); // the story's live windows onto other rooms
     if (++frames % 60 === 0) drawPlan();
@@ -827,7 +903,7 @@ function animate(now) {
   send(); setInterval(() => { if (!document.hidden) send(); }, 30000); // keeps 'online now' current on the dashboard
   addEventListener('pagehide', send);
 })();
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, get rise() { return rise; }, get portfolio() { return portfolio; }, get riseDust() { return riseDust; }, playRise() { riseStart = 1; riseClock = 0; rise.set(0); }, RISE_LENGTH, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, get rise() { return rise; }, get portfolio() { return portfolio; }, snapshot, get riseDust() { return riseDust; }, playRise() { riseStart = 1; riseClock = 0; rise.set(0); }, RISE_LENGTH, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;

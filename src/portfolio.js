@@ -59,7 +59,7 @@ function markup() {
     if (c.id === 'admissions') return stop(c, admissions.title, admissions.lead, `
         <dl class="pf-programmes">${admissions.list.map(p => `<div data-rv="up"><dt>${esc(p.name)}</dt><dd class="len">${esc(p.length)}</dd><dd>${esc(p.entry)}</dd></div>`).join('')}</dl>
         <details class="pf-more" data-rv="up"><summary data-cursor>${esc(admissions.objectivesTitle)}</summary><ol>${admissions.objectives.map(o => `<li>${esc(o)}</li>`).join('')}</ol></details>`);
-    if (c.id === 'lab-process') return stop(c, labRooms[c.id].title, labRooms[c.id].lead, `
+    if (c.id === 'lab-instruments') return stop(c, labRooms[c.id].title, labRooms[c.id].lead, `
         <p class="pf-note" data-rv="up">${esc(labs.lead)}</p>
         <ul class="pf-labs" data-rv="up">${labs.list.map(l => `<li><b>${esc(l.name)}</b><span>${esc(l.where)}</span></li>`).join('')}</ul>
         <p class="pf-research" data-rv="up">${labs.research.map(r => `<span>${esc(r)}</span>`).join('')}</p>
@@ -134,7 +134,7 @@ function markup() {
 // out of the ground after the building, then hanging in the air with a slow drift of its own, and dissolving as the
 // camera passes through it on the way to the porch.
 async function buildWordmark(scene) {
-  const word = 'IST', height = 3.1, z = 31, offsetX = 4.6, group = new T.Group(); group.name = 'Portfolio wordmark'; scene.add(group);
+  const word = 'IST', height = 3.1, z = 31, offsetX = 0, group = new T.Group(); group.name = 'Portfolio wordmark'; scene.add(group);
   try { await document.fonts.load('700 200px "Instrument Sans"'); } catch {}
   const glyphs = [], measure = document.createElement('canvas').getContext('2d'); measure.font = '700 400px "Instrument Sans"';
   const widths = [...word].map(ch => measure.measureText(ch).width / 400 * height * 1.04), gap = height * .32; // wide tracking, as Kage sets its four letters
@@ -256,7 +256,8 @@ const clothFragment = /* glsl */`
     vec2 e = min(vUv, 1. - vUv) * uRes; c += smoothstep(1.2, .2, min(e.x, e.y)) * uEdge * vec3(.91, .89, .84); // a hairline that rides the folds
     gl_FragColor = vec4(c, uAlpha * smoothstep(0., .35, vGenie));
   }`;
-function createCloth() {
+function createCloth(opts = {}) {
+  const CLOTH_ = { ...CLOTH, ...opts };
   const grid = new Float32Array(CL_N * CL_N * 3), idx = [];
   for (let y = 0; y < CL_N; y++) for (let x = 0; x < CL_N; x++) grid.set([x / CL_SEG, y / CL_SEG, 0], (y * CL_N + x) * 3);
   for (let y = 0; y < CL_SEG; y++) for (let x = 0; x < CL_SEG; x++) { const a = y * CL_N + x, b = a + 1, c = a + CL_N, d = c + 1; idx.push(a, c, b, b, c, d); }
@@ -266,8 +267,8 @@ function createCloth() {
   const offset = new T.BufferAttribute(new Float32Array(CL_N * CL_N * 2), 2).setUsage(T.DynamicDrawUsage);
   g.setAttribute('aData', data); g.setAttribute('aOffset', offset);
   const material = new T.ShaderMaterial({ vertexShader: clothVertex, fragmentShader: clothFragment, transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
-    uniforms: { tA: { value: null }, tB: { value: null }, uMix: { value: 0 }, uAlpha: { value: 1 }, uLight: { value: CLOTH.light }, uSheen: { value: CLOTH.sheen }, uEdge: { value: .05 },
-      uRes: { value: new T.Vector2(1, 1) }, uOut: { value: new T.Vector2(1, 1) }, uSrc: { value: new T.Vector2() }, uPad: { value: new T.Vector2(CL_BLEED, CL_BLEED) }, uGenie: { value: 1 }, uFocal: { value: CLOTH.focal } } });
+    uniforms: { tA: { value: null }, tB: { value: null }, uMix: { value: 0 }, uAlpha: { value: 1 }, uLight: { value: CLOTH_.light }, uSheen: { value: CLOTH_.sheen }, uEdge: { value: .05 },
+      uRes: { value: new T.Vector2(1, 1) }, uOut: { value: new T.Vector2(1, 1) }, uSrc: { value: new T.Vector2() }, uPad: { value: new T.Vector2(CL_BLEED, CL_BLEED) }, uGenie: { value: 1 }, uFocal: { value: CLOTH_.focal } } });
   const mesh = new T.Mesh(g, material); mesh.frustumCulled = false;
   const scene = new T.Scene(); scene.add(mesh);
   let hCur = new Float32Array(CL_N * CL_N), hPrev = new Float32Array(CL_N * CL_N), hNext = new Float32Array(CL_N * CL_N);
@@ -276,12 +277,12 @@ function createCloth() {
   let time = Math.random() * 60, gust = .5, debt = 0, edge = .05;
   const touch = { x: -1e5, y: -1e5, vx: 0, vy: 0, s: 0 };
   function step(dt) {
-    time += dt * CLOTH.speed;
-    const t = time, windAmp = CL_GAIN * CLOTH.wind * gust, kb1 = 2 * Math.PI / (CL_SEG / 1.5), kb2 = 2 * Math.PI / (CL_SEG / 3.8), ka = 2 * Math.PI / (CL_SEG / 2.2);
+    time += dt * CLOTH_.speed;
+    const t = time, windAmp = CL_GAIN * CLOTH_.wind * gust, kb1 = 2 * Math.PI / (CL_SEG / 1.5), kb2 = 2 * Math.PI / (CL_SEG / 3.8), ka = 2 * Math.PI / (CL_SEG / 2.2);
     const w1 = CL_WAVE * kb1, w2 = CL_WAVE * kb2, drift = 1.8 * Math.sin(.23 * t);
     for (let b = 0; b < CL_N; b++) rowF[b] = Math.sin(kb1 * b - w1 * t + drift) + .45 * Math.sin(kb2 * b + w2 * t * .8 + 3);
     for (let a = 0; a < CL_N; a++) colF[a] = (.7 + .3 * Math.sin(ka * a - 1.7 * t)) * hang[a];
-    const c2 = CL_WAVE * CL_WAVE, dt2 = dt * dt, decay = Math.exp(-CLOTH.damping * dt);
+    const c2 = CL_WAVE * CL_WAVE, dt2 = dt * dt, decay = Math.exp(-CLOTH_.damping * dt);
     for (let y = 0; y < CL_N; y++) {
       const up = Math.max(y - 1, 0) * CL_N, down = Math.min(y + 1, CL_SEG) * CL_N, row = y * CL_N;
       for (let x = 0; x < CL_N; x++) {
@@ -296,8 +297,8 @@ function createCloth() {
   }
   function imprint(dt, w, h) {
     if (touch.s < .01) return;
-    const cw = w / CL_SEG, ch = h / CL_SEG, rx = CLOTH.brushSize / cw, ry = CLOTH.brushSize / ch, gx = touch.x / cw, gy = touch.y / ch;
-    const lift = 1.1 * CLOTH.brush * touch.s, rate = Math.min(dt * 4, 1);
+    const cw = w / CL_SEG, ch = h / CL_SEG, rx = CLOTH_.brushSize / cw, ry = CLOTH_.brushSize / ch, gx = touch.x / cw, gy = touch.y / ch;
+    const lift = 1.1 * CLOTH_.brush * touch.s, rate = Math.min(dt * 4, 1);
     for (let y = Math.max(Math.ceil(gy - 2.5 * ry), 0); y <= Math.min(Math.floor(gy + 2.5 * ry), CL_SEG); y++) {
       const oy = (y - gy) / ry;
       for (let x = Math.max(Math.ceil(gx - 2.5 * rx), 0); x <= Math.min(Math.floor(gx + 2.5 * rx), CL_SEG); x++) {
@@ -319,8 +320,8 @@ function createCloth() {
     }
   }
   function compose(w, h) {
-    const cw = w / CL_SEG, ch = h / CL_SEG, drape = CLOTH.drape * (.3 + .7 * gust), d = data.array;
-    for (let y = 0; y < CL_N; y++) for (let x = 0; x < CL_N; x++) { const i = y * CL_N + x; zF[i] = CLOTH.amplitude * Math.tanh(hCur[i]) + drape * hang[y]; }
+    const cw = w / CL_SEG, ch = h / CL_SEG, drape = CLOTH_.drape * (.3 + .7 * gust), d = data.array;
+    for (let y = 0; y < CL_N; y++) for (let x = 0; x < CL_N; x++) { const i = y * CL_N + x; zF[i] = CLOTH_.amplitude * Math.tanh(hCur[i]) + drape * hang[y]; }
     for (let y = 0; y < CL_N; y++) {
       const up = Math.max(y - 1, 0) * CL_N, down = Math.min(y + 1, CL_SEG) * CL_N, row = y * CL_N;
       for (let x = 0; x < CL_N; x++) {
@@ -360,16 +361,25 @@ function createCloth() {
 // ------------------------------------------------------------------------------------------- photo plates
 // The professors' photographs, hung as cloth (above) over the rectangle of their frame on the page. Drawn after the
 // main view; the frame on the page only holds the place and the caption.
+const CARD = { wind: .35, amplitude: 8, drape: 4, brush: .8, brushSize: 150, light: .55, sheen: .07, focal: 1400 };
 function createPlates(renderer) {
   const flatCam = new T.Camera(), loader = new T.TextureLoader(), list = [];
+  const ink = new T.DataTexture(new Uint8Array([10, 17, 32, 255]), 1, 1); ink.needsUpdate = true; // the night's ink, #0a1120
   let frame = 0;
   const visible = p => p.rect && p.tex && p.rect.width >= 8 && p.rect.bottom > -60 && p.rect.top < innerHeight + 60 && p.alpha >= .02;
   return {
     list,
-    attach(el) {
-      const p = { cloth: createCloth(), el, frame: el.querySelector('[data-frame]') || el, tex: null, rect: null, alpha: 0, genie: 0, want: 0, src: new T.Vector2() };
+    // a photo: pours out of its door's sign (the genie) and hangs as cloth; onIn: once it has landed
+    attach(el, onIn) {
+      const p = { kind: 'photo', cloth: createCloth(), el, frame: el.querySelector('[data-frame]') || el, tex: null, rect: null, alpha: 0, genie: 0, want: 0, src: new T.Vector2(), onIn };
       // the photo's bytes go straight to the screen, like the copied frames the cloth was written for: no colour conversion
       loader.load(el.dataset.photo, t => { t.colorSpace = T.NoColorSpace; t.anisotropy = 4; p.tex = t; });
+      list.push(p); return p;
+    },
+    // a description's card: a sheet of the night's ink behind the text (which stays crisp in the page above it), hung
+    // from its top edge, barely stirring, giving way gently under the hand
+    card(el) {
+      const p = { kind: 'card', cloth: createCloth(CARD), el, frame: el, tex: ink, rect: null, alpha: 0, genie: 1, want: 0, src: new T.Vector2(), pad: 30 };
       list.push(p); return p;
     },
     invalidate() { for (const p of list) p.box = null; }, // the layout changed: measure again on the next frame
@@ -380,15 +390,25 @@ function createPlates(renderer) {
       let moving = false;
       for (const p of list) {
         // where the plate is: measured (a layout) every 30th frame, and between those carried by the scroll alone
-        if (frame % 30 === 0 || !p.box) { const r = p.frame.getBoundingClientRect(); p.box = { left: r.left, top: r.top + scrollY, width: r.width, height: r.height }; p.alpha = measureAlpha(p.el); }
+        if (frame % 30 === 0 || !p.box) { const r = p.frame.getBoundingClientRect(), d = p.pad ?? 0; p.box = { left: r.left - d, top: r.top + scrollY - d, width: r.width + 2 * d, height: r.height + 2 * d }; if (p.kind === 'photo') p.alpha = measureAlpha(p.el); }
         const top = p.box.top - scrollY;
         p.rect = { left: p.box.left, top, width: p.box.width, height: p.box.height, right: p.box.left + p.box.width, bottom: top + p.box.height };
         const h = here(p.el); p.want = h.on ? 1 : 0;
-        if (h.on) p.src.set(h.x - p.rect.left, h.y - p.rect.top);
-        const g = p.genie; p.genie = still ? p.want : p.genie + Math.sign(p.want - p.genie) * Math.min(Math.abs(p.want - p.genie), dt / .85);
-        if (p.genie !== g) moving = true;
-        if (!visible(p) || p.genie <= .001) continue;
+        if (p.kind === 'card') { // a card fades in while its stop is being read
+          const a = p.alpha; p.alpha = still ? p.want * .82 : p.alpha + Math.sign(p.want * .82 - p.alpha) * Math.min(Math.abs(p.want * .82 - p.alpha), dt / .6);
+          if (p.alpha !== a) moving = true;
+        } else {
+          if (h.on) p.src.set(h.x - p.rect.left, h.y - p.rect.top);
+          const g = p.genie; p.genie = still ? p.want : p.genie + Math.sign(p.want - p.genie) * Math.min(Math.abs(p.want - p.genie), dt / .85);
+          if (p.genie !== g) moving = true;
+          if (p.genie >= .98 && !p.landed) { p.landed = true; p.onIn?.(); } // the photo first, then its words
+        }
+        if (!visible(p) || p.genie <= .001) { p.calm = 0; continue; }
         const r = p.rect, inside = pointer && pointer.x >= r.left - 10 && pointer.x <= r.right + 10 && pointer.y >= r.top - 10 && pointer.y <= r.bottom + 10;
+        // Battery (owner, 2026-10-19): a sheet sways while it comes in and while the hand is on it; a few seconds after,
+        // it is left hanging as it is and nothing is drawn for it until the hand comes back.
+        p.calm = inside || p.genie < 1 || (p.kind === 'card' && Math.abs(p.alpha - p.want * .82) > .01) ? 0 : (p.calm || 0) + dt;
+        if (p.calm > (p.kind === 'card' ? 2.5 : 4)) continue;
         p.cloth.update(dt, r.width, r.height, inside ? pointer.x - r.left : null, inside ? pointer.y - r.top : null, still); moving = true;
       }
       return moving;
@@ -397,7 +417,7 @@ function createPlates(renderer) {
     draw() {
       const keepClear = renderer.autoClear; renderer.autoClear = false;
       let drew = false;
-      for (const p of list) {
+      for (const p of [...list].sort((a, b) => (a.kind === 'card' ? 0 : 1) - (b.kind === 'card' ? 0 : 1))) {
         if (!visible(p) || p.genie <= .001) continue;
         // drawn over the plate with a margin for its folds, and while the genie runs, over the way to the door's sign too
         const r = p.rect, H = renderer.domElement.height / renderer.getPixelRatio(), B = CL_BLEED, u = p.cloth.material.uniforms;
@@ -427,7 +447,7 @@ function createWisps(camera, coarse) {
   const material = new T.ShaderMaterial({
     uniforms: { uPx: { value: innerHeight } }, transparent: true, blending: T.AdditiveBlending, depthWrite: false, depthTest: false, fog: false,
     vertexShader: 'attribute float aA; attribute float aS; uniform float uPx; varying float vA; void main() { vA = aA; vec4 mv = modelViewMatrix * vec4(position, 1.); gl_PointSize = uPx * aS / max(-mv.z, .4); gl_Position = projectionMatrix * mv; }',
-    fragmentShader: 'varying float vA; void main() { if (vA <= 0.) discard; float r = length(gl_PointCoord - .5) * 2.; float a = exp(-r * r * 4.) + .5 * exp(-r * r * 30.); gl_FragColor = vec4(vec3(1., .93, .78) * a, a * vA); }',
+    fragmentShader: 'varying float vA; void main() { if (vA <= 0.) discard; float r = length(gl_PointCoord - .5) * 2.; float a = exp(-r * r * 4.) + .5 * exp(-r * r * 30.); gl_FragColor = vec4(vec3(.78, .9, 1.) * a, a * vA); }',
   });
   const points = new T.Points(g, material); points.frustumCulled = false; points.renderOrder = 9; points.layers.set(OVERLAY);
   camera.add(points);
@@ -485,6 +505,7 @@ function createLeaves(scene) {
   const m = new T.Matrix4(), q = new T.Quaternion(), one = new T.Vector3(1, 1, 1);
   let opacity = 0, t = 0;
   return {
+    mesh,
     update(dt, camera, outdoors, light) {
       t += dt; opacity = T.MathUtils.damp(opacity, outdoors ? 1 : 0, 2, dt);
       mesh.visible = opacity > .01; if (!mesh.visible) return false;
@@ -507,13 +528,16 @@ function createLeaves(scene) {
 }
 
 // ---------------------------------------------------------------------------------------------------- the layer
-export function createPortfolio({ scene, camera, renderer, reduced, onEnter, changed }) {
+// snapshot: { aspect, swayGate(k) } when the story is shown as pre-rendered frames (story.js): the poses are the frames'
+// own (their aspect), the overlay camera's lens matches the frame as it is cropped to the screen, and the hand-held sway
+// is held to the stops whose depth image is in (swayGate). flightClock: the flight's 0..1 from the frames' video.
+export function createPortfolio({ scene, camera, renderer, reduced, onEnter, changed, snapshot = null, flightClock = null }) {
   const root = document.createElement('div'); root.id = 'portfolio'; root.innerHTML = markup(); document.body.append(root);
   const $ = s => root.querySelector(s), $$ = s => [...root.querySelectorAll(s)];
   const coarse = matchMedia('(pointer: coarse)').matches;
   const sections = $$('[data-cam]'), walks = $$('[data-walk]'), chapters = C.chapters;
   const rig = { prog: 0, smooth: 0, mx: 0, my: 0, tmx: 0, tmy: 0, intro: 1, fly: 1, nx: 0, ny: 0 }; // fly: the arrival flight, 0..1 (1: done)
-  let segments = [], holds = [], maxScroll = 1, active = true, wordmark = null, wordT = reduced ? 99 : -1, lastChapter = -1, aspect = innerWidth / innerHeight;
+  let flightOn = false, segments = [], holds = [], maxScroll = 1, active = true, wordmark = null, wordT = reduced ? 99 : -1, lastChapter = -1, aspect = innerWidth / innerHeight;
   const pose = { p: new T.Vector3(), yaw: 0, pitch: 0, fov: 50, outdoors: true, veil: 0 };
   const dir = new T.Vector3(), right = new T.Vector3();
   if (!camera.parent) scene.add(camera); // the wisps hang from the camera
@@ -521,13 +545,14 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
 
   // ------------------------------------------------------------------ the path and the scroll
   function build() {
-    aspect = innerWidth / innerHeight;
+    aspect = snapshot ? snapshot.aspect : innerWidth / innerHeight;
     segments = chapters.map((c, i) => i ? buildSegment(chapters[i - 1], c, aspect) : null);
   }
   function measure() {
     const vh = innerHeight;
     // each walk's scroll distance follows its cost: about a screen per 9 m, never less than half a screen
-    walks.forEach(w => { const s = segments[+w.dataset.walk]; w.style.height = `${Math.round(clamp(s.cost * .11, .35, 2.6) * vh)}px`; });
+    // a screen of scroll for about every 6 m walked (owner, 2026-10-19: slower, so a newcomer never loses the path)
+    walks.forEach(w => { const s = segments[+w.dataset.walk]; w.style.height = `${Math.round(clamp(s.cost * .165, .6, 4) * vh)}px`; });
     maxScroll = Math.max(1, document.documentElement.scrollHeight - vh);
     holds = sections.map((el, i) => {
       if (i === 0) return [0, Math.max(0, el.offsetTop + el.offsetHeight - vh * 1.02)];
@@ -570,31 +595,43 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       const d = L.sub(out.p); out.yaw = yawOf(d); out.pitch = pitchOf(d); out.fov = fovAt(u); out.outdoors = true; out.veil = 0;
     };
   })();
-  function apply() {
-    const N = chapters.length - 1, k = clamp(rig.smooth, 0, N), i = Math.min(N - 1, Math.floor(k)), f = k - i;
-    if (f < 1e-5 && k < N) { const c = chapters[i], F = framing(c, aspect); pose.p.set(...c.eye); pose.yaw = F.yaw; pose.pitch = F.pitch; pose.fov = F.fov; pose.outdoors = !!c.outdoors; pose.veil = 0; }
-    else segments[i + 1].sample(f, pose);
-    if (k >= N) { const c = chapters[N], F = framing(c, aspect); pose.p.set(...c.eye); pose.yaw = F.yaw; pose.pitch = F.pitch; pose.fov = F.fov; pose.outdoors = true; pose.veil = 0; }
-    const flying = rig.fly < 1;
-    if (flying) { // the flight, blended over its last stretch into the page's own hero pose (a wider lens on tall screens)
-      const p = pose.p.clone(), yaw = pose.yaw, pitch = pose.pitch, fov = pose.fov, w = smooth(.82, 1, rig.fly);
-      flight(rig.fly, pose);
-      pose.p.lerp(p, w); pose.yaw = lerpAngle(pose.yaw, yaw, w); pose.pitch += (pitch - pose.pitch) * w; pose.fov += (fov - pose.fov) * w;
+  // The camera's pose without the hand-held parallax: at scroll position k (chapters) or, while fly < 1, on the arrival
+  // flight. The snapshot frames are rendered from exactly these poses (renderPlan below).
+  function basePose(k, fly, out = pose) {
+    const N = chapters.length - 1; k = clamp(k, 0, N);
+    const i = Math.min(N - 1, Math.floor(k)), f = k - i;
+    if (f < 1e-5 && k < N) { const c = chapters[i], F = framing(c, aspect); out.p.set(...c.eye); out.yaw = F.yaw; out.pitch = F.pitch; out.fov = F.fov; out.outdoors = !!c.outdoors; out.veil = 0; }
+    else segments[i + 1].sample(f, out);
+    if (k >= N) { const c = chapters[N], F = framing(c, aspect); out.p.set(...c.eye); out.yaw = F.yaw; out.pitch = F.pitch; out.fov = F.fov; out.outdoors = true; out.veil = 0; }
+    if (fly < 1) { // the flight, blended over its last stretch into the page's own hero pose (a wider lens on tall screens)
+      const p = out.p.clone(), yaw = out.yaw, pitch = out.pitch, fov = out.fov, w = smooth(.82, 1, fly);
+      flight(fly, out);
+      out.p.lerp(p, w); out.yaw = lerpAngle(out.yaw, yaw, w); out.pitch += (pitch - out.pitch) * w; out.fov += (fov - out.fov) * w;
     }
+    return out;
+  }
+  const lookFrom = (p, yaw, pitch) => { dir.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)); camera.position.copy(p); camera.lookAt(p.clone().add(dir)); };
+  // the parallax of the frame on screen: camera shift (metres, along its right and up) and turn (radians)
+  const sway = { x: 0, y: 0, yaw: 0, pitch: 0 };
+  function apply() {
+    const flying = rig.fly < 1;
+    basePose(rig.smooth, rig.fly);
     // hand-held parallax: generous outdoors, a breath indoors
     const out = pose.outdoors ? 1 : 0, still = flying ? 0 : 1 - Math.min(1, Math.abs(rig.smooth - rig.prog) * 3);
     const shift = flying ? 0 : (out ? .55 : .07) * (1 - smooth(0, 1.4, rig.smooth) * .5 * out), turn = (out ? .012 : .022) * still;
-    dir.set(Math.sin(pose.yaw) * Math.cos(pose.pitch), Math.sin(pose.pitch), Math.cos(pose.yaw) * Math.cos(pose.pitch));
+    const gate = snapshot ? snapshot.swayGate(rig.smooth) : 1;
+    sway.x = rig.mx * shift * gate; sway.y = rig.my * shift * .5 * gate; sway.yaw = -rig.mx * turn * gate; sway.pitch = rig.my * turn * .6 * gate;
     right.set(-Math.cos(pose.yaw), 0, Math.sin(pose.yaw));
-    camera.position.copy(pose.p).addScaledVector(right, rig.mx * shift); camera.position.y += rig.my * shift * .5;
-    const yaw = pose.yaw - rig.mx * turn, pitch = pose.pitch + rig.my * turn * .6;
-    dir.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
-    camera.lookAt(camera.position.clone().add(dir));
-    if (Math.abs(camera.fov - pose.fov) > 1e-4) { camera.fov = pose.fov; camera.updateProjectionMatrix(); }
+    lookFrom(pose.p.clone().addScaledVector(right, sway.x).add(new T.Vector3(0, sway.y, 0)), pose.yaw + sway.yaw, pose.pitch + sway.pitch);
+    const fov = snapshot ? coverFov(pose.fov) : pose.fov;
+    if (Math.abs(camera.fov - fov) > 1e-4) { camera.fov = fov; camera.updateProjectionMatrix(); }
   }
+  // the vertical lens of a frame (rendered at snapshot.aspect) as the screen shows it, cover-fitted: a wider screen crops
+  // the frame's top and bottom
+  const coverFov = f => { const W = innerWidth / innerHeight, A = snapshot.aspect; return W > A ? 2 * Math.atan(Math.tan(f * Math.PI / 360) * A / W) * 180 / Math.PI : f; };
 
   // ------------------------------------------------------------------ smooth scroll (Lenis), driven per frame from update()
-  const lenis = new Lenis({ autoRaf: false, lerp: reduced ? 1 : .085, wheelMultiplier: .9, touchMultiplier: 1.4, syncTouch: false });
+  const lenis = new Lenis({ autoRaf: false, lerp: reduced ? 1 : .065, wheelMultiplier: .75, touchMultiplier: 1.2, syncTouch: false });
   let scrollY = 0;
   lenis.on('scroll', () => { scrollY = lenis.animatedScroll; rig.prog = progressFor(scrollY); });
   const goTo = i => { const y = scrollFor(i), d = Math.abs(y - scrollY) / innerHeight; lenis.scrollTo(y, { duration: reduced ? 0 : clamp(1.2 + d * .22, 1.2, 4.2), easing: x => x < .5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2, force: true }); };
@@ -637,6 +674,10 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   let waiting = false;
   function status() {
     if (waiting) return;
+    if (snapshot) { // no live scene: the time in Visakhapatnam, from the visitor's own clock
+      const t = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()), h = +t.slice(0, 2);
+      $('.pf-live-tx').textContent = `Visakhapatnam, ${t} IST, ${h < 5 ? 'night' : h < 12 ? 'morning' : h < 16 ? 'afternoon' : h < 19 ? 'evening' : 'night'}`; return;
+    }
     const time = document.querySelector('#time-label')?.textContent || '', weather = document.querySelector('#weather-label')?.textContent || '';
     const [clock, , period] = time.split(' / '), [sky, moon] = weather.split(' / ');
     if (!clock) return;
@@ -655,7 +696,8 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     if (!e.isIntersecting) return; io.unobserve(e.target);
     setTimeout(() => e.target.classList.add('rv-in'), reduced ? 0 : +e.target.dataset.rvd || 0);
   }), { rootMargin: '0px 0px -10% 0px', threshold: .04 });
-  $$('[data-rv]').forEach(el => { if (!el.closest('#arrival')) io.observe(el); });
+  const photoFirst = el => !!el.closest('.pf-sec')?.querySelector('.pf-photo');
+  $$('[data-rv]').forEach(el => { if (!el.closest('#arrival') && !photoFirst(el)) io.observe(el); });
   // headings arrive word by word, masked, the first time they come into view; the hero waits for the arrival
   const reveals = new Map();
   let splitReady = Promise.resolve();
@@ -665,7 +707,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     const play = () => gsap.to(split.words, { yPercent: 0, opacity: 1, duration: .95, ease: 'expo.out', stagger: .072 });
     play.now = () => gsap.set(split.words, { yPercent: 0, opacity: 1 }); // while the campus is built the page stalls now and then: no animation to stall
     reveals.set(h, play);
-    if (!h.closest('#arrival')) { const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { o.disconnect(); play(); } }, { rootMargin: '0px 0px -12% 0px' }); o.observe(h); }
+    if (!h.closest('#arrival') && !photoFirst(h)) { const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { o.disconnect(); play(); } }, { rootMargin: '0px 0px -12% 0px' }); o.observe(h); }
   })).then(() => root.classList.add('split'));
   else root.classList.add('split');
 
@@ -695,7 +737,11 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     signAt.set(...(chapters[k].sign ?? chapters[k].anchor)).project(camera);
     return { on, x: (signAt.x + 1) / 2 * innerWidth, y: (1 - signAt.y) / 2 * innerHeight };
   };
-  $$('.pf-photo').forEach(el => plates.attach(el));
+  // photos first, then their words (owner, 2026-10-19): a stop's text comes in once its photo has poured out of the sign
+  const revealSection = sec => { sec.querySelectorAll('[data-rv]').forEach((e, i) => setTimeout(() => e.classList.add('rv-in'), reduced ? 0 : 150 + i * 90)); sec.querySelectorAll('.pf-display').forEach(h => reveals.get(h)?.()); };
+  $$('.pf-photo').forEach(el => plates.attach(el, () => revealSection(el.closest('.pf-sec'))));
+  // every stop's description on its own cloth card
+  $$('.pf-sec:not(.pf-hero):not(.pf-fin) > .pf-copy').forEach(el => plates.card(el));
   $$('.pf-chip').forEach(el => {
     el.addEventListener('pointerenter', () => $$('.pf-chip').forEach(o => o.classList.toggle('on', o === el)));
     el.addEventListener('pointerleave', () => el.classList.remove('on'));
@@ -708,7 +754,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   addEventListener('pointermove', e => {
     if (!active || e.pointerType === 'touch') return;
     if (!pointer.seen) { pointer.x = e.clientX; pointer.y = e.clientY; cursor.classList.add('seen'); } // the ring starts under the hand, not mid-screen
-    pointer.tx = e.clientX; pointer.ty = e.clientY; pointer.seen = true;
+    pointer.tx = e.clientX; pointer.ty = e.clientY; pointer.seen = true; pointer.at = performance.now();
     if (e.clientY < 90) nav.classList.remove('hide'); // the hidden nav comes back when the hand goes to it
     rig.tmx = e.clientX / innerWidth * 2 - 1; rig.tmy = -(e.clientY / innerHeight * 2 - 1);
     cursor.classList.toggle('act', !!e.target.closest?.('[data-cursor], a, button, summary'));
@@ -738,7 +784,9 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     const tl = gsap.timeline({ delay, onComplete: () => { lenis.start(); root.classList.add('arrived'); ring(true); } });
     // the hero steps aside for the flight and comes back as the camera settles
     root.classList.add('flying');
-    tl.fromTo(rig, { fly: 0 }, { fly: 1, duration: riseLength + .6, ease: 'none' }, 0)
+    if (flightClock) { flightOn = true; tl.to({}, { duration: riseLength + .6 }, 0); } // the video sets the pace (update)
+    else tl.fromTo(rig, { fly: 0 }, { fly: 1, duration: riseLength + .6, ease: 'none' }, 0);
+    tl
       .call(() => root.classList.remove('flying'), null, riseLength - 1.4)
       .call(() => { wordT = 0; }, null, riseLength - .9)
       .call(() => { if (!heroShown) reveals.get($('#arrival .pf-display'))?.(); }, null, riseLength - .2)
@@ -768,6 +816,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       if (!active) return false;
       const now = performance.now(); lenis.raf(now); last = now;
       const before = rig.smooth;
+      if (flightOn) { rig.fly = clamp(flightClock()); if (rig.fly >= 1) flightOn = false; }
       rig.smooth = reduced ? rig.prog : T.MathUtils.damp(rig.smooth, rig.prog, 5.2, dt);
       if (Math.abs(rig.smooth - rig.prog) < 1e-4) rig.smooth = rig.prog;
       rig.mx = T.MathUtils.damp(rig.mx, reduced ? 0 : rig.tmx, 2.6, dt); rig.my = T.MathUtils.damp(rig.my, reduced ? 0 : rig.tmy, 2.6, dt);
@@ -776,18 +825,21 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       $('.pf-veil').style.opacity = pose.veil.toFixed(3);
       // the copy column's wash: full while a chapter is read indoors, lighter outdoors and on the walk
       const hold = 1 - Math.min(1, Math.abs(rig.smooth - Math.round(rig.smooth)) * 4);
-      $('.pf-scrim').style.opacity = ((pose.outdoors ? .55 : .9) * (.45 + .55 * hold)).toFixed(3);
+      $('.pf-scrim').style.opacity = ((pose.outdoors ? .4 : .6) * (.45 + .55 * hold)).toFixed(3); // lighter: each description sits on its own card
       // cursor: the ring trails the hand
       pointer.x += (pointer.tx - pointer.x) * .18; pointer.y += (pointer.ty - pointer.y) * .18;
       cursor.style.transform = `translate3d(${pointer.x.toFixed(1)}px,${pointer.y.toFixed(1)}px,0)`;
       let moving = Math.abs(before - rig.smooth) > 1e-5 || Math.abs(rig.mx - rig.tmx) > 1e-3 || Math.abs(rig.my - rig.tmy) > 1e-3 || rig.intro < 1 || rig.fly < 1;
-      if (wisps && wisps.update(dt, rig.tmx, rig.tmy, pointer.seen && !reduced)) moving = true;
+      // the motes' faint breath stops once the hand has been still a moment: a resting page draws nothing (battery)
+      if (wisps && wisps.update(dt, rig.tmx, rig.tmy, pointer.seen && !reduced && performance.now() - (pointer.at || 0) < 1500)) moving = true;
       if (!reduced && leaves.update(dt, camera, pose.outdoors && rig.intro > .9, light)) moving = true;
       if (plates.update(dt, pointer.seen ? { x: pointer.tx, y: pointer.ty } : null, reduced, alphaOf, plateHere)) moving = true;
       if (wordmark) {
         if (wordT >= 0) wordT += dt;
         const near = 1 - smooth(.25, .75, rig.smooth); // gone by the time the camera reaches the porch
         wordmark.group.visible = near > .01 && wordT > 0;
+        // narrower on a tall screen, so the three letters stay on it: scaled about their own plane (z = 31)
+        const fit = clamp(camera.aspect / 1.15, .5, 1); wordmark.group.scale.setScalar(fit); wordmark.group.position.z = 31 * (1 - fit);
         if (wordmark.group.visible) {
           moving = true;
           for (const g of wordmark.glyphs) {
@@ -804,6 +856,38 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     },
     // after main.js has drawn the frame: the live windows
     get flying() { return rig.fly < 1; },
+    get fly() { return rig.fly; },
+    // anything moving because of the visitor or the story (not the ambient leaves and cloth): drawn at full rate
+    get busy() { return rig.fly < 1 || Math.abs(rig.smooth - rig.prog) > 1e-4 || lenis.isScrolling; },
+    get sway() { return sway; },
+    get pose() { return pose; },
+    // For the snapshot renderer: every frame of the story at one aspect. The arrival flight at fps over its length,
+    // then each walk sampled every `spacing` of its cost (metres walked, plus turning), both ends included; a stop's
+    // hold is its walk's last frame. Each item carries what poseFor needs.
+    renderPlan({ aspect: a, spacing = .2, flightSeconds, fps = 30 }) {
+      const keep = aspect; aspect = a; const segs = chapters.map((c, i) => i ? buildSegment(chapters[i - 1], c, a) : null);
+      const plan = { aspect: a, flight: Math.round(flightSeconds * fps), segments: [], frames: [] };
+      for (let j = 0; j < plan.flight; j++) plan.frames.push({ key: `fly/${String(j).padStart(3, '0')}`, fly: j / (plan.flight - 1), k: 0, outdoor: true, first: true });
+      segs.forEach((g, i) => {
+        if (!g) return;
+        const n = Math.max(2, Math.ceil(g.cost / spacing) + 1);
+        plan.segments[i] = n;
+        // hold: a stop's frame (the walk's end, and the hero at the first walk's start), the only frames with depth
+        const outdoor = i === 1 || !!chapters[i].outdoors; // the walk up to the porch, and out over the campus
+        for (let j = 0; j < n; j++) plan.frames.push({ key: `w${String(i).padStart(2, '0')}/${String(j).padStart(3, '0')}`, fly: 1, k: i - 1 + j / (n - 1), first: i === 1, outdoor, hold: j === n - 1 || (i === 1 && j === 0) });
+      });
+      aspect = keep;
+      return plan;
+    },
+    // put the camera on a plan item's pose (no parallax), at aspect a
+    poseFor(item, a) {
+      if (a !== aspect) { aspect = a; segments = chapters.map((c, i) => i ? buildSegment(chapters[i - 1], c, a) : null); }
+      const q = basePose(item.k, item.fly, { p: new T.Vector3() });
+      lookFrom(q.p, q.yaw, q.pitch); camera.fov = q.fov; camera.aspect = a; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+      return q;
+    },
+    // what the snapshot page needs to draw: the overlays it hides while frames are shot
+    overlays() { return [wordmark?.group, wisps?.points, leaves.mesh].filter(Boolean); },
     // the flight's opening view, drawn once while the page is still covered (the driver finishes a shader on its first
     // draw; a whole new side of the campus otherwise stalls the first frames of the rise)
     warm(draw) {

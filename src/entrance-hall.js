@@ -63,9 +63,10 @@ export function buildEntranceHall(parent, exterior) {
   floor.name = 'Continuous tiled entrance floor'; floor.rotation.x = -Math.PI / 2; floor.position.set(0, .164, 0);
   floor.receiveShadow = true; group.add(floor);
   // Side doors open onto the cross-corridor; upper grilles remain fixed.
-  // 14 October photographs (docs/entrance-video.md): the gate head sits at about half the clear height and
-  // the hexagon grille fills the rest up to the beam, nine rows deep.
-  const gateHead = 2.017, grilleTop = 3.66;
+  // 14 October photographs (docs/entrance-video.md): the hexagon grille over the gate head, up to the beam. Owner,
+  // 2026-10-19: the grille is half as deep (five rows) and the gate head higher, so the walk into the right wing (eye
+  // 2.32 m above the hall floor) passes under it.
+  const gateHead = 2.84, grilleTop = 3.66;
   for (const side of [-1, 1]) {
     const x = side * 3.79, win = hallWindows[side];
     const { roomFront, front, corridorCenter, corridorDepth } = groundSpine;
@@ -86,7 +87,7 @@ export function buildEntranceHall(parent, exterior) {
     box(x, gateHead, corridorCenter, .16, .07, corridorDepth, trim);
     box(x, grilleTop - .02, corridorCenter, .16, .05, corridorDepth, trim);
     // Elongated hexagons in columns, tied vertically, with a cross between neighbours in each row.
-    const cols = 8, rows = 9, cell = (corridorDepth - .12) / cols, pitch = (grilleTop - gateHead - .06) / rows;
+    const cols = 8, rows = 5, cell = (corridorDepth - .12) / cols, pitch = (grilleTop - gateHead - .06) / rows;
     for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
       const cy = gateHead + .035 + (row + .5) * pitch, cz = roomFront + .06 + (col + .5) * cell, hx = .36 * cell, hy = .3 * pitch;
       const pts = [[-hx, 0], [-hx / 2, hy], [hx / 2, hy], [hx, 0], [hx / 2, -hy], [-hx / 2, -hy], [-hx, 0]];

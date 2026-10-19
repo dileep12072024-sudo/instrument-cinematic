@@ -390,7 +390,12 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     const g = new T.PlaneGeometry(.32, .6); g.translate(0, at(1.55), .012); add(g, new T.MeshStandardMaterial({ name: 'Wall calendar', map: c, roughness: .9 })); }); // calendar (frame 57)
   for (const u of highWindows) W(u, () => highWindow(.72, .4, 2.5));
   for (const [u, fn] of westFit) placed(new T.Matrix4().set(0, 0, 1, inW, 0, 1, 0, 0, -1, 0, 0, u, 0, 0, 0, 1), fn); // local (x along wall, y, z into passage) -> world
-  signs.push({ ...sign('INDUSTRIAL INSTRUMENTS LAB', doors.instruments + .7, 2.32), wall: 'w' }, { ...sign('CONTROL SYSTEMS LABORATORY', doors.control + .7, 2.32), wall: 'w' }, { ...sign('PROCESS CONTROL LAB', 3.02, 2.45, .5), wall: 'w' }, { ...sign('D C S LAB', 14.55, 2.3, .5), wall: 'w' });
+  // The labs in order from the gate corner (owner, 2026-10-19): DCS, Process Control (the toran door), Industrial
+  // Instruments (the double door ahead of the corridor), Sensors and Transducers, Control Systems, Machines; the washing
+  // bay's door at the far end is not a lab. Each blade sign stands on the gate side of its door.
+  signs.push({ ...sign('D C S LAB', 14.55, 2.3, .5), wall: 'w' }, { ...sign('PROCESS CONTROL LAB', 3.02, 2.45, .5), wall: 'w' },
+    { ...sign('INDUSTRIAL INSTRUMENTS LAB', 1.25, 2.32), wall: 'w' }, { ...sign('SENSORS AND TRANSDUCERS LAB', doors.labA + .62, 2.32), wall: 'w' },
+    { ...sign('CONTROL SYSTEMS LABORATORY', doors.instruments + .7, 2.32), wall: 'w' }, { ...sign('MACHINES LAB', doors.control + .7, 2.32, .5), wall: 'w' });
 
   // East wall: the grilled courtyard door (one-leaf grid gate over a six-panel door, photo 34).
   placed(new T.Matrix4().set(0, 0, -1, inE, 0, 1, 0, 0, 1, 0, 0, eastDoor.u, 0, 0, 0, 1), () => labDoor(0, eastDoor.w, 2.12, { arched: false, gateLeaves: 1, panels: 6, material: greyDoor }));
