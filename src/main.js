@@ -614,7 +614,7 @@ function compileShadowShaders(root = scene) {
   return Promise.all(pending);
 }
 let previous = performance.now(), frames = 0, hallLit = false, hallFanSpeed = 1;
-let rise, riseDust, riseStart = 0; // the arrival: the building rising out of the land
+let rise, riseDust, riseStart = 0, riseClock = 0; // the arrival: the building rising out of the land; its own clock
 const RISE_RATE = .62; // the rise's own clock runs slower than wall time: about eleven seconds, with weight
 let portfolio = null, entered = false; // the story layer (portfolio.js), shown first; entered: Enter pressed during the load
 function goFullscreen() { // the whole page, so the story scrolls in full screen too; iPhone Safari has no API for it
@@ -624,7 +624,7 @@ function goFullscreen() { // the whole page, so the story scrolls in full screen
 function openDoors() { doorsOpen = true; $('#door span').textContent = 'Close the doors'; $('#door').setAttribute('aria-pressed', 'true'); }
 function begin(gesture) {
   if (gesture) { goFullscreen(); resumeDefaultSound(); }
-  if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; } else riseStart = performance.now() + 750; // the arrival, once the loader has faded
+  if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; } else { riseStart = 1; riseClock = -.75 * RISE_RATE; } // the arrival, once the loader has faded
   // the story walks in through the front doors
   if (window.__noStory) leaveStory('explore'); else { openDoors(); portfolio.play(RISE_LENGTH / RISE_RATE, .75); }
   $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700); needsRender = true;
@@ -736,7 +736,10 @@ function animate(now) {
   if (liveClock && now - lastClockSync > 15000) { lastClockSync = now; setHour(localHour(), { manual: false }); updateMoon(); }
   if (Date.now() - moonState.updatedAt > 30000) updateMoon();
   if (riseStart && !rise.done) { // the building rising: every frame, with its shadows
-    const t = Math.max(-1, (now - riseStart) / 1000 * RISE_RATE); rise.set(t); riseDust.set(t); riseDust.material.uniforms.uLight.value = 1 - .8 * sunlight.night;
+    // the rise's own clock steps by the frame time, capped: one long stall (a first draw) pauses it rather than skipping
+    // it, as the story's timeline does (portfolio.js); ordinary slow frames keep wall time
+    riseClock += Math.min(frameDuration / 1000, .25) * RISE_RATE;
+    const t = Math.max(-1, riseClock); rise.set(t); riseDust.set(t); riseDust.material.uniforms.uLight.value = 1 - .8 * sunlight.night;
     if (frames % 4 === 0) renderer.shadowMap.needsUpdate = true; needsRender = true; // shadows follow every fourth frame: redrawing the whole campus into the shadow map halved the frame rate
     if (rise.done) { renderer.shadowMap.needsUpdate = true; riseDust.set(1e6); }
   }
@@ -822,7 +825,7 @@ function animate(now) {
   send(); setInterval(() => { if (!document.hidden) send(); }, 30000); // keeps 'online now' current on the dashboard
   addEventListener('pagehide', send);
 })();
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, get rise() { return rise; }, get portfolio() { return portfolio; }, get riseDust() { return riseDust; }, playRise() { riseStart = performance.now(); rise.set(0); }, RISE_LENGTH, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, get rise() { return rise; }, get portfolio() { return portfolio; }, get riseDust() { return riseDust; }, playRise() { riseStart = 1; riseClock = 0; rise.set(0); }, RISE_LENGTH, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
 boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;

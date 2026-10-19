@@ -6,7 +6,7 @@ import * as C from './portfolio-content.js';
 import './portfolio.css';
 
 gsap.registerPlugin(SplitText);
-gsap.ticker.lagSmoothing(0); // the arrival follows wall time, as the rise does: a slow frame must not stretch it
+gsap.ticker.lagSmoothing(250, 1000 / 60); // the arrival keeps wall time through slow frames, but one long stall (a first draw) pauses it instead of skipping it, as the rise does (main.js)
 
 // The portfolio layer (docs/portfolio-layer.md, plan v2): the first thing a visitor sees. A normal scrolling document
 // over the fixed live campus, after mengto.github.io/kage: every chapter is a camera waypoint and the scroll position,
