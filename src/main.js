@@ -737,7 +737,7 @@ function animate(now) {
   if (Date.now() - moonState.updatedAt > 30000) updateMoon();
   if (riseStart && !rise.done) { // the building rising: every frame, with its shadows
     const t = Math.max(-1, (now - riseStart) / 1000 * RISE_RATE); rise.set(t); riseDust.set(t); riseDust.material.uniforms.uLight.value = 1 - .8 * sunlight.night;
-    if (frames % 2 === 0) renderer.shadowMap.needsUpdate = true; needsRender = true;
+    if (frames % 4 === 0) renderer.shadowMap.needsUpdate = true; needsRender = true; // shadows follow every fourth frame: redrawing the whole campus into the shadow map halved the frame rate
     if (rise.done) { renderer.shadowMap.needsUpdate = true; riseDust.set(1e6); }
   }
   if (Math.abs(hour - targetHour) > .005) { hour = THREE.MathUtils.damp(hour, targetHour, 4, dt); updateLighting(hour); }
@@ -801,6 +801,7 @@ function animate(now) {
     for (const [o, s] of smallParts) o.visible = s.radius > .005 * s.center.distanceTo(camera.position);
     // A room's fans and switches are drawn only from inside it (each is several draw calls; from outside they are behind walls or patterned glass).
     for (const { bounds, parts } of interiors) { const inside = bounds.distanceToPoint(camera.position) < 1.5; for (const p of parts) p.visible = inside; }
+    portfolio?.beforeRender();
     renderer.render(scene, camera);
     portfolio?.afterRender(); // the story's live windows onto other rooms
     if (++frames % 60 === 0) drawPlan();

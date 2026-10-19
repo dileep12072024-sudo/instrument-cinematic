@@ -6,6 +6,7 @@ import * as C from './portfolio-content.js';
 import './portfolio.css';
 
 gsap.registerPlugin(SplitText);
+gsap.ticker.lagSmoothing(0); // the arrival follows wall time, as the rise does: a slow frame must not stretch it
 
 // The portfolio layer (docs/portfolio-layer.md, plan v2): the first thing a visitor sees. A normal scrolling document
 // over the fixed live campus, after mengto.github.io/kage: every chapter is a camera waypoint and the scroll position,
@@ -244,44 +245,56 @@ function buildSegment(a, b, aspect) {
 }
 
 // --------------------------------------------------------------------------------------------- live windows
-// Kage's card viewports: a camera elsewhere in the building rendered into a buffer, and the buffer drawn into the
-// rectangle of a frame on the page. A buffer is re-rendered while its lens is pushing in, when it changes place, and
-// otherwise every 30th frame, staggered; switching place crossfades between the old and the new picture.
+// Kage's card viewports: a camera elsewhere in the building, shown in the rectangle of a frame on the page. A window's
+// view is drawn straight into the canvas at its rectangle before the main view (with the screen's own shaders: an
+// offscreen buffer would need a second, linear set of every shader, ~20 s to compile on an integrated GPU) and copied
+// into a texture; after the main view, each window's texture is laid back over its rectangle. A view is redrawn while
+// its lens pushes in, when it changes place, and otherwise every 30th frame; changing place crossfades.
 function createViews(scene, renderer) {
   const quadScene = new T.Scene(), quadCam = new T.Camera();
   const material = new T.ShaderMaterial({
     uniforms: { tA: { value: null }, tB: { value: null }, uMix: { value: 0 }, uAlpha: { value: 1 } },
     vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
+    // the textures hold finished screen pixels: no tone mapping or colour conversion here
     fragmentShader: `uniform sampler2D tA, tB; uniform float uMix, uAlpha; varying vec2 vUv;
       void main() { vec3 a = texture2D(tA, vUv).rgb, b = texture2D(tB, vUv).rgb; vec3 c = mix(a, b, smoothstep(0., 1., uMix));
         vec2 q = vUv - .5; c *= 1. - .55 * dot(q, q); c *= mix(.62, 1., smoothstep(0., .45, vUv.y));
-        gl_FragColor = vec4(c, uAlpha);
-        #include <tonemapping_fragment>
-        #include <colorspace_fragment>
-      }`,
-    depthTest: false, depthWrite: false, transparent: true,
+        gl_FragColor = vec4(c, uAlpha); }`,
+    depthTest: false, depthWrite: false, transparent: true, toneMapped: false,
   });
   quadScene.add(new T.Mesh(new T.PlaneGeometry(2, 2), material));
-  const list = [];
+  const list = [], at = new T.Vector2();
   let frame = 0;
-  // linear, untoned buffers: the quad applies the renderer's tone mapping and output colour space, as the main view gets
-  const target = (w, h) => new T.WebGLRenderTarget(w, h, { type: T.HalfFloatType, samples: 2 });
   function aim(v, def, cam) {
     const eye = V(def.eye), look = V(def.look), dir = look.clone().sub(eye).normalize();
     cam.position.copy(eye).addScaledVector(dir, v.push * 1.1); cam.lookAt(look); cam.fov = def.fov - v.push * 6; cam.updateProjectionMatrix();
   }
+  // the window's rectangle in drawing-buffer pixels, whole pixels, inside the canvas
+  function box(r) {
+    const pr = renderer.getPixelRatio(), cw = renderer.domElement.width, ch = renderer.domElement.height;
+    const x = Math.max(0, Math.round(r.left * pr)), y = Math.max(0, Math.round(ch - r.bottom * pr));
+    return { x, y, w: Math.min(cw - x, Math.round(r.width * pr)), h: Math.min(ch - y, Math.round(r.height * pr)), pr };
+  }
+  function shoot(cam, def, v, tex, b) {
+    aim(v, def, cam); cam.aspect = b.w / b.h; cam.updateProjectionMatrix();
+    renderer.setViewport(b.x / b.pr, b.y / b.pr, b.w / b.pr, b.h / b.pr); renderer.setScissor(b.x / b.pr, b.y / b.pr, b.w / b.pr, b.h / b.pr); renderer.setScissorTest(true);
+    renderer.render(scene, cam);
+    renderer.copyFramebufferToTexture(tex, at.set(b.x, b.y));
+  }
+  const reset = () => { const pr = renderer.getPixelRatio(), w = renderer.domElement.width / pr, h = renderer.domElement.height / pr; renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h); renderer.setScissor(0, 0, w, h); };
+  const visible = v => v.rect && v.rect.width >= 8 && v.rect.bottom > -40 && v.rect.top < innerHeight + 40 && v.alpha >= .02;
   return {
     list,
     attach(el) {
-      const v = { el, frame: el.querySelector('[data-frame]') || el, name: el.dataset.view, next: null, mix: 0, push: 0, want: 0, rtA: null, rtB: null, cam: new T.PerspectiveCamera(46, 1, .12, 400), camB: new T.PerspectiveCamera(46, 1, .12, 400), dirty: true, slot: list.length * 7, alpha: 0, rect: null };
+      const v = { el, frame: el.querySelector('[data-frame]') || el, name: el.dataset.view, next: null, mix: 0, push: 0, want: 0, texA: null, texB: null, cam: new T.PerspectiveCamera(46, 1, .12, 400), camB: new T.PerspectiveCamera(46, 1, .12, 400), dirty: true, dirtyB: false, slot: list.length * 7, alpha: 0, rect: null };
       v.cam.layers.set(0); v.camB.layers.set(0);
       el.addEventListener('pointerenter', () => { v.want = 1; }); el.addEventListener('pointerleave', () => { v.want = 0; });
       list.push(v); return v;
     },
-    // turn a window to another place: rendered into the second buffer, then crossfaded
+    // turn a window to another place: shot into the second texture, then crossfaded
     show(v, name) {
       if (!v || !C.views[name] || name === (v.next ?? v.name)) return;
-      if (v.next) { v.name = v.next; [v.rtA, v.rtB] = [v.rtB, v.rtA]; }
+      if (v.next) { v.name = v.next; [v.texA, v.texB] = [v.texB, v.texA]; }
       v.next = name; v.mix = 0; v.dirtyB = true;
       v.el.querySelector('figcaption b').textContent = C.views[name].label; v.el.querySelector('figcaption i').textContent = C.views[name].note;
     },
@@ -290,33 +303,45 @@ function createViews(scene, renderer) {
       let moving = false;
       for (const v of list) {
         const p = v.push; v.push = T.MathUtils.damp(v.push, v.want, 3.4, dt); if (Math.abs(v.push - p) > 1e-4) moving = true;
-        if (v.next) { v.mix = Math.min(1, v.mix + dt / .65); moving = true; if (v.mix >= 1) { v.name = v.next; v.next = null; [v.rtA, v.rtB] = [v.rtB, v.rtA]; v.mix = 0; } }
+        if (v.next) { v.mix = Math.min(1, v.mix + dt / .65); moving = true; if (v.mix >= 1) { v.name = v.next; v.next = null; [v.texA, v.texB] = [v.texB, v.texA]; v.mix = 0; } }
       }
       return moving;
     },
-    // after the main view is drawn: refresh the buffers that need it and draw each window into its rectangle
-    draw(measureAlpha) {
+    // the first shot of a window, taken while the loader still covers the page: a place's first draw finishes its
+    // shaders in the driver (~2.5 s here), which would otherwise land as a stall just after the arrival
+    prime(v) {
+      v.rect = v.frame.getBoundingClientRect(); const b = box(v.rect); if (b.w < 8 || b.h < 8) return;
+      v.texA?.dispose(); v.texB?.dispose(); v.texA = new T.FramebufferTexture(b.w, b.h); v.texB = new T.FramebufferTexture(b.w, b.h);
+      shoot(v.cam, C.views[v.name], v, v.texA, b); v.dirty = false; reset();
+    },
+    // before the main view: shoot the views that need it into their textures
+    shoot(measureAlpha) {
       frame++;
-      const pr = renderer.getPixelRatio(), H = renderer.domElement.height / pr;
-      const keepTarget = renderer.getRenderTarget(), keepClear = renderer.autoClear;
-      let drew = false;
+      let shot = false;
       for (const v of list) {
         if (frame % 10 === 0 || !v.rect) { v.rect = v.frame.getBoundingClientRect(); v.alpha = measureAlpha(v.el); }
-        const r = v.rect;
-        if (r.width < 8 || r.bottom < -40 || r.top > innerHeight + 40 || v.alpha < .02) continue;
-        const w = Math.max(8, Math.round(r.width * Math.min(pr, 1.5))), h = Math.max(8, Math.round(r.height * Math.min(pr, 1.5)));
-        if (!v.rtA || v.rtA.width !== w || v.rtA.height !== h) { v.rtA?.dispose(); v.rtB?.dispose(); v.rtA = target(w, h); v.rtB = target(w, h); v.dirty = v.dirtyB = true; }
+        if (!visible(v)) continue;
+        const b = box(v.rect); if (b.w < 8 || b.h < 8) continue;
+        if (!v.texA || v.texA.image.width !== b.w || v.texA.image.height !== b.h) { v.texA?.dispose(); v.texB?.dispose(); v.texA = new T.FramebufferTexture(b.w, b.h); v.texB = new T.FramebufferTexture(b.w, b.h); v.dirty = true; if (v.next) v.dirtyB = true; }
         const pushing = Math.abs(v.push - v.want) > .002 || v.push > .002 && v.want > 0;
-        renderer.autoClear = true;
-        if (v.dirty || pushing || (frame + v.slot) % 30 === 0) { aim(v, C.views[v.name], v.cam); v.cam.aspect = w / h; v.cam.updateProjectionMatrix(); renderer.setRenderTarget(v.rtA); renderer.render(scene, v.cam); v.dirty = false; }
-        if (v.next && (v.dirtyB || pushing || frame % 4 === 0)) { aim(v, C.views[v.next], v.camB); v.camB.aspect = w / h; v.camB.updateProjectionMatrix(); renderer.setRenderTarget(v.rtB); renderer.render(scene, v.camB); v.dirtyB = false; }
-        renderer.setRenderTarget(null); renderer.autoClear = false;
-        renderer.setViewport(r.left, H - r.bottom, r.width, r.height); renderer.setScissor(r.left, H - r.bottom, r.width, r.height); renderer.setScissorTest(true);
-        material.uniforms.tA.value = v.rtA.texture; material.uniforms.tB.value = (v.next ? v.rtB : v.rtA).texture; material.uniforms.uMix.value = v.next ? v.mix : 0; material.uniforms.uAlpha.value = v.alpha;
+        if (v.dirty || pushing || (frame + v.slot) % 30 === 0) { shoot(v.cam, C.views[v.name], v, v.texA, b); v.dirty = false; shot = true; }
+        if (v.next && (v.dirtyB || pushing || frame % 4 === 0)) { shoot(v.camB, C.views[v.next], v, v.texB, b); v.dirtyB = false; shot = true; }
+      }
+      if (shot) reset();
+    },
+    // after the main view: lay each window's picture over its rectangle
+    draw() {
+      const keepClear = renderer.autoClear; renderer.autoClear = false;
+      let drew = false;
+      for (const v of list) {
+        if (!visible(v) || !v.texA) continue;
+        const b = box(v.rect);
+        renderer.setViewport(b.x / b.pr, b.y / b.pr, b.w / b.pr, b.h / b.pr); renderer.setScissor(b.x / b.pr, b.y / b.pr, b.w / b.pr, b.h / b.pr); renderer.setScissorTest(true);
+        material.uniforms.tA.value = v.texA; material.uniforms.tB.value = v.next ? v.texB : v.texA; material.uniforms.uMix.value = v.next ? v.mix : 0; material.uniforms.uAlpha.value = v.alpha;
         renderer.render(quadScene, quadCam); drew = true;
       }
-      if (drew) { renderer.setScissorTest(false); renderer.setViewport(0, 0, renderer.domElement.width / pr, H); renderer.setScissor(0, 0, renderer.domElement.width / pr, H); }
-      renderer.setRenderTarget(keepTarget); renderer.autoClear = keepClear;
+      if (drew) reset();
+      renderer.autoClear = keepClear;
     },
   };
 }
@@ -612,6 +637,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     .observe(loading, { childList: true, characterData: true, subtree: true });
 
   function play(riseLength, delay = 0) {
+    views.prime(heroLens);
     const heroParts = $$('#arrival [data-rv]');
     if (waiting) { waiting = false; root.classList.remove('waiting'); status(); }
     if (reduced) { rig.intro = 1; wordT = 99; root.classList.add('arrived'); ring(true); heroParts.forEach(e => e.classList.add('rv-in')); return; }
@@ -674,6 +700,8 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       return moving || views.list.some(v => v.rect && v.rect.bottom > 0 && v.rect.top < innerHeight);
     },
     // after main.js has drawn the frame: the live windows
-    afterRender() { if (active && root.classList.contains('arrived') || active && reduced) views.draw(alphaOf); },
+    // around main.js's draw of the frame: the live windows are shot before it and laid over it after
+    beforeRender() { if (active && (root.classList.contains('arrived') || reduced)) views.shoot(alphaOf); },
+    afterRender() { if (active && (root.classList.contains('arrived') || reduced)) views.draw(); },
   };
 }
