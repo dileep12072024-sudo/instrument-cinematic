@@ -10,71 +10,130 @@ export const department = {
   city: 'Visakhapatnam',
 };
 
-const EYE = 1.62, HALL = .164 + EYE, CORRIDOR = -.376 + EYE, WING = -.916 + EYE, LANDING = 4.044 + EYE, CLASS = 3.504 + EYE, EAST = 4.704 + EYE;
+const EYE = 1.62, HALL = .164 + EYE, CORRIDOR = -.376 + EYE, WING = -.916 + EYE, LANDING = 4.044 + EYE, CLASS = 3.504 + EYE, LOWER = 2.964 + EYE, EAST = 4.704 + EYE, GROUND_E = .704 + EYE;
 
-// The places. Each chapter holds at `eye`, framing `anchor` (the door or board it is about); `route` is the walk from
-// the previous chapter's eye, along the corridors, steps and stairs (every point on a floor or a flight).
+// The walk: every stop is a real room in the building. Each holds at `eye`, framing `anchor` (the door, its sign, or the
+// board); `route` is the walk from the previous stop's eye along corridors, steps and stairs (every point on a floor or a
+// flight). group: which header link the stop belongs to. Coordinates are the main site's model (metres).
 export const chapters = [
-  { id: 'arrival', nav: 'Arrival', where: 'Outside, under tonight’s sky', outdoors: true,
+  { id: 'arrival', group: 'arrival', nav: 'Arrival', where: 'Outside, under today\u2019s sky', outdoors: true,
     eye: [0, 4.2, 47], anchor: [0, 7.2, 0], fov: 38, frame: 'centre' },
-  { id: 'heritage', nav: 'Heritage', where: 'Entrance hall, ground floor',
+  { id: 'heritage', group: 'heritage', nav: 'Heritage', where: 'Entrance hall, ground floor',
     route: [[0, 3.1, 33], [0, 2.15, 21], [0, HALL, 12.6], [0, HALL, 8.6], [.2, HALL, 6.4]],
     eye: [.45, HALL, 5.4], anchor: [3.72, 2.55, 5.12], fov: 56 },
-  { id: 'admissions', nav: 'Admissions', where: 'Department office, west corridor',
+  { id: 'admissions', group: 'admissions', nav: 'Admissions', where: 'Department office, west corridor',
     route: [[.1, HALL, 3.4], [-2.6, HALL, 2.2], [-4.7, CORRIDOR, 2.17], [-10, CORRIDOR, 2.2], [-16.2, CORRIDOR, 2.3]],
     eye: [-18.6, CORRIDOR, 2.7], anchor: [-20.45, 1.15, 1.09], fov: 54 },
-  { id: 'labs', nav: 'Laboratories', where: 'West wing, ground floor',
+  // the west wing: a passage running north-south below the corridor, the labs on its west wall
+  { id: 'lab-process', group: 'labs', nav: 'Process Control Lab', where: 'West wing, ground floor',
     route: [[-20.0, CORRIDOR, 2.35], [-20.9, CORRIDOR, 2.2]],
     eye: [-21.3, CORRIDOR - .2, 2.17], anchor: [-24.42, .45, 2.2], fov: 56 },
-  { id: 'guide', nav: 'Finding your way', where: 'Library, first-floor landing',
-    route: [[-20.4, CORRIDOR, 2.2], [-16, CORRIDOR, 2.2], [-10, CORRIDOR, 2.2], [-4.7, CORRIDOR, 2.17], [-2.67, HALL, 2.1],
-      [-2.67, HALL, .3], [-2.67, 2.484 + EYE, -4.0], [-2.3, 2.484 + EYE, -5.0], [-.6, 2.484 + EYE, -5.15], [0, 2.484 + EYE, -4.1],
-      [0, LANDING, -.7], [0, LANDING, .3]],
+  { id: 'lab-instruments', group: 'labs', nav: 'Industrial Instruments Lab', where: 'West wing, ground floor',
+    route: [[-21.9, CORRIDOR - .4, 2.1], [-22.6, WING, 1.6], [-23.0, WING, .6]],
+    eye: [-23.0, WING, -.7], anchor: [-24.3, .85, -2.45], fov: 56 },
+  { id: 'lab-control', group: 'labs', nav: 'Control Systems Laboratory', where: 'West wing, ground floor',
+    route: [[-23.0, WING, -2.6], [-23.0, WING, -4.6]],
+    eye: [-23.0, WING, -5.9], anchor: [-24.3, .85, -7.7], fov: 56 },
+  { id: 'lab-dcs', group: 'labs', nav: 'DCS Lab', where: 'West wing, by the gate',
+    route: [[-23.1, WING, -3.5], [-23.2, WING, 1.5], [-23.2, WING, 6.5], [-23.15, WING, 10.4]],
+    eye: [-23.1, WING, 12.0], anchor: [-24.3, .85, 14.3], fov: 56 },
+  { id: 'lab-simulation', group: 'labs', nav: 'Simulation Lab', where: 'East corridor, ground floor',
+    route: [[-23.1, WING, 8], [-23.0, WING, 3.4], [-22.4, WING, 2.17], [-21.3, CORRIDOR, 2.17], [-16, CORRIDOR, 2.2], [-10, CORRIDOR, 2.2], [-4.7, CORRIDOR, 2.17],
+      [-2.6, HALL, 2.2], [0, HALL, 2.8], [2.6, HALL, 2.3], [3.65, HALL, 2.167], [4.7, GROUND_E, 2.167]],
+    eye: [7.4, GROUND_E, 2.55], anchor: [5.45, 1.75, 1.1], fov: 56 },
+  { id: 'lab-electronics', group: 'labs', nav: 'Electronics Lab II', where: 'East side, ground floor',
+    route: [[10, GROUND_E, 2.2], [16, GROUND_E, 2.2], [21.6, GROUND_E, 2.2], [23.25, GROUND_E, 2.7]],
+    eye: [23.25, GROUND_E, 4.8], anchor: [23.25, 1.85, 7.85], fov: 56 },
+  { id: 'guide', group: 'guide', nav: 'Finding your way', where: 'Library, first-floor landing',
+    route: [[23.2, GROUND_E, 2.6], [21, GROUND_E, 2.2], [12, GROUND_E, 2.2], [4.7, GROUND_E, 2.167], [3.65, HALL, 2.167], [2.67, HALL, 2.1],
+      [2.67, HALL, .2], [2.67, 2.484 + EYE, -4.1], [2.3, 2.484 + EYE, -5.0], [.6, 2.484 + EYE, -5.15], [0, 2.484 + EYE, -4.1], [0, LANDING, -.7], [0, LANDING, .3]],
     eye: [-.45, LANDING, 1.25], anchor: [-2.55, 5.2, 3.4], fov: 56 },
-  { id: 'hod', nav: 'Head of Department', where: 'Classroom wing, first floor',
-    route: [[-1.4, LANDING, 2.0], [-2.4, LANDING, 2.17], [-3.98, LANDING, 2.17], [-4.62, CLASS, 2.17], [-8.4, CLASS, 2.2]],
-    eye: [-10.9, CLASS, 2.55], anchor: [-13.2, 4.75, 1.13], fov: 54 },
-  { id: 'faculty', nav: 'Faculty', where: 'East corridor, first floor',
-    route: [[-8.4, CLASS, 2.2], [-4.62, CLASS, 2.17], [-3.98, LANDING, 2.17], [-2.4, LANDING, 2.17], [0, LANDING, 2.0], [2.6, LANDING, 2.1],
-      [4.1, LANDING, 2.1], [4.9, EAST, 2.1]],
-    eye: [6.6, EAST, 2.55], anchor: [11.9, 5.75, 1.09], fov: 56 },
-  { id: 'enter', nav: 'Step inside', where: 'Over the north campus', outdoors: true,
-    route: [[9, EAST, 2.4], [11, EAST, 2.6], [11.5, EAST, 4.4], [11.3, 12.8, 6.2], [8.5, 15.6, 15], [4, 16.5, 34]],
+  // the classroom wing: faculty rooms on the left, the classrooms at its far end down three steps
+  { id: 'fac-daisy', group: 'faculty', nav: 'Dr. A. Daisy Rani', where: 'Classroom wing, first floor', person: 'daisy',
+    route: [[-1.4, LANDING, 2.0], [-2.4, LANDING, 2.17], [-3.98, LANDING, 2.17], [-4.62, CLASS, 2.17]],
+    eye: [-4.6, CLASS, 2.5], anchor: [-6.55, 5.35, 1.2], fov: 54 },
+  { id: 'fac-kamala', group: 'faculty', nav: 'Dr. A. Kamala Kumari', where: 'Classroom wing, first floor', person: 'kamala',
+    route: [[-6.2, CLASS, 2.3]],
+    eye: [-8.0, CLASS, 2.5], anchor: [-10.05, 5.35, 1.2], fov: 54 },
+  { id: 'hod', group: 'faculty', nav: 'Head of Department', where: 'Classroom wing, first floor', person: 'swapna',
+    route: [[-9.6, CLASS, 2.3]],
+    eye: [-11.4, CLASS, 2.5], anchor: [-13.45, 5.35, 1.2], fov: 54 },
+  { id: 'classrooms', group: 'classrooms', nav: 'Classrooms II and III', where: 'End of the classroom wing',
+    route: [[-14.5, CLASS, 2.2], [-18, CLASS, 2.17], [-20.7, CLASS, 2.17], [-21.64, LOWER, 2.17]],
+    eye: [-22.0, LOWER, 1.95], anchor: [-23.7, 3.9, 3.2], fov: 58 },
+  { id: 'classroom-iv', group: 'classrooms', nav: 'Classroom IV', where: 'Classroom wing, side passage',
+    route: [[-23.15, LOWER, 1.2], [-23.15, LOWER, -1.8]],
+    eye: [-23.15, LOWER, -4.3], anchor: [-24.2, 3.9, -6.73], fov: 56 },
+  // the east corridor on the first floor: professors' rooms on the left, the labs at its end
+  { id: 'fac-patnaik', group: 'faculty', nav: 'Prof. M. Ramesh Patnaik', where: 'East corridor, first floor', person: 'patnaik',
+    route: [[-23.15, LOWER, -1], [-22.6, LOWER, 1.8], [-21.64, LOWER, 2.17], [-20.7, CLASS, 2.17], [-12, CLASS, 2.2], [-4.62, CLASS, 2.17], [-3.98, LANDING, 2.17],
+      [-2.4, LANDING, 2.17], [0, LANDING, 2.0], [2.6, LANDING, 2.1], [4.1, LANDING, 2.1], [4.9, EAST, 2.1]],
+    eye: [6.9, EAST, 2.5], anchor: [9.55, 6.35, 1.25], fov: 54 },
+  { id: 'fac-ysrao', group: 'faculty', nav: 'Prof. Y. Srinivasa Rao', where: 'East corridor, first floor', person: 'ysrao',
+    route: [[8.4, EAST, 2.3]],
+    eye: [9.7, EAST, 2.5], anchor: [12.15, 6.35, 1.25], fov: 54 },
+  { id: 'fac-bhujanga', group: 'faculty', nav: 'Prof. A. Bhujanga Rao', where: 'East corridor, first floor', person: 'bhujanga',
+    route: [[11.6, EAST, 2.3]],
+    eye: [14.2, EAST, 2.5], anchor: [16.65, 6.35, 1.25], fov: 54 },
+  { id: 'lab-devicefab', group: 'labs', nav: 'Device Fab Lab', where: 'East wing, first floor',
+    route: [[17.6, EAST, 2.3]],
+    eye: [20.3, EAST, 2.1], anchor: [24.37, 5.75, 2.09], fov: 54 },
+  { id: 'lab-biomedical', group: 'labs', nav: 'Biomedical Instrumentation Lab', where: 'East wing, first floor',
+    route: [[21.6, EAST, 2.05], [23.27, EAST, .4], [23.27, EAST, -3.5]],
+    eye: [23.27, EAST, -7.4], anchor: [23.27, 5.75, -11.2], fov: 54 },
+  { id: 'enter', group: 'enter', nav: 'Step inside', where: 'Over the north campus', outdoors: true,
+    route: [[23.27, EAST, -3.5], [23.0, EAST, 1.2], [21.4, EAST, 2.4], [20.4, EAST, 4.4], [19.8, 12.8, 6.2], [12, 15.6, 15], [4, 16.5, 34]],
     eye: [0, 15, 62], anchor: [0, 6.5, 0], fov: 40, frame: 'centre', through: [2.95, 6.4] }, // the front wall and the tree crowns before it, z from..to: crossed under a veil
-  { id: 'foot', nav: '', where: '', outdoors: true,
+  { id: 'foot', group: 'enter', nav: '', where: '', outdoors: true,
     route: [[-4, 19, 72]],
     eye: [-9, 24, 82], anchor: [0, 5, 0], fov: 38, frame: 'centre' },
 ];
 
-// Live views (Kage's card viewports): a camera in another part of the building, rendered into a frame on the page.
-export const views = {
-  hall: { eye: [0, HALL, 10.4], look: [0, 2.0, 2.4], fov: 50, label: 'Entrance hall', note: 'Right now' },
-  boards: { eye: [.45, HALL, 5.4], look: [3.72, 2.55, 5.12], fov: 50, label: 'The hall boards', note: 'Ground floor' },
-  office: { eye: [-18.2, CORRIDOR, 2.75], look: [-20.45, 1.15, 1.09], fov: 50, label: 'Department office', note: 'West corridor' },
-  process: { eye: [-21.1, CORRIDOR - .2, 2.17], look: [-24.42, .45, 2.2], fov: 46, label: 'Process Control Lab', note: 'West wing, ground floor' },
-  devicefab: { eye: [20.6, EAST, 2.1], look: [24.37, 5.75, 2.09], fov: 46, label: 'Device Fab Lab', note: 'East wing, first floor' },
-  biomedical: { eye: [23.27, EAST, -6.4], look: [23.27, 5.75, -11.2], fov: 46, label: 'Biomedical Instrumentation Lab', note: 'East wing, first floor' },
-  library: { eye: [-.45, LANDING, 1.25], look: [-2.55, 5.2, 3.4], fov: 50, label: 'Department library', note: 'First-floor landing' },
-  swapna: { eye: [-10.1, CLASS, 2.35], look: [-13.6, 5.6, 1.25], fov: 50, label: 'Dr. P. Swapna', note: 'Classroom wing, first floor' },
-  kamala: { eye: [-6.9, CLASS, 2.35], look: [-10.2, 5.6, 1.25], fov: 50, label: 'Dr. A. Kamala Kumari', note: 'Classroom wing, first floor' },
-  patnaik: { eye: [6.4, EAST, 2.3], look: [9.7, 6.35, 1.25], fov: 50, label: 'Prof. M. Ramesh Patnaik', note: 'East corridor, first floor' },
-  ysrao: { eye: [9.0, EAST, 2.3], look: [12.3, 6.35, 1.25], fov: 50, label: 'Prof. Y. Srinivasa Rao', note: 'East corridor, first floor' },
-  bhujanga: { eye: [13.5, EAST, 2.3], look: [16.8, 6.35, 1.25], fov: 50, label: 'Prof. A. Bhujanga Rao', note: 'East corridor, first floor' },
-  classrooms: { eye: [-17.5, CLASS, 2.17], look: [-24, 4.3, 2.4], fov: 50, label: 'Classrooms II, III and IV', note: 'End of the classroom wing' },
+// The people. Rooms, degrees and posts are from the door signs in the building; areas from the department's page; the
+// Ph.D years from the hall board of Ph.D awardees; the years as head from the board of successive heads.
+export const people = {
+  swapna: { name: 'Dr. P. Swapna', role: 'Professor and Head of the Department', degrees: 'M.Tech, Ph.D (Andhra University, 2015)', area: 'Industrial process instrumentation', photo: '/media/faculty/swapna.webp',
+    note: 'The department\u2019s present head. Her room is this door, under the blade sign; academic matters come here, while the department office handles admissions, certificates and fees.' },
+  daisy: { name: 'Dr. A. Daisy Rani', role: '', // post not yet confirmed
+    degrees: 'Ph.D (Andhra University, 2015)', area: 'Industrial process instrumentation', photo: '/media/faculty/daisy-rani.webp',
+    note: 'The first room in the classroom wing corridor.' },
+  kamala: { name: 'Dr. A. Kamala Kumari', role: 'Associate Professor', degrees: 'M.Tech, Ph.D (Andhra University, 2015)', area: 'Digital systems and computer electronics', photo: '/media/faculty/kamala-kumari.webp',
+    note: 'Head of the department from 2022.' },
+  patnaik: { name: 'Prof. M. Ramesh Patnaik', role: 'Professor', degrees: 'M.Tech, Ph.D (Andhra University, 2011), F.I.E', area: 'Industrial process instrumentation',
+    note: 'Head of the department from 2021.' },
+  ysrao: { name: 'Prof. Y. Srinivasa Rao', role: 'Professor', degrees: 'Ph.D', area: 'Microelectronics', photo: '/media/faculty/y-srinivasa-rao.webp', note: '' },
+  bhujanga: { name: 'Prof. A. Bhujanga Rao', role: 'Professor', degrees: 'Ph.D (Andhra University, 2001)', area: 'Instrumentation', photo: '/media/faculty/bhujanga-rao.webp',
+    note: 'Head of the department from 2012; the first floor of this wing was inaugurated during his term, on 30 August 2015.' },
+};
+
+// Each lab's own line: what it is for, as the B.Tech and M.Tech courses use it, and where its door is.
+export const labRooms = {
+  'lab-process': { title: 'Process Control Lab', lead: 'Straight ahead at the foot of the steps. Closed control loops of level, flow, pressure and temperature: tuning a controller and watching a plant answer it.' },
+  'lab-instruments': { title: 'Industrial Instruments Lab', lead: 'The transmitters and transducers of a working plant, measured, compared and calibrated: pressure, flow, level and temperature.' },
+  'lab-control': { title: 'Control Systems Laboratory', lead: 'Control theory at the bench: how a system responds, what keeps it stable, and how a controller shapes it.' },
+  'lab-dcs': { title: 'DCS Lab', lead: 'Distributed control systems, the plant-wide architecture that runs refineries and power stations, at the far end of the wing by the gate.' },
+  'lab-simulation': { title: 'Simulation Lab', lead: 'Instruments and control systems modelled and tested on the computer before they are built.' },
+  'lab-electronics': { title: 'Electronics Lab II', lead: 'The electronic circuits behind every instrument: amplifiers, filters, converters and signal conditioning. At the end of the passage past the Seminar Hall.' },
+  'lab-devicefab': { title: 'Device Fab Lab', lead: 'Where sensors and devices are made, the bench for the department\u2019s research in MEMS, thin films and nanotechnology.' },
+  'lab-biomedical': { title: 'Biomedical Instrumentation Lab', lead: 'Instruments that read the body: the signals of heart, muscle and brain, and how they are measured safely.' },
+};
+
+export const classroomRooms = {
+  classrooms: { title: 'Smart Classrooms II and III', lead: 'Down three steps at the end of the wing: Classroom II to the right, Classroom III ahead. Both were opened as smart classrooms, with projectors and boards at the teaching platform.' },
+  'classroom-iv': { title: 'Classroom IV', lead: 'Along the side passage, past the Strong Room. The last teaching room in the wing.' },
 };
 
 export const hero = {
   lines: ['Measuring', 'the world', 'since 1937.'],
   lead: 'The Department of Instrument Technology, AU College of Engineering (A), Andhra University. Walk in: every chapter below stops at a real door in the building.',
   cue: 'Scroll to walk in',
-  // the four floating tabs: each turns the window to its place
+  // the four floating tabs: each walks to the first stop of its group
   chips: [
-    { n: '01', title: 'Heritage', text: 'The boards in the entrance hall.', view: 'boards', to: 'heritage' },
-    { n: '02', title: 'Admissions', text: 'The office at the end of the west corridor.', view: 'office', to: 'admissions' },
-    { n: '03', title: 'Laboratories', text: 'Seven labs across both wings.', view: 'process', to: 'labs' },
-    { n: '04', title: 'Faculty', text: 'Every door on the first floor.', view: 'patnaik', to: 'faculty' },
+    { n: '01', title: 'Heritage', text: 'The boards in the entrance hall.', group: 'heritage' },
+    { n: '02', title: 'Laboratories', text: 'Eight labs, each at its own door.', group: 'labs' },
+    { n: '03', title: 'Faculty', text: 'Every professor, at their own room.', group: 'faculty' },
+    { n: '04', title: 'Classrooms', text: 'At the end of the classroom wing.', group: 'classrooms' },
   ],
-  peek: 'hall',
 };
 
 export const heritage = {
@@ -91,7 +150,7 @@ export const heritage = {
     { year: 2011, text: 'The renovated department is inaugurated on 8 May by Prof. Beela Satyanarayana, Vice-Chancellor.' },
     { year: 2015, text: 'The first floor of the east wing opens on 30 August.' },
   ],
-  stats: [['1937', 'Founded'], ['21', 'Heads of department'], ['7', 'Laboratories'], ['NBA', 'Accredited programmes']],
+  stats: [['1937', 'Founded'], ['21', 'Heads of department'], ['8', 'Laboratories'], ['NBA', 'Accredited programmes']],
   now: 'Andhra University holds NAAC A++ (CGPA 3.74, valid to 2030) and is ranked 23rd among Indian universities in NIRF 2025.',
 };
 
@@ -115,16 +174,16 @@ export const admissions = {
 
 export const labs = {
   title: 'Where the measuring happens.',
-  lead: 'Ahead is the Process Control Lab. The west wing holds the industrial labs; the device and biomedical labs are upstairs in the east wing.',
-  cards: ['process', 'devicefab', 'biomedical'],
+  lead: 'The walk calls at every lab in turn. The west wing holds the industrial labs, the east side the simulation and electronics labs, and the device and biomedical labs are upstairs in the east wing.',
   list: [
     { name: 'Process Control Lab', where: 'West wing, ground floor, ahead of the corridor' },
     { name: 'Industrial Instruments Lab', where: 'West wing, ground floor' },
     { name: 'Control Systems Laboratory', where: 'West wing, ground floor' },
-    { name: 'DCS Lab', where: 'West wing, at the gate' },
+    { name: 'DCS Lab', where: 'West wing, by the gate' },
     { name: 'Device Fab Lab', where: 'East wing, first floor, end of the corridor' },
     { name: 'Biomedical Instrumentation Lab', where: 'East wing, first floor, south passage' },
-    { name: 'Electronics Lab II', where: 'East side, ground floor' },
+    { name: 'Simulation Lab', where: 'East corridor, ground floor' },
+    { name: 'Electronics Lab II', where: 'East side, ground floor, past the Seminar Hall' },
   ],
   research: ['Sensors and sensor networks', 'MEMS', 'Nanotechnology', 'Instrumentation and automation', 'Thin films, photo-elasticity and ultrasonics'],
   facts: [
@@ -156,33 +215,9 @@ export const guide = {
   ],
 };
 
-export const hod = {
-  title: 'Head of the Department.',
-  name: 'Dr. P. Swapna',
-  role: 'Professor and Head of the Department',
-  degrees: 'M.Tech, Ph.D',
-  area: 'Industrial process instrumentation',
-  room: 'Her room is the second door on the left, under the blade sign.',
-  lead: 'The department office handles admissions, certificates and fees; academic matters come here.',
-  next: [
-    { view: 'kamala', name: 'Dr. A. Kamala Kumari', text: 'Associate Professor, the door before it. Head of the department from 2022.' },
-    { view: 'classrooms', name: 'Classrooms II, III and IV', text: 'At the end of this corridor, down three steps.' },
-  ],
-};
-
 // Faculty board in the entrance hall (newest source), with the door signs where the building shows the room.
 export const faculty = {
-  title: 'The people who teach here.',
-  lead: 'Hover a name to see the door. Every room the building shows is on this floor or in the classroom wing.',
-  people: [
-    { name: 'Dr. P. Swapna', role: 'Professor and Head of the Department', area: 'Industrial process instrumentation', room: 'Classroom wing, first floor', view: 'swapna' },
-    { name: 'Prof. A. Bhujanga Rao', role: 'Professor', area: 'Instrumentation', room: 'East corridor, first floor', view: 'bhujanga' },
-    { name: 'Prof. D. V. Rama Koti Reddy', role: 'Professor', area: 'Sensors and sensor networks, MEMS, nanotechnology', room: '' },
-    { name: 'Prof. Y. Srinivasa Rao', role: 'Professor', area: 'Microelectronics', room: 'East corridor, first floor', view: 'ysrao' },
-    { name: 'Prof. M. Ramesh Patnaik', role: 'Professor', area: 'Industrial process instrumentation', room: 'East corridor, first floor', view: 'patnaik' },
-    { name: 'Dr. A. Kamala Kumari', role: 'Associate Professor', area: 'Digital systems and computer electronics', room: 'Classroom wing, first floor', view: 'kamala' },
-    { name: 'Dr. A. Daisy Rani', role: 'Faculty', area: 'Industrial process instrumentation', room: '' },
-  ],
+  alsoNote: 'Also on the faculty: Prof. D. V. Rama Koti Reddy (sensors and sensor networks, MEMS and nanotechnology), head of the department from 2017. Every other professor\u2019s room is on this walk.',
   staffTitle: 'Department office and laboratories',
   staff: [
     ['S. Phani', 'Typist'], ['N. V. D. Ganesh', 'Junior Assistant'], ['P. T. Reddy', 'Junior Assistant'],

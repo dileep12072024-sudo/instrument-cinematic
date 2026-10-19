@@ -6,7 +6,7 @@ import * as C from './portfolio-content.js';
 import './portfolio.css';
 
 gsap.registerPlugin(SplitText);
-gsap.ticker.lagSmoothing(250, 1000 / 60); // the arrival keeps wall time through slow frames, but one long stall (a first draw) pauses it instead of skipping it, as the rise does (main.js)
+gsap.ticker.lagSmoothing(500, 1000 / 30); // the arrival keeps wall time through slow frames, but one long stall (a first draw) pauses it instead of skipping it, as the rise does (main.js)
 
 // The portfolio layer (docs/portfolio-layer.md, plan v2): the first thing a visitor sees. A normal scrolling document
 // over the fixed live campus, after mengto.github.io/kage: every chapter is a camera waypoint and the scroll position,
@@ -26,11 +26,77 @@ const OVERLAY = 3; // camera layer for the cursor wisps and the leaves: the main
 
 // ---------------------------------------------------------------------------------------------------------- markup
 function markup() {
-  const { hero, heritage, admissions, labs, guide, hod, faculty, enter, footer, credits, chapters, views } = C;
-  const nav = chapters.filter(c => ['heritage', 'admissions', 'labs', 'faculty', 'enter'].includes(c.id));
-  const sec = (c, i, n) => `<div class="pf-sec-head" data-rv="fade"><span class="k"><b>${String(n).padStart(2, '0')}</b> ${esc(c.nav)}</span><span class="rule"></span><span class="k">${esc(c.where)}</span></div>`;
-  const view = (name, cls = '') => { const v = views[name]; return `<figure class="pf-view ${cls}" data-view="${name}" data-cursor><span class="pf-view-fr" data-frame></span><span class="pf-view-ar">${arrow}</span><figcaption><b>${esc(v.label)}</b><i>${esc(v.note)}</i></figcaption></figure>`; };
-  const ch = Object.fromEntries(chapters.map((c, i) => [c.id, i]));
+  const { hero, heritage, admissions, labs, guide, faculty, enter, footer, credits, chapters, people, labRooms, classroomRooms } = C;
+  // header links: the first stop of each group
+  const groups = [['heritage', 'Heritage'], ['admissions', 'Admissions'], ['labs', 'Laboratories'], ['faculty', 'Faculty'], ['classrooms', 'Classrooms'], ['enter', 'Step inside']];
+  const firstOf = g => chapters.find(c => c.group === g);
+  const where = { heritage: 'Entrance hall', admissions: 'West corridor', labs: 'Both wings, every lab', faculty: 'Every professor\u2019s room', classrooms: 'End of the classroom wing', enter: 'Over the north campus' };
+  let n = 0;
+  const head = c => `<div class="pf-sec-head" data-rv="fade"><span class="k"><b>${String(++n).padStart(2, '0')}</b> ${esc(c.nav)}</span><span class="rule"></span><span class="k">${esc(c.where)}</span></div>`;
+  const walk = i => `<div class="pf-walk" data-walk="${i}"></div>`;
+  const photo = p => p.photo ? `<div class="pf-side-lens" data-rv="fade"><figure class="pf-view pf-photo" data-photo="${p.photo}" data-cursor><span class="pf-view-fr" data-frame></span><figcaption><b>${esc(p.name)}</b>${p.role ? `<i>${esc(p.role)}</i>` : ''}</figcaption></figure></div>` : '';
+  const person = (c, p, extra = '') => `${head(c)}
+      <div class="pf-copy">
+        <h2 class="pf-display">${esc(c.id === 'hod' ? 'Head of the Department.' : p.name)}</h2>
+        <div class="pf-hod" data-rv="up">${c.id === 'hod' ? `<b>${esc(p.name)}</b>` : ''}${p.role ? `<span class="role">${esc(p.role)}</span>` : ''}<span class="deg">${esc(p.degrees)}. ${esc(p.area)}.</span></div>
+        ${p.note ? `<p class="pf-lead" data-rv="up">${esc(p.note)}</p>` : ''}${extra}
+      </div>${photo(p)}`;
+  const stop = (c, title, lead, extra = '') => `${head(c)}
+      <div class="pf-copy">
+        <h2 class="pf-display">${esc(title)}</h2>
+        <p class="pf-lead" data-rv="up">${esc(lead)}</p>${extra}
+      </div>`;
+  const body = (c, i) => {
+    if (c.id === 'heritage') return `${head(c)}
+      <div class="pf-copy">
+        <h2 class="pf-display">${esc(heritage.title)}</h2>
+        <p class="pf-lead" data-rv="up">${esc(heritage.lead)}</p>
+        <ol class="pf-years" data-rv="up">${heritage.events.map(e => `<li><b>${e.year}</b><span>${esc(e.text)}</span></li>`).join('')}</ol>
+        <p class="pf-note" data-rv="up">${esc(heritage.now)}</p>
+      </div>
+      <div class="pf-stats" data-rv="up">${heritage.stats.map(([b, t]) => `<div><b>${esc(b)}</b><span>${esc(t)}</span></div>`).join('')}</div>`;
+    if (c.id === 'admissions') return stop(c, admissions.title, admissions.lead, `
+        <dl class="pf-programmes">${admissions.list.map(p => `<div data-rv="up"><dt>${esc(p.name)}</dt><dd class="len">${esc(p.length)}</dd><dd>${esc(p.entry)}</dd></div>`).join('')}</dl>
+        <details class="pf-more" data-rv="up"><summary data-cursor>${esc(admissions.objectivesTitle)}</summary><ol>${admissions.objectives.map(o => `<li>${esc(o)}</li>`).join('')}</ol></details>`);
+    if (c.id === 'lab-process') return stop(c, labRooms[c.id].title, labRooms[c.id].lead, `
+        <p class="pf-note" data-rv="up">${esc(labs.lead)}</p>
+        <ul class="pf-labs" data-rv="up">${labs.list.map(l => `<li><b>${esc(l.name)}</b><span>${esc(l.where)}</span></li>`).join('')}</ul>
+        <p class="pf-research" data-rv="up">${labs.research.map(r => `<span>${esc(r)}</span>`).join('')}</p>
+        <ul class="pf-facts" data-rv="up">${labs.facts.map(f => `<li>${esc(f)}</li>`).join('')}</ul>`);
+    if (labRooms[c.id]) return stop(c, labRooms[c.id].title, labRooms[c.id].lead);
+    if (classroomRooms[c.id]) return stop(c, classroomRooms[c.id].title, classroomRooms[c.id].lead);
+    if (c.id === 'guide') return stop(c, guide.title, guide.lead, guide.groups.map(g => `<div class="pf-group" data-rv="up"><h3>${esc(g.title)}</h3>${g.items ? `<ul>${g.items.map(t => `<li>${linkify(t)}</li>`).join('')}</ul>` : ''}${g.contacts ? `<dl class="pf-calls">${g.contacts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${tel(v)}</dd></div>`).join('')}</dl>` : ''}</div>`).join(''));
+    if (c.id === 'hod') return person(c, people[c.person], `
+        <p class="pf-note" data-rv="up">${esc(faculty.alsoNote)}</p>
+        <details class="pf-more" data-rv="up"><summary data-cursor>${esc(faculty.staffTitle)}</summary><ul class="pf-staff">${faculty.staff.map(([k, r]) => `<li><b>${esc(k)}</b><span>${esc(r)}</span></li>`).join('')}</ul></details>
+        <details class="pf-more" data-rv="up"><summary data-cursor>${esc(faculty.headsTitle)}</summary><ol class="pf-staff">${faculty.heads.map(([k, r]) => `<li><b>${esc(k)}</b><span>${esc(r)}</span></li>`).join('')}</ol><p class="pf-note">${esc(faculty.headsNote)}</p></details>`);
+    if (c.person) return person(c, people[c.person]);
+    return '';
+  };
+  const stops = chapters.map((c, i) => {
+    if (i === 0) return '';
+    if (c.id === 'enter') return `${walk(i)}
+    <section id="enter" class="pf-sec pf-fin" data-cam="${i}">
+      <p class="pf-eyebrow" data-rv="fade"><span class="dot"></span>${esc(c.where)}</p>
+      <h2 class="pf-display pf-big">${esc(enter.title)}</h2>
+      <p class="pf-lead" data-rv="up">${esc(enter.lead)}</p>
+      <div class="pf-doors" data-rv="up"><button class="pf-cta" data-enter="explore" data-cursor><i></i><span>${esc(enter.explore)}</span>${arrow}</button><button class="pf-cta pf-alt" data-enter="walk" data-cursor><i></i><span>${esc(enter.walk)}</span>${arrow}</button></div>
+    </section>`;
+    if (c.id === 'foot') return `${walk(i)}
+    <footer class="pf-foot" data-cam="${i}">
+      <div class="pf-foot-grid">
+        <div class="pf-foot-brand"><address>${footer.address.map(esc).join('<br>')}</address></div>
+        <div><h4>Chapters</h4><ul>${groups.map(([g, t]) => `<li><a href="#${firstOf(g).id}" data-cursor>${esc(t)}</a></li>`).join('')}</ul></div>
+        <div><h4>Contact</h4><ul>${footer.phones.map(([l, k]) => `<li>${esc(l)} ${tel(k)}</li>`).join('')}</ul></div>
+        <div><h4>Credits</h4><ul><li>Made by ${esc(credits.maker.name)}, <a href="${credits.maker.link}" target="_blank" rel="noopener" data-cursor>${esc(credits.maker.linkText)}</a></li><li>Guided by ${esc(credits.guide.name)}, <a href="${credits.guide.link}" target="_blank" rel="noopener" data-cursor>${esc(credits.guide.org)}</a></li></ul></div>
+      </div>
+      <div class="pf-foot-base"><span>${esc(footer.note)}</span><span>Three.js, live sky over Visakhapatnam</span></div>
+    </footer>`;
+    return `${walk(i)}
+    <section id="${c.id}" class="pf-sec" data-cam="${i}">
+      ${body(c, i)}
+    </section>`;
+  }).join('\n');
   return `
   <div class="pf-night" aria-hidden="true"></div>
   <div class="pf-scrim" aria-hidden="true"></div>
@@ -38,15 +104,15 @@ function markup() {
   <div class="pf-vignette" aria-hidden="true"></div>
   <div class="pf-grain" aria-hidden="true"></div>
   <header class="pf-nav">
-    <a class="pf-brand" href="#arrival" data-cursor aria-label="${esc(C.department.name)}, back to the start"><span class="pf-glyph" aria-hidden="true"></span><span class="pf-brand-tx"><b>Instrument Technology</b><i>Andhra University</i></span></a>
-    <nav class="pf-links" id="pf-links" aria-label="Chapters">${nav.map(c => `<a class="pf-link" href="#${c.id}" data-cursor><span>${esc(c.nav)}</span><span class="alt" aria-hidden="true">${esc(c.where)}</span></a>`).join('')}</nav>
+    <a class="pf-brand" href="#arrival" data-cursor aria-label="${esc(C.department.name)}, back to the start"><span class="pf-brand-tx"><b>Instrument Technology</b><i>Andhra University</i></span></a>
+    <nav class="pf-links" id="pf-links" aria-label="Chapters">${groups.map(([g, t]) => `<a class="pf-link" href="#${firstOf(g).id}" data-group="${g}" data-cursor><span>${esc(t)}</span><span class="alt" aria-hidden="true">${esc(where[g])}</span></a>`).join('')}</nav>
     <button class="pf-skip" data-enter="explore" data-cursor>Explore the campus</button>
     <button class="pf-burger" aria-label="Chapters" aria-controls="pf-links" aria-expanded="false" data-cursor><i></i><i></i></button>
   </header>
   <nav class="pf-rail" aria-label="Chapter position">${chapters.slice(0, -1).map((c, i) => `<button data-rail="${i}" aria-label="${esc(c.nav)}" title="${esc(c.nav)}"><i></i></button>`).join('')}</nav>
   <p class="pf-where" aria-live="polite"><span class="pf-where-dot"></span><span class="pf-where-tx"></span></p>
   <main class="pf-doc">
-    <section id="arrival" class="pf-sec pf-hero" data-cam="${ch.arrival}">
+    <section id="arrival" class="pf-sec pf-hero" data-cam="0">
       <div class="pf-hero-top">
         <p class="pf-eyebrow pf-live" data-rv="fade"><span class="dot"></span><span class="pf-live-tx">Live from Visakhapatnam</span></p>
         <h1 class="pf-display pf-h-hero" aria-label="${esc(hero.lines.join(' '))}">${hero.lines.map(l => `<span class="pf-line">${esc(l)}</span>`).join('')}</h1>
@@ -54,104 +120,10 @@ function markup() {
       </div>
       <div class="pf-hero-foot">
         <p class="pf-cue" data-rv="fade"><span>${esc(hero.cue)}</span><span class="track"><i></i></span></p>
-        <div class="pf-chips">${hero.chips.map(c => `<a class="pf-chip" href="#${c.to}" data-chip="${c.view}" data-rv="up" data-cursor><span class="num">${c.n}</span><span class="tx"><b>${esc(c.title)}</b><span>${esc(c.text)}</span></span></a>`).join('')}</div>
-      </div>
-      <div class="pf-peek" data-rv="fade">${view(hero.peek, 'pf-lens')}</div>
-    </section>
-    <div class="pf-walk" data-walk="${ch.heritage}"></div>
-
-    <section id="heritage" class="pf-sec" data-cam="${ch.heritage}">
-      ${sec(chapters[ch.heritage], ch.heritage, 1)}
-      <div class="pf-copy">
-        <h2 class="pf-display">${esc(heritage.title)}</h2>
-        <p class="pf-lead" data-rv="up">${esc(heritage.lead)}</p>
-        <ol class="pf-years" data-rv="up">${heritage.events.map(e => `<li><b>${e.year}</b><span>${esc(e.text)}</span></li>`).join('')}</ol>
-        <p class="pf-note" data-rv="up">${esc(heritage.now)}</p>
-      </div>
-      <div class="pf-stats" data-rv="up">${heritage.stats.map(([b, s]) => `<div><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join('')}</div>
-    </section>
-    <div class="pf-walk" data-walk="${ch.admissions}"></div>
-
-    <section id="admissions" class="pf-sec" data-cam="${ch.admissions}">
-      ${sec(chapters[ch.admissions], ch.admissions, 2)}
-      <div class="pf-copy">
-        <h2 class="pf-display">${esc(admissions.title)}</h2>
-        <p class="pf-lead" data-rv="up">${esc(admissions.lead)}</p>
-        <dl class="pf-programmes">${admissions.list.map(p => `<div data-rv="up"><dt>${esc(p.name)}</dt><dd class="len">${esc(p.length)}</dd><dd>${esc(p.entry)}</dd></div>`).join('')}</dl>
-        <details class="pf-more" data-rv="up"><summary data-cursor>${esc(admissions.objectivesTitle)}</summary><ol>${admissions.objectives.map(o => `<li>${esc(o)}</li>`).join('')}</ol></details>
+        <div class="pf-chips">${hero.chips.map(c => `<a class="pf-chip" href="#${firstOf(c.group).id}" data-rv="up" data-cursor><span class="num">${c.n}</span><span class="tx"><b>${esc(c.title)}</b><span>${esc(c.text)}</span></span></a>`).join('')}</div>
       </div>
     </section>
-    <div class="pf-walk" data-walk="${ch.labs}"></div>
-
-    <section id="labs" class="pf-sec" data-cam="${ch.labs}">
-      ${sec(chapters[ch.labs], ch.labs, 3)}
-      <div class="pf-copy">
-        <h2 class="pf-display">${esc(labs.title)}</h2>
-        <p class="pf-lead" data-rv="up">${esc(labs.lead)}</p>
-      </div>
-      <div class="pf-cards">${labs.cards.map((v, i) => `<div class="pf-card" data-rv="up">${view(v)}<p class="pf-card-meta"><span>${esc(C.views[v].note)}</span><span>0${i + 1} / 0${labs.cards.length}</span></p></div>`).join('')}</div>
-      <div class="pf-copy pf-copy-2">
-        <ul class="pf-labs" data-rv="up">${labs.list.map(l => `<li><b>${esc(l.name)}</b><span>${esc(l.where)}</span></li>`).join('')}</ul>
-        <p class="pf-research" data-rv="up">${labs.research.map(r => `<span>${esc(r)}</span>`).join('')}</p>
-        <ul class="pf-facts" data-rv="up">${labs.facts.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
-      </div>
-    </section>
-    <div class="pf-walk" data-walk="${ch.guide}"></div>
-
-    <section id="guide" class="pf-sec" data-cam="${ch.guide}">
-      ${sec(chapters[ch.guide], ch.guide, 4)}
-      <div class="pf-copy">
-        <h2 class="pf-display">${esc(guide.title)}</h2>
-        <p class="pf-lead" data-rv="up">${esc(guide.lead)}</p>
-        ${guide.groups.map(g => `<div class="pf-group" data-rv="up"><h3>${esc(g.title)}</h3>${g.items ? `<ul>${g.items.map(i => `<li>${linkify(i)}</li>`).join('')}</ul>` : ''}${g.contacts ? `<dl class="pf-calls">${g.contacts.map(([n, v]) => `<div><dt>${esc(n)}</dt><dd>${tel(v)}</dd></div>`).join('')}</dl>` : ''}</div>`).join('')}
-      </div>
-    </section>
-    <div class="pf-walk" data-walk="${ch.hod}"></div>
-
-    <section id="hod" class="pf-sec" data-cam="${ch.hod}">
-      ${sec(chapters[ch.hod], ch.hod, 5)}
-      <div class="pf-copy">
-        <h2 class="pf-display">${esc(hod.title)}</h2>
-        <div class="pf-hod" data-rv="up"><b>${esc(hod.name)}</b><span>${esc(hod.role)}</span><span>${esc(hod.degrees)}. ${esc(hod.area)}.</span></div>
-        <p class="pf-lead" data-rv="up">${esc(hod.room)} ${esc(hod.lead)}</p>
-        <ul class="pf-next">${hod.next.map(n => `<li data-rv="up" data-show="${n.view}" data-cursor tabindex="0"><b>${esc(n.name)}</b><span>${esc(n.text)}</span></li>`).join('')}</ul>
-      </div>
-      <div class="pf-side-lens" data-rv="fade">${view('swapna', 'pf-lens')}</div>
-    </section>
-    <div class="pf-walk" data-walk="${ch.faculty}"></div>
-
-    <section id="faculty" class="pf-sec" data-cam="${ch.faculty}">
-      ${sec(chapters[ch.faculty], ch.faculty, 6)}
-      <div class="pf-copy">
-        <h2 class="pf-display">${esc(faculty.title)}</h2>
-        <p class="pf-lead" data-rv="up">${esc(faculty.lead)}</p>
-      </div>
-      <div class="pf-people">${faculty.people.map((p, i) => `<div class="pf-person" data-rv="up" ${p.view ? `data-show="${p.view}" tabindex="0"` : ''} data-cursor><span class="k">${String(i + 1).padStart(2, '0')}</span><h3>${esc(p.name)}<em>${esc(p.role)}</em></h3><p>${esc(p.area)}</p><span class="t">${esc(p.room || 'Room not shown in the model')}</span><i class="bar"></i></div>`).join('')}</div>
-      <div class="pf-side-lens" data-rv="fade">${view('ysrao', 'pf-lens')}</div>
-      <div class="pf-copy pf-copy-2">
-        <details class="pf-more" data-rv="up"><summary data-cursor>${esc(faculty.staffTitle)}</summary><ul class="pf-staff">${faculty.staff.map(([n, r]) => `<li><b>${esc(n)}</b><span>${esc(r)}</span></li>`).join('')}</ul></details>
-        <details class="pf-more" data-rv="up"><summary data-cursor>${esc(faculty.headsTitle)}</summary><ol class="pf-staff">${faculty.heads.map(([n, r]) => `<li><b>${esc(n)}</b><span>${esc(r)}</span></li>`).join('')}</ol><p class="pf-note">${esc(faculty.headsNote)}</p></details>
-      </div>
-    </section>
-    <div class="pf-walk" data-walk="${ch.enter}"></div>
-
-    <section id="enter" class="pf-sec pf-fin" data-cam="${ch.enter}">
-      <p class="pf-eyebrow" data-rv="fade"><span class="dot"></span>Chapter 07, ${esc(chapters[ch.enter].where)}</p>
-      <h2 class="pf-display pf-big">${esc(enter.title)}</h2>
-      <p class="pf-lead" data-rv="up">${esc(enter.lead)}</p>
-      <div class="pf-doors" data-rv="up"><button class="pf-cta" data-enter="explore" data-cursor><i></i><span>${esc(enter.explore)}</span>${arrow}</button><button class="pf-cta pf-alt" data-enter="walk" data-cursor><i></i><span>${esc(enter.walk)}</span>${arrow}</button></div>
-    </section>
-    <div class="pf-walk" data-walk="${ch.foot}"></div>
-
-    <footer class="pf-foot" data-cam="${ch.foot}">
-      <div class="pf-foot-grid">
-        <div class="pf-foot-brand"><span class="pf-glyph" aria-hidden="true"></span><address>${footer.address.map(esc).join('<br>')}</address></div>
-        <div><h4>Chapters</h4><ul>${nav.map(c => `<li><a href="#${c.id}" data-cursor>${esc(c.nav)}</a></li>`).join('')}</ul></div>
-        <div><h4>Contact</h4><ul>${footer.phones.map(([l, n]) => `<li>${esc(l)} ${tel(n)}</li>`).join('')}</ul></div>
-        <div><h4>Credits</h4><ul><li>Made by ${esc(credits.maker.name)}, <a href="${credits.maker.link}" target="_blank" rel="noopener" data-cursor>${esc(credits.maker.linkText)}</a></li><li>Guided by ${esc(credits.guide.name)}, <a href="${credits.guide.link}" target="_blank" rel="noopener" data-cursor>${esc(credits.guide.org)}</a></li></ul></div>
-      </div>
-      <div class="pf-foot-base"><span>${esc(footer.note)}</span><span>Three.js, live sky over Visakhapatnam</span></div>
-    </footer>
+    ${stops}
   </main>
   <div class="pf-cursor" aria-hidden="true"></div>`;
 }
@@ -244,103 +216,178 @@ function buildSegment(a, b, aspect) {
   };
 }
 
-// --------------------------------------------------------------------------------------------- live windows
-// Kage's card viewports: a camera elsewhere in the building, shown in the rectangle of a frame on the page. A window's
-// view is drawn straight into the canvas at its rectangle before the main view (with the screen's own shaders: an
-// offscreen buffer would need a second, linear set of every shader, ~20 s to compile on an integrated GPU) and copied
-// into a texture; after the main view, each window's texture is laid back over its rectangle. A view is redrawn while
-// its lens pushes in, when it changes place, and otherwise every 30th frame; changing place crossfades.
-function createViews(scene, renderer) {
-  const quadScene = new T.Scene(), quadCam = new T.Camera();
-  const material = new T.ShaderMaterial({
-    uniforms: { tA: { value: null }, tB: { value: null }, uMix: { value: 0 }, uAlpha: { value: 1 } },
-    vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
-    // the textures hold finished screen pixels: no tone mapping or colour conversion here
-    fragmentShader: `uniform sampler2D tA, tB; uniform float uMix, uAlpha; varying vec2 vUv;
-      void main() { vec3 a = texture2D(tA, vUv).rgb, b = texture2D(tB, vUv).rgb; vec3 c = mix(a, b, smoothstep(0., 1., uMix));
-        vec2 q = vUv - .5; c *= 1. - .55 * dot(q, q); c *= mix(.62, 1., smoothstep(0., .45, vUv.y));
-        gl_FragColor = vec4(c, uAlpha); }`,
-    depthTest: false, depthWrite: false, transparent: true, toneMapped: false,
-  });
-  quadScene.add(new T.Mesh(new T.PlaneGeometry(2, 2), material));
-  const list = [], at = new T.Vector2();
+// --------------------------------------------------------------------------------------------------- the cloth
+// After Kage's plates (Canvas UI's Cloth): each photo plate hangs like fabric, pinned along its top, stirred by a slow
+// wind, and pushed out where the cursor touches it; folds catch the light. A height field on a 48 x 48 grid (wave
+// equation, 120 steps a second), drawn with perspective so a fold lifts toward the viewer.
+const CL_SEG = 48, CL_N = CL_SEG + 1, CL_DT = 1 / 120, CL_WAVE = 15, CL_STIFF = .55, CL_GAIN = 5, CL_BLEED = 40;
+const CLOTH = { wind: 1.6, speed: .5, amplitude: 34, drape: 26, brush: 2.05, brushSize: 64, damping: 1, light: .85, sheen: .22, focal: 800 }; // scaled to these ~200 px plates
+const clothVertex = /* glsl */`
+  attribute vec4 aData; attribute vec2 aOffset;
+  uniform vec2 uRes, uOut; uniform float uBleed, uFocal;
+  varying vec2 vUv; varying vec3 vNormal; varying float vFold;
+  void main() {
+    vUv = position.xy; float z = aData.x; vec2 nxy = aData.yz;
+    vNormal = vec3(nxy, sqrt(max(1. - dot(nxy, nxy), .04))); vFold = aData.w;
+    vec2 px = position.xy * uRes + aOffset + vec2(uBleed), ndc = px / uOut * 2. - 1.; ndc.y = -ndc.y;
+    gl_Position = vec4(ndc, -z / uFocal, (uFocal - z) / uFocal);
+  }`;
+const clothFragment = /* glsl */`
+  uniform sampler2D tA, tB; uniform float uMix, uAlpha, uLight, uSheen, uEdge; uniform vec2 uRes;
+  varying vec2 vUv; varying vec3 vNormal; varying float vFold;
+  void main() {
+    vec2 uv = vec2(vUv.x, 1. - vUv.y); // the texture's first row is its bottom (a photo loaded with flipY)
+    vec3 c = mix(texture2D(tA, uv).rgb, texture2D(tB, uv).rgb, smoothstep(0., 1., uMix));
+    vec2 q = vUv - .5; c *= 1. - .55 * dot(q, q); c *= mix(1., .62, smoothstep(.55, 1., vUv.y));
+    vec3 n = normalize(vNormal), L = normalize(vec3(-.3, .42, .86));
+    c *= mix(1., (.58 + .42 * dot(n, L)) / (.58 + .42 * L.z) * vFold, uLight);
+    vec3 H = normalize(L + vec3(0., 0., 1.)); float flat_ = pow(H.z, 34.);
+    c += uSheen * max(pow(max(dot(n, H), 0.), 34.) - flat_, 0.) / (1. - flat_) * mix(vec3(1.), c, .35);
+    vec2 e = min(vUv, 1. - vUv) * uRes; c += smoothstep(1.2, .2, min(e.x, e.y)) * uEdge * vec3(.91, .89, .84); // a hairline that rides the folds
+    gl_FragColor = vec4(c, uAlpha);
+  }`;
+function createCloth() {
+  const grid = new Float32Array(CL_N * CL_N * 3), idx = [];
+  for (let y = 0; y < CL_N; y++) for (let x = 0; x < CL_N; x++) grid.set([x / CL_SEG, y / CL_SEG, 0], (y * CL_N + x) * 3);
+  for (let y = 0; y < CL_SEG; y++) for (let x = 0; x < CL_SEG; x++) { const a = y * CL_N + x, b = a + 1, c = a + CL_N, d = c + 1; idx.push(a, c, b, b, c, d); }
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.BufferAttribute(grid, 3)); g.setIndex(idx);
+  const data = new T.BufferAttribute(new Float32Array(CL_N * CL_N * 4), 4).setUsage(T.DynamicDrawUsage);
+  const offset = new T.BufferAttribute(new Float32Array(CL_N * CL_N * 2), 2).setUsage(T.DynamicDrawUsage);
+  g.setAttribute('aData', data); g.setAttribute('aOffset', offset);
+  const material = new T.ShaderMaterial({ vertexShader: clothVertex, fragmentShader: clothFragment, transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
+    uniforms: { tA: { value: null }, tB: { value: null }, uMix: { value: 0 }, uAlpha: { value: 1 }, uLight: { value: CLOTH.light }, uSheen: { value: CLOTH.sheen }, uEdge: { value: .05 },
+      uRes: { value: new T.Vector2(1, 1) }, uOut: { value: new T.Vector2(1, 1) }, uBleed: { value: CL_BLEED }, uFocal: { value: CLOTH.focal } } });
+  const mesh = new T.Mesh(g, material); mesh.frustumCulled = false;
+  const scene = new T.Scene(); scene.add(mesh);
+  let hCur = new Float32Array(CL_N * CL_N), hPrev = new Float32Array(CL_N * CL_N), hNext = new Float32Array(CL_N * CL_N);
+  const zF = new Float32Array(CL_N * CL_N), rowF = new Float32Array(CL_N), colF = new Float32Array(CL_N), hang = new Float32Array(CL_N);
+  for (let a = 0; a < CL_N; a++) hang[a] = Math.pow(a / CL_SEG, 1.3);
+  let time = Math.random() * 60, gust = .5, debt = 0, edge = .05;
+  const touch = { x: -1e5, y: -1e5, vx: 0, vy: 0, s: 0 };
+  function step(dt) {
+    time += dt * CLOTH.speed;
+    const t = time, windAmp = CL_GAIN * CLOTH.wind * gust, kb1 = 2 * Math.PI / (CL_SEG / 1.5), kb2 = 2 * Math.PI / (CL_SEG / 3.8), ka = 2 * Math.PI / (CL_SEG / 2.2);
+    const w1 = CL_WAVE * kb1, w2 = CL_WAVE * kb2, drift = 1.8 * Math.sin(.23 * t);
+    for (let b = 0; b < CL_N; b++) rowF[b] = Math.sin(kb1 * b - w1 * t + drift) + .45 * Math.sin(kb2 * b + w2 * t * .8 + 3);
+    for (let a = 0; a < CL_N; a++) colF[a] = (.7 + .3 * Math.sin(ka * a - 1.7 * t)) * hang[a];
+    const c2 = CL_WAVE * CL_WAVE, dt2 = dt * dt, decay = Math.exp(-CLOTH.damping * dt);
+    for (let y = 0; y < CL_N; y++) {
+      const up = Math.max(y - 1, 0) * CL_N, down = Math.min(y + 1, CL_SEG) * CL_N, row = y * CL_N;
+      for (let x = 0; x < CL_N; x++) {
+        const i = row + x, h = hCur[i];
+        const lap = hCur[row + Math.max(x - 1, 0)] + hCur[row + Math.min(x + 1, CL_SEG)] + hCur[up + x] + hCur[down + x] - 4 * h;
+        const next = 2 * h - hPrev[i] + dt2 * (c2 * lap - CL_STIFF * h + windAmp * rowF[x] * colF[y]);
+        hNext[i] = Math.max(-3.5, Math.min(3.5, h + (next - h) * decay));
+      }
+    }
+    for (let x = 0; x < CL_N; x++) hNext[x] = 0; // pinned along the top
+    [hPrev, hCur, hNext] = [hCur, hNext, hPrev];
+  }
+  function imprint(dt, w, h) {
+    if (touch.s < .01) return;
+    const cw = w / CL_SEG, ch = h / CL_SEG, rx = CLOTH.brushSize / cw, ry = CLOTH.brushSize / ch, gx = touch.x / cw, gy = touch.y / ch;
+    const lift = 1.1 * CLOTH.brush * touch.s, rate = Math.min(dt * 4, 1);
+    for (let y = Math.max(Math.ceil(gy - 2.5 * ry), 0); y <= Math.min(Math.floor(gy + 2.5 * ry), CL_SEG); y++) {
+      const oy = (y - gy) / ry;
+      for (let x = Math.max(Math.ceil(gx - 2.5 * rx), 0); x <= Math.min(Math.floor(gx + 2.5 * rx), CL_SEG); x++) {
+        const ox = (x - gx) / rx, k = Math.exp(-(ox * ox + oy * oy)); if (k < .02) continue;
+        const i = y * CL_N + x, pull = rate * k, goal = lift * k;
+        hCur[i] += (goal - hCur[i]) * pull; hPrev[i] += (goal - hPrev[i]) * pull;
+      }
+    }
+  }
+  // the fabric does not stretch: where it tilts, the points below the pin (and either side of the middle) draw in
+  function foreshorten(o, stride, lineStride, ds, anchor, comp) {
+    const ds2 = ds * ds;
+    for (let l = 0; l < CL_N; l++) {
+      const base = l * lineStride; o[(base + anchor * stride) * 2 + comp] = 0;
+      let cum = 0;
+      for (let k = anchor + 1; k < CL_N; k++) { const i = base + k * stride, dz = zF[i] - zF[i - stride]; cum += ds - Math.sqrt(Math.max(ds2 - dz * dz, 0)); o[i * 2 + comp] = -cum; }
+      cum = 0;
+      for (let k = anchor - 1; k >= 0; k--) { const i = base + k * stride, dz = zF[i] - zF[i + stride]; cum += ds - Math.sqrt(Math.max(ds2 - dz * dz, 0)); o[i * 2 + comp] = cum; }
+    }
+  }
+  function compose(w, h) {
+    const cw = w / CL_SEG, ch = h / CL_SEG, drape = CLOTH.drape * (.3 + .7 * gust), d = data.array;
+    for (let y = 0; y < CL_N; y++) for (let x = 0; x < CL_N; x++) { const i = y * CL_N + x; zF[i] = CLOTH.amplitude * Math.tanh(hCur[i]) + drape * hang[y]; }
+    for (let y = 0; y < CL_N; y++) {
+      const up = Math.max(y - 1, 0) * CL_N, down = Math.min(y + 1, CL_SEG) * CL_N, row = y * CL_N;
+      for (let x = 0; x < CL_N; x++) {
+        const i = row + x, l = row + Math.max(x - 1, 0), r = row + Math.min(x + 1, CL_SEG);
+        const dzdx = (zF[r] - zF[l]) / (2 * cw), dzdy = (zF[down + x] - zF[up + x]) / (2 * ch), inv = 1 / Math.hypot(dzdx, dzdy, 1);
+        const fold = Math.max(.86, Math.min(1.06, 1 - (zF[l] + zF[r] + zF[up + x] + zF[down + x] - 4 * zF[i]) * .01));
+        d[i * 4] = zF[i]; d[i * 4 + 1] = -dzdx * inv; d[i * 4 + 2] = -dzdy * inv; d[i * 4 + 3] = fold;
+      }
+    }
+    foreshorten(offset.array, CL_N, 1, ch, 0, 1); foreshorten(offset.array, 1, CL_N, cw, CL_SEG >> 1, 0);
+    data.needsUpdate = true; offset.needsUpdate = true;
+  }
+  return {
+    scene, material,
+    // dt: seconds; w, h: the window's size in CSS pixels; px, py: the pointer in the window (null when outside)
+    update(dt, w, h, px, py, still) {
+      if (!still) {
+        const target = Math.max(.55 + .35 * Math.sin(time * .31 + 1.3) + .25 * Math.sin(time * .83) * (.5 + .5 * Math.sin(time * .17)), .15);
+        gust += (target - gust) * Math.min(dt * 2, 1);
+        const inside = px != null;
+        if (inside) { touch.tx = px; touch.ty = py; if (touch.s < .01) { touch.x = px; touch.y = py; } }
+        touch.s += ((inside ? 1 : 0) - touch.s) * Math.min(dt * (inside ? 8 : 2.5), 1);
+        const om = 14;
+        touch.vx += (((touch.tx ?? touch.x) - touch.x) * om * om - 2 * om * touch.vx) * dt; touch.vy += (((touch.ty ?? touch.y) - touch.y) * om * om - 2 * om * touch.vy) * dt;
+        touch.x += touch.vx * dt; touch.y += touch.vy * dt;
+        imprint(dt, w, h);
+        edge += ((inside ? .32 : .05) - edge) * Math.min(dt * 5, 1);
+        debt = Math.min(debt + dt, CL_DT * 5);
+        while (debt >= CL_DT) { step(CL_DT); debt -= CL_DT; }
+      }
+      compose(w, h);
+      material.uniforms.uEdge.value = edge;
+    },
+  };
+}
+
+// ------------------------------------------------------------------------------------------- photo plates
+// The professors' photographs, hung as cloth (above) over the rectangle of their frame on the page. Drawn after the
+// main view; the frame on the page only holds the place and the caption.
+function createPlates(renderer) {
+  const flatCam = new T.Camera(), loader = new T.TextureLoader(), list = [];
   let frame = 0;
-  function aim(v, def, cam) {
-    const eye = V(def.eye), look = V(def.look), dir = look.clone().sub(eye).normalize();
-    cam.position.copy(eye).addScaledVector(dir, v.push * 1.1); cam.lookAt(look); cam.fov = def.fov - v.push * 6; cam.updateProjectionMatrix();
-  }
-  // the window's rectangle in drawing-buffer pixels, whole pixels, inside the canvas
-  function box(r) {
-    const pr = renderer.getPixelRatio(), cw = renderer.domElement.width, ch = renderer.domElement.height;
-    const x = Math.max(0, Math.round(r.left * pr)), y = Math.max(0, Math.round(ch - r.bottom * pr));
-    return { x, y, w: Math.min(cw - x, Math.round(r.width * pr)), h: Math.min(ch - y, Math.round(r.height * pr)), pr };
-  }
-  function shoot(cam, def, v, tex, b) {
-    aim(v, def, cam); cam.aspect = b.w / b.h; cam.updateProjectionMatrix();
-    renderer.setViewport(b.x / b.pr, b.y / b.pr, b.w / b.pr, b.h / b.pr); renderer.setScissor(b.x / b.pr, b.y / b.pr, b.w / b.pr, b.h / b.pr); renderer.setScissorTest(true);
-    renderer.render(scene, cam);
-    renderer.copyFramebufferToTexture(tex, at.set(b.x, b.y));
-  }
-  const reset = () => { const pr = renderer.getPixelRatio(), w = renderer.domElement.width / pr, h = renderer.domElement.height / pr; renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h); renderer.setScissor(0, 0, w, h); };
-  const visible = v => v.rect && v.rect.width >= 8 && v.rect.bottom > -40 && v.rect.top < innerHeight + 40 && v.alpha >= .02;
+  const visible = p => p.rect && p.tex && p.rect.width >= 8 && p.rect.bottom > -60 && p.rect.top < innerHeight + 60 && p.alpha >= .02;
   return {
     list,
     attach(el) {
-      const v = { el, frame: el.querySelector('[data-frame]') || el, name: el.dataset.view, next: null, mix: 0, push: 0, want: 0, texA: null, texB: null, cam: new T.PerspectiveCamera(46, 1, .12, 400), camB: new T.PerspectiveCamera(46, 1, .12, 400), dirty: true, dirtyB: false, slot: list.length * 7, alpha: 0, rect: null };
-      v.cam.layers.set(0); v.camB.layers.set(0);
-      el.addEventListener('pointerenter', () => { v.want = 1; }); el.addEventListener('pointerleave', () => { v.want = 0; });
-      list.push(v); return v;
+      const p = { cloth: createCloth(), el, frame: el.querySelector('[data-frame]') || el, tex: null, rect: null, alpha: 0 };
+      // the photo's bytes go straight to the screen, like the copied frames the cloth was written for: no colour conversion
+      loader.load(el.dataset.photo, t => { t.colorSpace = T.NoColorSpace; t.anisotropy = 4; p.tex = t; });
+      list.push(p); return p;
     },
-    // turn a window to another place: shot into the second texture, then crossfaded
-    show(v, name) {
-      if (!v || !C.views[name] || name === (v.next ?? v.name)) return;
-      if (v.next) { v.name = v.next; [v.texA, v.texB] = [v.texB, v.texA]; }
-      v.next = name; v.mix = 0; v.dirtyB = true;
-      v.el.querySelector('figcaption b').textContent = C.views[name].label; v.el.querySelector('figcaption i').textContent = C.views[name].note;
-    },
-    // per page frame: easing; returns true while anything moves
-    update(dt) {
+    // per page frame: where each plate is, and its cloth; pointer: { x, y } in the page, or null. True while any shows.
+    update(dt, pointer, still, measureAlpha) {
+      frame++;
       let moving = false;
-      for (const v of list) {
-        const p = v.push; v.push = T.MathUtils.damp(v.push, v.want, 3.4, dt); if (Math.abs(v.push - p) > 1e-4) moving = true;
-        if (v.next) { v.mix = Math.min(1, v.mix + dt / .65); moving = true; if (v.mix >= 1) { v.name = v.next; v.next = null; [v.texA, v.texB] = [v.texB, v.texA]; v.mix = 0; } }
+      for (const p of list) {
+        if (frame % 10 === 0 || !p.rect) { p.alpha = measureAlpha(p.el); }
+        p.rect = p.frame.getBoundingClientRect(); // every frame: the page scrolls under it
+        if (!visible(p)) continue;
+        const r = p.rect, inside = pointer && pointer.x >= r.left - 10 && pointer.x <= r.right + 10 && pointer.y >= r.top - 10 && pointer.y <= r.bottom + 10;
+        p.cloth.update(dt, r.width, r.height, inside ? pointer.x - r.left : null, inside ? pointer.y - r.top : null, still); moving = true;
       }
       return moving;
     },
-    // the first shot of a window, taken while the loader still covers the page: a place's first draw finishes its
-    // shaders in the driver (~2.5 s here), which would otherwise land as a stall just after the arrival
-    prime(v) {
-      v.rect = v.frame.getBoundingClientRect(); const b = box(v.rect); if (b.w < 8 || b.h < 8) return;
-      v.texA?.dispose(); v.texB?.dispose(); v.texA = new T.FramebufferTexture(b.w, b.h); v.texB = new T.FramebufferTexture(b.w, b.h);
-      shoot(v.cam, C.views[v.name], v, v.texA, b); v.dirty = false; reset();
-    },
-    // before the main view: shoot the views that need it into their textures
-    shoot(measureAlpha) {
-      frame++;
-      let shot = false;
-      for (const v of list) {
-        if (frame % 10 === 0 || !v.rect) { v.rect = v.frame.getBoundingClientRect(); v.alpha = measureAlpha(v.el); }
-        if (!visible(v)) continue;
-        const b = box(v.rect); if (b.w < 8 || b.h < 8) continue;
-        if (!v.texA || v.texA.image.width !== b.w || v.texA.image.height !== b.h) { v.texA?.dispose(); v.texB?.dispose(); v.texA = new T.FramebufferTexture(b.w, b.h); v.texB = new T.FramebufferTexture(b.w, b.h); v.dirty = true; if (v.next) v.dirtyB = true; }
-        const pushing = Math.abs(v.push - v.want) > .002 || v.push > .002 && v.want > 0;
-        if (v.dirty || pushing || (frame + v.slot) % 30 === 0) { shoot(v.cam, C.views[v.name], v, v.texA, b); v.dirty = false; shot = true; }
-        if (v.next && (v.dirtyB || pushing || frame % 4 === 0)) { shoot(v.camB, C.views[v.next], v, v.texB, b); v.dirtyB = false; shot = true; }
-      }
-      if (shot) reset();
-    },
-    // after the main view: lay each window's picture over its rectangle
+    // after the main view: each plate over its rectangle, drawn with a margin so a fold can lift past the frame
     draw() {
       const keepClear = renderer.autoClear; renderer.autoClear = false;
       let drew = false;
-      for (const v of list) {
-        if (!visible(v) || !v.texA) continue;
-        const b = box(v.rect);
-        renderer.setViewport(b.x / b.pr, b.y / b.pr, b.w / b.pr, b.h / b.pr); renderer.setScissor(b.x / b.pr, b.y / b.pr, b.w / b.pr, b.h / b.pr); renderer.setScissorTest(true);
-        material.uniforms.tA.value = v.texA; material.uniforms.tB.value = v.next ? v.texB : v.texA; material.uniforms.uMix.value = v.next ? v.mix : 0; material.uniforms.uAlpha.value = v.alpha;
-        renderer.render(quadScene, quadCam); drew = true;
+      for (const p of list) {
+        if (!visible(p)) continue;
+        const r = p.rect, H = renderer.domElement.height / renderer.getPixelRatio(), B = CL_BLEED, u = p.cloth.material.uniforms;
+        renderer.setViewport(r.left - B, H - r.bottom - B, r.width + 2 * B, r.height + 2 * B); renderer.setScissor(r.left - B, H - r.bottom - B, r.width + 2 * B, r.height + 2 * B); renderer.setScissorTest(true);
+        u.tA.value = u.tB.value = p.tex; u.uMix.value = 0; u.uAlpha.value = p.alpha;
+        u.uRes.value.set(r.width, r.height); u.uOut.value.set(r.width + 2 * B, r.height + 2 * B);
+        renderer.render(p.cloth.scene, flatCam); drew = true;
       }
-      if (drew) reset();
+      if (drew) { const pr = renderer.getPixelRatio(), w = renderer.domElement.width / pr, h = renderer.domElement.height / pr; renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h); renderer.setScissor(0, 0, w, h); }
       renderer.autoClear = keepClear;
     },
   };
@@ -443,7 +490,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   const $ = s => root.querySelector(s), $$ = s => [...root.querySelectorAll(s)];
   const coarse = matchMedia('(pointer: coarse)').matches;
   const sections = $$('[data-cam]'), walks = $$('[data-walk]'), chapters = C.chapters;
-  const rig = { prog: 0, smooth: 0, mx: 0, my: 0, tmx: 0, tmy: 0, intro: reduced ? 1 : 0, nx: 0, ny: 0 };
+  const rig = { prog: 0, smooth: 0, mx: 0, my: 0, tmx: 0, tmy: 0, intro: 1, nx: 0, ny: 0 }; // intro 1: no fly-in (owner, 2026-10-19)
   let segments = [], holds = [], maxScroll = 1, active = true, wordmark = null, wordT = reduced ? 99 : -1, lastChapter = -1, aspect = innerWidth / innerHeight;
   const pose = { p: new T.Vector3(), yaw: 0, pitch: 0, fov: 50, outdoors: true, veil: 0 };
   const dir = new T.Vector3(), right = new T.Vector3();
@@ -512,11 +559,9 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     const el = document.getElementById(jump.getAttribute('href').slice(1)); if (!el) return;
     e.preventDefault(); closeMenu(); const i = sections.indexOf(el); goTo(i >= 0 ? i : 0);
   });
-  root.addEventListener('keydown', e => { const t = e.target.closest('[data-show]'); if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); showIn(t); } });
 
   // ------------------------------------------------------------------ nav, burger, rail, where-am-I line
   const nav = $('.pf-nav'), burger = $('.pf-burger'), links = $$('.pf-link'), rails = $$('[data-rail]');
-  const linkFor = links.map(l => sections.indexOf(document.getElementById(l.getAttribute('href').slice(1))));
   const closeMenu = () => { nav.classList.remove('menu-open'); burger.setAttribute('aria-expanded', 'false'); };
   burger.addEventListener('click', () => { const open = !nav.classList.contains('menu-open'); nav.classList.toggle('menu-open', open); burger.setAttribute('aria-expanded', String(open)); if (open) nav.classList.remove('hide'); });
   addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
@@ -531,7 +576,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     if (k !== lastChapter) {
       lastChapter = k;
       rails.forEach((r, i) => r.classList.toggle('on', i === k));
-      links.forEach((l, i) => l.classList.toggle('on', linkFor[i] === k));
+      links.forEach(l => l.classList.toggle('on', l.dataset.group === chapters[k]?.group));
     }
     // between chapters, a line says where the walk is going
     const walking = Math.abs(rig.smooth - Math.round(rig.smooth)) > .06 && rig.smooth < chapters.length - 1.5;
@@ -569,6 +614,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     const split = SplitText.create(h, { type: 'words', mask: 'words', aria: 'auto' });
     gsap.set(split.words, { yPercent: 112, opacity: 0 });
     const play = () => gsap.to(split.words, { yPercent: 0, opacity: 1, duration: .95, ease: 'expo.out', stagger: .072 });
+    play.now = () => gsap.set(split.words, { yPercent: 0, opacity: 1 }); // while the campus is built the page stalls now and then: no animation to stall
     reveals.set(h, play);
     if (!h.closest('#arrival')) { const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) { o.disconnect(); play(); } }, { rootMargin: '0px 0px -12% 0px' }); o.observe(h); }
   })).then(() => root.classList.add('split'));
@@ -576,7 +622,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
 
   // ------------------------------------------------------------------ the hero exit (Kage: each piece of the hero foot goes in its own window)
   const exitSeq = [
-    { el: $('.pf-peek'), at: 0, span: .26, blur: 10 }, { el: $('.pf-cue'), at: .1, span: .3, shift: true },
+    { el: $('.pf-cue'), at: .1, span: .3, shift: true },
     ...$$('.pf-chip').map((el, i) => ({ el, at: .2 + i * .1, span: .3, shift: true }))
   ];
   let exiting = false;
@@ -593,21 +639,12 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   }
 
   // ------------------------------------------------------------------ live windows, chips and rows
-  const views = createViews(scene, renderer);
-  const viewEls = $$('.pf-view').map(el => views.attach(el));
-  const lensOf = el => views.list.find(v => v.el === el.closest('.pf-sec')?.querySelector('.pf-lens'));
-  const heroLens = views.list.find(v => v.el.closest('.pf-peek'));
-  function showIn(row) {
-    const lens = lensOf(row); if (!lens) return;
-    views.show(lens, row.dataset.show);
-    row.closest('.pf-sec').querySelectorAll('[data-show]').forEach(o => o.classList.toggle('on', o === row));
-  }
+  const plates = createPlates(renderer);
+  $$('.pf-photo').forEach(el => plates.attach(el));
   $$('.pf-chip').forEach(el => {
-    el.addEventListener('pointerenter', () => { views.show(heroLens, el.dataset.chip); heroLens.want = .35; $$('.pf-chip').forEach(o => o.classList.toggle('on', o === el)); });
-    el.addEventListener('pointerleave', () => { views.show(heroLens, C.hero.peek); heroLens.want = 0; el.classList.remove('on'); });
-    el.addEventListener('focus', () => views.show(heroLens, el.dataset.chip)); el.addEventListener('blur', () => views.show(heroLens, C.hero.peek));
+    el.addEventListener('pointerenter', () => $$('.pf-chip').forEach(o => o.classList.toggle('on', o === el)));
+    el.addEventListener('pointerleave', () => el.classList.remove('on'));
   });
-  $$('[data-show]').forEach(el => { el.addEventListener('pointerenter', () => showIn(el)); el.addEventListener('focus', () => showIn(el)); });
   const alphaOf = el => { let a = 1; for (let n = el; n && n !== document.body; n = n.parentElement) { const s = getComputedStyle(n); if (s.display === 'none' || s.visibility === 'hidden') return 0; a *= +s.opacity; if (a < .01) return 0; } return a; };
 
   // ------------------------------------------------------------------ the cursor (Kage: a ring that trails the hand and opens over anything live)
@@ -637,17 +674,19 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     .observe(loading, { childList: true, characterData: true, subtree: true });
 
   function play(riseLength, delay = 0) {
-    views.prime(heroLens);
     const heroParts = $$('#arrival [data-rv]');
+    const heroShown = waiting; // the hero already came in during the wait
     if (waiting) { waiting = false; root.classList.remove('waiting'); status(); }
     if (reduced) { rig.intro = 1; wordT = 99; root.classList.add('arrived'); ring(true); heroParts.forEach(e => e.classList.add('rv-in')); return; }
     lenis.stop(); root.classList.remove('arrived');
     const tl = gsap.timeline({ delay, onComplete: () => { lenis.start(); root.classList.add('arrived'); ring(true); } });
-    tl.fromTo(rig, { intro: 0 }, { intro: 1, duration: riseLength + 1.2, ease: 'power2.inOut' }, 0)
+    tl.to({}, { duration: riseLength + 1.2 }, 0) // the camera holds on the hero framing while the building rises
       .call(() => { wordT = 0; }, null, riseLength - .9)
-      .call(() => reveals.get($('#arrival .pf-display'))?.(), null, riseLength - .2)
-      .call(() => heroParts.forEach((e, i) => setTimeout(() => e.classList.add('rv-in'), 120 + i * 95)), null, riseLength + .1)
-      .from('.pf-nav, .pf-rail', { autoAlpha: 0, y: -10, duration: 1.1, ease: 'power3.out', clearProps: 'transform' }, riseLength + .2); // a transform left on the nav would hold the phone menu sheet inside it
+      .call(() => { if (!heroShown) reveals.get($('#arrival .pf-display'))?.(); }, null, riseLength - .2)
+      .call(() => heroParts.forEach((e, i) => setTimeout(() => e.classList.add('rv-in'), 120 + i * 95)), null, riseLength + .1);
+    // the nav comes in with the hero, unless it already did during the wait (a transform left on it would hold the phone
+    // menu sheet inside it, hence clearProps)
+    if (!heroShown) tl.from('.pf-nav, .pf-rail', { autoAlpha: 0, y: -10, duration: 1.1, ease: 'power3.out', clearProps: 'transform' }, riseLength + .2);
   }
 
   let last = performance.now();
@@ -662,7 +701,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       this.show(); waiting = true; root.classList.add('waiting'); lenis.stop();
       $('.pf-live-tx').textContent = 'Raising the department';
       $$('#arrival [data-rv]').forEach((e, i) => setTimeout(() => e.classList.add('rv-in'), reduced ? 0 : 250 + i * 95));
-      splitReady.then(() => reveals.get($('#arrival .pf-display'))?.());
+      splitReady.then(() => reveals.get($('#arrival .pf-display'))?.now());
     },
     // the exploration canvas is not a stop in the story's tab order
     show() { active = true; document.documentElement.classList.add('portfolio-mode'); ring(root.classList.contains('arrived')); root.hidden = false; renderer.domElement.tabIndex = -1; lenis.start(); relayout(); },
@@ -687,7 +726,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       let moving = Math.abs(before - rig.smooth) > 1e-5 || Math.abs(rig.mx - rig.tmx) > 1e-3 || Math.abs(rig.my - rig.tmy) > 1e-3 || rig.intro < 1;
       if (wisps && wisps.update(dt, rig.tmx, rig.tmy, pointer.seen && !reduced)) moving = true;
       if (!reduced && leaves.update(dt, camera, pose.outdoors && rig.intro > .9, light)) moving = true;
-      if (views.update(dt)) moving = true;
+      if (plates.update(dt, pointer.seen ? { x: pointer.tx, y: pointer.ty } : null, reduced, alphaOf)) moving = true;
       if (wordmark) {
         if (wordT >= 0 && wordT < 3) { wordT += dt; moving = true; }
         const near = 1 - smooth(.25, .75, rig.smooth); // gone by the time the camera reaches the porch
@@ -697,11 +736,10 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
           g.mesh.position.y = g.base - 5 * (1 - back); g.material.opacity = near;
         }
       }
-      return moving || views.list.some(v => v.rect && v.rect.bottom > 0 && v.rect.top < innerHeight);
+      return moving;
     },
     // after main.js has drawn the frame: the live windows
-    // around main.js's draw of the frame: the live windows are shot before it and laid over it after
-    beforeRender() { if (active && (root.classList.contains('arrived') || reduced)) views.shoot(alphaOf); },
-    afterRender() { if (active && (root.classList.contains('arrived') || reduced)) views.draw(); },
+    // after main.js has drawn the frame: the photo plates over it
+    afterRender() { if (active) plates.draw(); },
   };
 }

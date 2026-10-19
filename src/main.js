@@ -457,10 +457,9 @@ async function boot() {
   if (automated && !window.__playRise) window.__noRise = true;
   document.body.append($('#loader')); // above every layer: #experience is fixed (its own stacking context), the story sits over it
   portfolio = createPortfolio({ scene, camera, renderer, reduced: reduced || !!window.__noRise, changed: () => { needsRender = true; }, onEnter: way => leaveStory(way) });
-  // Enter goes live once the page can answer it: after the campus is built (those steps hold the page), while the
-  // shaders compile (which does not)
-  const enterEarly = () => { if (automated) return; const go = $('#begin'); go.hidden = false;
-    go.onclick = () => { entered = true; goFullscreen(); resumeDefaultSound(); controls.enabled = false; portfolio.wait(); $('#loader').classList.add('loaded'); setTimeout(() => { $('#loader').hidden = true; }, reduced ? 0 : 700); }; };
+  // No gate (owner, 2026-10-19: the site ships as an app, so no full-screen request): the story shows at once, its hero
+  // over the night while the campus is built, and the building rises as soon as it is ready.
+  if (!automated) { entered = true; controls.enabled = false; portfolio.wait(); $('#loader').hidden = true; }
   controls.minDistance = 13; controls.maxDistance = 260; controls.maxPolarAngle = Math.PI * .485; controls.minPolarAngle = .001; controls.enablePan = false; controls.zoomSpeed = .7; controls.rotateSpeed = .5;
   camera.position.fromArray(cameraFor(0)); controls.target.fromArray(chapters[0].target); controls.update();
   controls.addEventListener('start', () => { transition = null; interactive = true; stopJourney(); setOrbit(false); });
@@ -548,7 +547,6 @@ async function boot() {
   sky.update(0, sunlight.night, weatherState, reduced);
   updateWetMaterials();
   performance.mark('lighting-set');
-  enterEarly();
   updateLighting(hour);
   // The building rises out of the land on arrival (rise.js): patched before any shader compiles, so it costs no stall.
   rise.attach(architecture.group, scene); // again: parts built since that share the building's materials get their centres
@@ -623,6 +621,7 @@ function goFullscreen() { // the whole page, so the story scrolls in full screen
 }
 function openDoors() { doorsOpen = true; $('#door span').textContent = 'Close the doors'; $('#door').setAttribute('aria-pressed', 'true'); }
 function begin(gesture) {
+  performance.mark('begin');
   if (gesture) { goFullscreen(); resumeDefaultSound(); }
   if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; } else { riseStart = 1; riseClock = -.75 * RISE_RATE; } // the arrival, once the loader has faded
   // the story walks in through the front doors
@@ -738,7 +737,7 @@ function animate(now) {
   if (riseStart && !rise.done) { // the building rising: every frame, with its shadows
     // the rise's own clock steps by the frame time, capped: one long stall (a first draw) pauses it rather than skipping
     // it, as the story's timeline does (portfolio.js); ordinary slow frames keep wall time
-    riseClock += Math.min(frameDuration / 1000, .25) * RISE_RATE;
+    riseClock += Math.min(frameDuration / 1000, .5) * RISE_RATE;
     const t = Math.max(-1, riseClock); rise.set(t); riseDust.set(t); riseDust.material.uniforms.uLight.value = 1 - .8 * sunlight.night;
     if (frames % 4 === 0) renderer.shadowMap.needsUpdate = true; needsRender = true; // shadows follow every fourth frame: redrawing the whole campus into the shadow map halved the frame rate
     if (rise.done) { renderer.shadowMap.needsUpdate = true; riseDust.set(1e6); }
@@ -804,7 +803,6 @@ function animate(now) {
     for (const [o, s] of smallParts) o.visible = s.radius > .005 * s.center.distanceTo(camera.position);
     // A room's fans and switches are drawn only from inside it (each is several draw calls; from outside they are behind walls or patterned glass).
     for (const { bounds, parts } of interiors) { const inside = bounds.distanceToPoint(camera.position) < 1.5; for (const p of parts) p.visible = inside; }
-    portfolio?.beforeRender();
     renderer.render(scene, camera);
     portfolio?.afterRender(); // the story's live windows onto other rooms
     if (++frames % 60 === 0) drawPlan();
