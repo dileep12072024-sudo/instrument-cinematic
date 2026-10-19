@@ -26,9 +26,16 @@ html.portfolio-mode #experience > :not(#viewport):not(#loader):not(#toast) { dis
 #portfolio em, #portfolio h1, #portfolio h2, #portfolio h3, #portfolio h4, #portfolio address { font-family: inherit; }
 #portfolio button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 #portfolio :focus-visible { outline: 1.5px solid var(--marigold); outline-offset: 4px; border-radius: 2px; }
-@media (hover: hover) and (pointer: fine) { html.portfolio-mode, html.portfolio-mode * { cursor: none !important; } }
+/* the system pointer gives way only once the ring is on screen (after the arrival); the loader and the Enter gate keep it */
+@media (hover: hover) and (pointer: fine) { html.pf-ring, html.pf-ring * { cursor: none !important; } }
 
 /* ------------------------------------------------------------------ overlays */
+/* the night the hero waits in while the campus is built; it lifts as the building starts to rise */
+.pf-night { position: fixed; inset: 0; z-index: -2; pointer-events: none; opacity: 0; transition: opacity 2.2s var(--ease);
+  background: radial-gradient(120% 90% at 70% 0%, #1a2a44 0%, #0d1628 45%, #070b14 100%); }
+#portfolio.waiting .pf-night { opacity: 1; transition: none; }
+#portfolio.waiting .pf-peek, #portfolio.waiting .pf-cue { visibility: hidden; }
+#portfolio.waiting .pf-live .dot { animation: pf-pulse 1.4s var(--ease) infinite; }
 .pf-scrim { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
   background: linear-gradient(90deg, rgb(8 13 22 / .86) 0%, rgb(8 13 22 / .7) calc(var(--col) + var(--pad)), rgb(8 13 22 / 0) calc(var(--col) + var(--pad) + 26vw)),
     linear-gradient(180deg, rgb(8 13 22 / .55), rgb(8 13 22 / 0) 20vh, rgb(8 13 22 / 0) 76vh, rgb(8 13 22 / .6)); }
@@ -40,7 +47,7 @@ html.portfolio-mode #experience > :not(#viewport):not(#loader):not(#toast) { dis
 /* ------------------------------------------------------------------ cursor: a ring that trails the hand */
 .pf-cursor { position: fixed; z-index: 80; top: 0; left: 0; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 1px solid rgb(232 227 214 / .45); border-radius: 50%;
   pointer-events: none; opacity: 0; transition: width .35s var(--ease-out), height .35s var(--ease-out), margin .35s var(--ease-out), background .35s, border-color .35s, opacity .3s; }
-@media (hover: hover) and (pointer: fine) { #portfolio.arrived .pf-cursor { opacity: 1; } }
+@media (hover: hover) and (pointer: fine) { #portfolio.arrived .pf-cursor.seen { opacity: 1; } }
 .pf-cursor.act { width: 52px; height: 52px; margin: -26px 0 0 -26px; background: rgb(232 227 214 / .07); border-color: rgb(232 227 214 / .62); }
 .pf-cursor.away { opacity: 0 !important; }
 

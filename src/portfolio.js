@@ -31,6 +31,7 @@ function markup() {
   const view = (name, cls = '') => { const v = views[name]; return `<figure class="pf-view ${cls}" data-view="${name}" data-cursor><span class="pf-view-fr" data-frame></span><span class="pf-view-ar">${arrow}</span><figcaption><b>${esc(v.label)}</b><i>${esc(v.note)}</i></figcaption></figure>`; };
   const ch = Object.fromEntries(chapters.map((c, i) => [c.id, i]));
   return `
+  <div class="pf-night" aria-hidden="true"></div>
   <div class="pf-scrim" aria-hidden="true"></div>
   <div class="pf-veil" aria-hidden="true"></div>
   <div class="pf-vignette" aria-hidden="true"></div>
@@ -514,7 +515,9 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   }
 
   // ------------------------------------------------------------------ live status (the real time of the department)
+  let waiting = false;
   function status() {
+    if (waiting) return;
     const time = document.querySelector('#time-label')?.textContent || '', weather = document.querySelector('#weather-label')?.textContent || '';
     const [clock, , period] = time.split(' / '), [sky, moon] = weather.split(' / ');
     if (!clock) return;
@@ -536,7 +539,8 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   $$('[data-rv]').forEach(el => { if (!el.closest('#arrival')) io.observe(el); });
   // headings arrive word by word, masked, the first time they come into view; the hero waits for the arrival
   const reveals = new Map();
-  if (!reduced) document.fonts.ready.then(() => $$('.pf-display').forEach(h => {
+  let splitReady = Promise.resolve();
+  if (!reduced) splitReady = document.fonts.ready.then(() => $$('.pf-display').forEach(h => {
     const split = SplitText.create(h, { type: 'words', mask: 'words', aria: 'auto' });
     gsap.set(split.words, { yPercent: 112, opacity: 0 });
     const play = () => gsap.to(split.words, { yPercent: 0, opacity: 1, duration: .95, ease: 'expo.out', stagger: .072 });
@@ -586,10 +590,13 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   const pointer = { x: innerWidth / 2, y: innerHeight / 2, tx: innerWidth / 2, ty: innerHeight / 2, seen: false };
   addEventListener('pointermove', e => {
     if (!active || e.pointerType === 'touch') return;
+    if (!pointer.seen) { pointer.x = e.clientX; pointer.y = e.clientY; cursor.classList.add('seen'); } // the ring starts under the hand, not mid-screen
     pointer.tx = e.clientX; pointer.ty = e.clientY; pointer.seen = true;
     rig.tmx = e.clientX / innerWidth * 2 - 1; rig.tmy = -(e.clientY / innerHeight * 2 - 1);
     cursor.classList.toggle('act', !!e.target.closest?.('[data-cursor], a, button, summary'));
   }, { passive: true });
+  // the ring replaces the system pointer only on a fine pointer, only while the story shows, and only after the arrival
+  const ring = on => document.documentElement.classList.toggle('pf-ring', on && !coarse && matchMedia('(hover: hover) and (pointer: fine)').matches);
   document.addEventListener('pointerleave', () => cursor.classList.add('away'));
   document.addEventListener('pointerenter', () => cursor.classList.remove('away'));
 
@@ -599,11 +606,17 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
 
   // The arrival: one GSAP timeline over the rise. The camera dollies in from far down the drive on a long lens, the
   // wordmark rises from the lawn as the signs land, then the hero copy. Scrolling is held until the building stands.
+  // While the campus is still being built: the live line reads the load's own progress.
+  const loading = document.querySelector('#loading-status');
+  if (loading) new MutationObserver(() => { if (waiting && loading.textContent) $('.pf-live-tx').textContent = `Raising the department: ${loading.textContent.charAt(0).toLowerCase()}${loading.textContent.slice(1)}`; })
+    .observe(loading, { childList: true, characterData: true, subtree: true });
+
   function play(riseLength, delay = 0) {
     const heroParts = $$('#arrival [data-rv]');
-    if (reduced) { rig.intro = 1; wordT = 99; root.classList.add('arrived'); heroParts.forEach(e => e.classList.add('rv-in')); return; }
+    if (waiting) { waiting = false; root.classList.remove('waiting'); status(); }
+    if (reduced) { rig.intro = 1; wordT = 99; root.classList.add('arrived'); ring(true); heroParts.forEach(e => e.classList.add('rv-in')); return; }
     lenis.stop(); root.classList.remove('arrived');
-    const tl = gsap.timeline({ delay, onComplete: () => { lenis.start(); root.classList.add('arrived'); } });
+    const tl = gsap.timeline({ delay, onComplete: () => { lenis.start(); root.classList.add('arrived'); ring(true); } });
     tl.fromTo(rig, { intro: 0 }, { intro: 1, duration: riseLength + 1.2, ease: 'power2.inOut' }, 0)
       .call(() => { wordT = 0; }, null, riseLength - .9)
       .call(() => reveals.get($('#arrival .pf-display'))?.(), null, riseLength - .2)
@@ -617,9 +630,17 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     get active() { return active; },
     get progress() { return rig.smooth; },
     goTo,
+    // The visitor pressed Enter before the building was ready: the hero over the night, the load's progress on the live
+    // line; play() takes over when the campus is ready.
+    wait() {
+      this.show(); waiting = true; root.classList.add('waiting'); lenis.stop();
+      $('.pf-live-tx').textContent = 'Raising the department';
+      $$('#arrival [data-rv]').forEach((e, i) => setTimeout(() => e.classList.add('rv-in'), reduced ? 0 : 250 + i * 95));
+      splitReady.then(() => reveals.get($('#arrival .pf-display'))?.());
+    },
     // the exploration canvas is not a stop in the story's tab order
-    show() { active = true; document.documentElement.classList.add('portfolio-mode'); root.hidden = false; renderer.domElement.tabIndex = -1; lenis.start(); relayout(); },
-    hide() { active = false; lenis.stop(); closeMenu(); renderer.domElement.tabIndex = 0; document.documentElement.classList.remove('portfolio-mode'); root.hidden = true; if (wordmark) wordmark.group.visible = false; if (wisps) wisps.points.visible = false; leaves.update(1, camera, false, 1); },
+    show() { active = true; document.documentElement.classList.add('portfolio-mode'); ring(root.classList.contains('arrived')); root.hidden = false; renderer.domElement.tabIndex = -1; lenis.start(); relayout(); },
+    hide() { active = false; ring(false); lenis.stop(); closeMenu(); renderer.domElement.tabIndex = 0; document.documentElement.classList.remove('portfolio-mode'); root.hidden = true; if (wordmark) wordmark.group.visible = false; if (wisps) wisps.points.visible = false; leaves.update(1, camera, false, 1); },
     // the page's own frame: called from main.js's loop before it draws; true while anything moves
     update(dt, { light = 1 } = {}) {
       if (!active) return false;

@@ -448,6 +448,19 @@ async function boot() {
   renderer.domElement.tabIndex = 0; renderer.domElement.setAttribute('aria-label', 'Interactive building. Arrow keys rotate, plus and minus zoom, Home returns to arrival.');
   $('#viewport').append(renderer.domElement);
   controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = .055;
+  // The story layer exists from the start, so a visitor can step in while the campus is still being built: Enter is
+  // live at once, and the hero shows over the night until the building is ready to rise (owner, 2026-10-19: loading
+  // must feel quick). Automated runs (checks, measurements) see the finished building in the exploration layer unless
+  // they ask for the story (__story) or the rise (__playRise).
+  const automated = navigator.webdriver || window.__autoBegin || /[?&]auto\b/.test(location.search);
+  if (automated && !window.__story) window.__noStory = true;
+  if (automated && !window.__playRise) window.__noRise = true;
+  document.body.append($('#loader')); // above every layer: #experience is fixed (its own stacking context), the story sits over it
+  portfolio = createPortfolio({ scene, camera, renderer, reduced: reduced || !!window.__noRise, changed: () => { needsRender = true; }, onEnter: way => leaveStory(way) });
+  // Enter goes live once the page can answer it: after the campus is built (those steps hold the page), while the
+  // shaders compile (which does not)
+  const enterEarly = () => { if (automated) return; const go = $('#begin'); go.hidden = false;
+    go.onclick = () => { entered = true; goFullscreen(); resumeDefaultSound(); controls.enabled = false; portfolio.wait(); $('#loader').classList.add('loaded'); setTimeout(() => { $('#loader').hidden = true; }, reduced ? 0 : 700); }; };
   controls.minDistance = 13; controls.maxDistance = 260; controls.maxPolarAngle = Math.PI * .485; controls.minPolarAngle = .001; controls.enablePan = false; controls.zoomSpeed = .7; controls.rotateSpeed = .5;
   camera.position.fromArray(cameraFor(0)); controls.target.fromArray(chapters[0].target); controls.update();
   controls.addEventListener('start', () => { transition = null; interactive = true; stopJourney(); setOrbit(false); });
@@ -498,6 +511,15 @@ async function boot() {
   await new Promise(resolve => requestAnimationFrame(resolve));
   $('#loading-status').textContent = 'Growing the Blender landscape';
   performance.mark('architecture-built');
+  // One filter for the sky and every reflection probe: each new generator recompiled its shaders (~1.6 s apiece).
+  reflectionFilter = new THREE.PMREMGenerator(renderer);
+  try {
+    const hdr = await skyDownload; hdr.mapping = THREE.EquirectangularReflectionMapping;
+    const env = reflectionFilter.fromEquirectangular(hdr);
+    scene.environment = env.texture; scene.background = hdr; scene.backgroundBlurriness = .02; scene.backgroundRotation.y = 1.9; scene.environmentRotation.y = 1.9;
+  } catch { console.warn('Sky map unavailable. Using daylight fallback.'); }
+  performance.mark('sky-ready');
+  rise = createRise(); rise.attach(architecture.group); rise.set(-1); // patched before any shader compiles: no stall later
   landscape = await loadBlenderEnvironment(scene, group => { rectangularAprons(group); regradeGround(group); placeFacadeTrees(group); }, environmentDownload);
   const breathe = () => new Promise(resolve => requestAnimationFrame(resolve)); // let the loader paint between stages
   await breathe();
@@ -526,46 +548,13 @@ async function boot() {
   sky.update(0, sunlight.night, weatherState, reduced);
   updateWetMaterials();
   performance.mark('lighting-set');
-  // One filter for the sky and every reflection probe: each new generator recompiled its shaders (~1.6 s apiece).
-  const reflectionFilter = new THREE.PMREMGenerator(renderer);
-  try {
-    const hdr = await skyDownload; hdr.mapping = THREE.EquirectangularReflectionMapping;
-    const env = reflectionFilter.fromEquirectangular(hdr);
-    scene.environment = env.texture; scene.background = hdr; scene.backgroundBlurriness = .02; scene.backgroundRotation.y = 1.9; scene.environmentRotation.y = 1.9;
-  } catch { console.warn('Sky map unavailable. Using daylight fallback.'); }
-  performance.mark('sky-ready');
+  enterEarly();
   updateLighting(hour);
   // The building rises out of the land on arrival (rise.js): patched before any shader compiles, so it costs no stall.
-  rise = createRise(); rise.attach(architecture.group, scene); rise.set(-1);
+  rise.attach(architecture.group, scene); // again: parts built since that share the building's materials get their centres
   riseDust = createRiseDust(footprint, (x, z) => puddles.heightAt(x, z)); scene.add(riseDust.points);
-  $('#loading-status').textContent = 'Reflecting the courtyards';
-  const glass = [architecture.materials.glass, architecture.materials.rearGlass, architecture.materials.entranceReflectiveGlass];
-  glass.forEach(material => { material.visible = false; });
-  // Shaders compile in parallel off the main thread: first the reflection probes' linear (untonemapped) variants,
-  // then the screen's. Compiling them inside the first render froze the page for ~20 s on integrated GPUs.
-  const probeTarget = new THREE.WebGLCubeRenderTarget(4, { type: THREE.HalfFloatType });
-  renderer.setRenderTarget(probeTarget);
-  try { await renderer.compileAsync(scene, camera); await compileShadowShaders(); } finally { renderer.setRenderTarget(null); probeTarget.dispose(); }
-  performance.mark('probe-shaders-compiled');
-  try {
-    for (const [i, position] of [[0, 6, 20], [0, 6, -9], [0, 2.2, 7.25]].entries()) {
-      // The entrance needs a crisp reflection; capture it once, without a per-frame render pass.
-      const probe = new THREE.WebGLCubeRenderTarget(i === 2 ? 512 : 128, { type: THREE.HalfFloatType });
-      const probeCamera = new THREE.CubeCamera(.2, 180, probe);
-      try {
-        probeCamera.position.fromArray(position); probeCamera.update(renderer, scene); performance.mark(`probe-${i}-rendered`);
-        glass[i].envMap = reflectionFilter.fromCubemap(probe.texture).texture;
-        glass[i].needsUpdate = true;
-      } finally {
-        probe.dispose();
-      }
-    }
-    // Ground-level view in front of the building for the puddles (one capture; parallax is not tracked).
-    { const probe = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType }), cam = new THREE.CubeCamera(.1, 200, probe);
-      try { cam.position.set(0, .35, 15); cam.update(renderer, scene); puddles.setReflection(reflectionFilter.fromCubemap(probe.texture).texture); } finally { probe.dispose(); } }
-  } finally {
-    glass.forEach(material => { material.visible = true; }); reflectionFilter.dispose();
-  }
+  $('#loading-status').textContent = 'Compiling the light';
+  await compileShadowShaders();
   const defaultAudio = sound.setEnabled(true);
   updateSoundButton();
   defaultAudio.then(updateSoundButton).catch(updateSoundButton);
@@ -577,44 +566,41 @@ async function boot() {
   // Upload every texture now: three uploads a texture the first time its object is drawn, so turning the view in the
   // panorama stalled ~0.1 s whenever something new came into sight (measured mid-drag on the owner's laptop).
   { const seen = new Set(); scene.traverse(o => { for (const m of [o.material].flat()) if (m) for (const v of Object.values(m)) if (v?.isTexture && !v.isRenderTargetTexture && !seen.has(v)) { seen.add(v); renderer.initTexture(v); } }); }
+  performance.mark('textures-uploaded');
   // Walkable guide: collides with the building and ground, never with foliage or effects.
   avatar = createAvatar({ scene, camera, canvas: renderer.domElement, changed: () => { needsRender = true; }, collidables: (() => {
     let list; return () => list ||= (() => { const out = []; const add = root => root?.traverse(o => { if (o.isMesh && o.visible !== false && !o.isInstancedMesh && !o.userData.windHeight && !/Batched trees|Live rain|sky|cloud|moon|horizon|Distant/i.test(o.name + (o.parent?.name || ''))) out.push(o); });
       add(architecture.group); add(landscape.group); add(surroundings.sheds); return out; })(); })() });
-  // Warm-up while the loader still covers the page: draw the scene once in six directions. ANGLE (D3D11) finishes each
-  // shader the first time it draws on screen, so the first turn of the panorama stalled 0.1-0.6 s per new view.
-  { const facing = camera.quaternion.clone(), ahead = new THREE.Vector3();
-    for (const d of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, .01], [0, -1, .01]]) { camera.lookAt(ahead.copy(camera.position).add(new THREE.Vector3(...d))); renderer.render(scene, camera); }
-    camera.quaternion.copy(facing); }
+  performance.mark('guide-built');
+  if (window.__noStory) await prepareExploration(); // straight to the free camera: ready as before
   ready = true; window.__portrait.ready = true; readyAt = performance.now();
   // The portfolio layer comes first: the story of the department over the live campus, then the doors into it.
-  document.body.append($('#loader')); // above every layer: #experience is fixed (its own stacking context), the story sits over it
-  portfolio = createPortfolio({ scene, camera, renderer, reduced: reduced || !!window.__noRise, changed: () => { needsRender = true; }, onEnter: way => leaveStory(way) });
   // Automated runs (checks, measurements) see the finished building in the exploration layer unless they ask for the
   // story (__story) or the rise (__playRise).
-  const automated = navigator.webdriver || window.__autoBegin || /[?&]auto\b/.test(location.search);
-  if (automated && !window.__story) window.__noStory = true;
-  if (automated && !window.__playRise) window.__noRise = true;
   if (!window.__noStory) { controls.enabled = false; portfolio.show(); }
   renderer.render(scene, camera);
   // One tap to begin (owner, 2026-10-18: full screen by default). Browsers only allow full screen, and sound, from a
   // tap, click or key, so the loader ends on an Enter button; that one gesture goes full screen, starts the ambience
   // and starts the building rising. Automated runs (and our test scripts) skip it.
-  if (automated) begin(false);
+  if (automated || entered) begin(false); // in already: the building rises now
   else { $('#loader').classList.add('gate'); $('#loading-status').textContent = ''; const go = $('#begin'); go.hidden = false; go.focus({ preventScroll: true }); go.onclick = () => begin(true); }
   loadWeather();
   drawPlan(); resize(); requestAnimationFrame(animate);
 }
 // Shadow-map shaders are only built when shadows first render, synchronously (~6 s here). Compile them ahead, in
 // parallel: give each shadow caster the exact material three's shadow pass will use, then restore it.
-async function compileShadowShaders() {
+// The shadow passes' programs, for everything under root. compile() creates the programs synchronously and only their
+// readiness is waited for, so the shadow materials are swapped back at once: the scene is never left in its shadow dress
+// while other work runs.
+function compileShadowShaders(root = scene) {
   const kinds = new Set();
   scene.traverse(o => { if (o.isLight && o.castShadow) kinds.add(o.isPointLight ? 'distance' : 'depth'); });
   const flip = { [THREE.FrontSide]: THREE.BackSide, [THREE.BackSide]: THREE.FrontSide, [THREE.DoubleSide]: THREE.DoubleSide };
   const plain = { depth: new THREE.MeshDepthMaterial(), distance: new THREE.MeshDistanceMaterial() };
+  const pending = [];
   for (const kind of kinds) {
     const swapped = [];
-    scene.traverseVisible(o => {
+    root.traverseVisible(o => {
       if (!o.isMesh || !o.castShadow || Array.isArray(o.material) || !o.material.visible) return;
       const m = o.material, custom = kind === 'distance' ? o.customDistanceMaterial : o.customDepthMaterial;
       const shadow = custom || plain[kind].clone(); // clones keep each caster's settings; programs are shared by key
@@ -622,14 +608,15 @@ async function compileShadowShaders() {
       swapped.push([o, m]); o.material = shadow;
     });
     const fog = scene.fog; scene.fog = null; // the shadow pass renders without the scene, so without fog
-    try { await renderer.compileAsync(scene, camera); }
+    try { pending.push(renderer.compileAsync(root, camera, scene)); }
     finally { scene.fog = fog; for (const [o, m] of swapped) o.material = m; }
   }
+  return Promise.all(pending);
 }
 let previous = performance.now(), frames = 0, hallLit = false, hallFanSpeed = 1;
 let rise, riseDust, riseStart = 0; // the arrival: the building rising out of the land
 const RISE_RATE = .62; // the rise's own clock runs slower than wall time: about eleven seconds, with weight
-let portfolio = null; // the story layer (portfolio.js), shown first
+let portfolio = null, entered = false; // the story layer (portfolio.js), shown first; entered: Enter pressed during the load
 function goFullscreen() { // the whole page, so the story scrolls in full screen too; iPhone Safari has no API for it
   const el = document.documentElement, ask = el.requestFullscreen || el.webkitRequestFullscreen;
   if (!document.fullscreenElement && ask) try { const r = ask.call(el, { navigationUI: 'hide' }); r?.catch?.(() => {}); } catch {}
@@ -642,7 +629,61 @@ function begin(gesture) {
   if (window.__noStory) leaveStory('explore'); else { openDoors(); portfolio.play(RISE_LENGTH / RISE_RATE, .75); }
   $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700); needsRender = true;
 }
-function leaveStory(way) {
+let reflectionFilter, explorationReady = null, explored = false;
+// The reflection captures and the shader warm-up serve the free camera (glass and puddles seen up close, the panorama's
+// turns). The story starts without them, its glass lit by the sky's own reflection, and they run once, behind the
+// loader, when the visitor first leaves the story (they cost ~30 s of the load on an integrated GPU).
+function prepareExploration() {
+  return explorationReady ||= (async () => {
+    const glass = [architecture.materials.glass, architecture.materials.rearGlass, architecture.materials.entranceReflectiveGlass];
+    glass.forEach(material => { material.visible = false; });
+    // Shaders compile in parallel off the main thread: first the reflection probes' linear (untonemapped) variants,
+    // then the screen's. Compiling them inside the first render froze the page for ~20 s on integrated GPUs.
+    // The reflections show the building and the sky; the 7-million-triangle campus environment around it is left out of
+    // them (it cost ~45 s of the load on an integrated GPU, compiling and drawing into twenty-four cube faces).
+    const environment = scene.getObjectByName('Blender campus environment'), environmentShown = environment?.visible;
+    if (environment) environment.visible = false;
+    const probeTarget = new THREE.WebGLCubeRenderTarget(4, { type: THREE.HalfFloatType });
+    renderer.setRenderTarget(probeTarget);
+    try { await renderer.compileAsync(scene, camera); } finally { renderer.setRenderTarget(null); probeTarget.dispose(); }
+    performance.mark('probe-shaders-compiled');
+    try {
+      for (const [i, position] of [[0, 6, 20], [0, 6, -9], [0, 2.2, 7.25]].entries()) {
+        // The entrance needs a crisp reflection; capture it once, without a per-frame render pass.
+        const probe = new THREE.WebGLCubeRenderTarget(i === 2 ? 512 : 128, { type: THREE.HalfFloatType });
+        const probeCamera = new THREE.CubeCamera(.2, 180, probe);
+        try {
+          probeCamera.position.fromArray(position); probeCamera.update(renderer, scene); performance.mark(`probe-${i}-rendered`);
+          glass[i].envMap = reflectionFilter.fromCubemap(probe.texture).texture;
+          glass[i].needsUpdate = true;
+        } finally {
+          probe.dispose();
+        }
+      }
+      // Ground-level view in front of the building for the puddles (one capture; parallax is not tracked).
+      { const probe = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType }), cam = new THREE.CubeCamera(.1, 200, probe);
+        try { cam.position.set(0, .35, 15); cam.update(renderer, scene); puddles.setReflection(reflectionFilter.fromCubemap(probe.texture).texture); } finally { probe.dispose(); } }
+    } finally {
+      glass.forEach(material => { material.visible = true; });
+      if (environment) environment.visible = environmentShown;
+    }
+    reflectionFilter.dispose();
+    performance.mark('reflections-captured');
+    await renderer.compileAsync(scene, camera); // the glass and puddles, recompiled with their new reflections
+    // Draw the scene once in six directions: ANGLE (D3D11) finishes each shader the first time it draws on screen, so
+    // the first turn of the panorama stalled 0.1-0.6 s per new view.
+    const facing = camera.quaternion.clone(), ahead = new THREE.Vector3();
+    for (const d of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, .01], [0, -1, .01]]) { camera.lookAt(ahead.copy(camera.position).add(new THREE.Vector3(...d))); renderer.render(scene, camera); }
+    camera.quaternion.copy(facing);
+    explored = true; performance.mark('exploration-ready');
+  })();
+}
+async function leaveStory(way) {
+  if (!explored) {
+    const loader = $('#loader'); loader.hidden = false; loader.classList.remove('loaded', 'gate'); $('#loading-status').textContent = 'Opening the campus';
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); await prepareExploration();
+    loader.classList.add('loaded'); setTimeout(() => { loader.hidden = true; }, reduced ? 0 : 700);
+  }
   portfolio.hide(); scrollTo(0, 0); controls.enabled = true; camera.fov = 43; camera.updateProjectionMatrix();
   controls.target.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(30)); controls.update();
   if (way === 'walk') enterAvatar(); else selectChapter(0);

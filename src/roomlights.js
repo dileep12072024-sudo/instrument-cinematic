@@ -5,48 +5,67 @@ import * as T from 'three';
 // every pixel, and a full shader rebuild whenever one is switched). Instead the room's materials get a shader term: a
 // diffuse contribution from each fitting, inverse-square falloff, a downward lobe, limited to the room's box so nothing
 // leaks through its walls. Switching changes a uniform only: instant, and free everywhere else.
-const MAX = 12;
+// One table for every room (it was one shader term per room: each room's materials then compiled their own programs,
+// 140 of the campus's 337, and those programs were most of the loading time on an integrated GPU). Each fitting carries
+// its room; a fragment is lit by the fittings of the rooms whose boxes contain it, so nothing leaks through walls, and
+// every patched material shares one program key.
+const ROOMS = 8, FITTINGS = 64;
+const table = {
+  uRL: { value: Array.from({ length: FITTINGS }, () => new T.Vector4(0, -100, 0, 0)) },
+  uRLRoom: { value: new Array(FITTINGS).fill(-1) },
+  uRLCount: { value: 0 },
+  uRLRooms: { value: 0 },
+  uRLColor: { value: new T.Color('#fff7ea') },
+  uRLMin: { value: Array.from({ length: ROOMS }, () => new T.Vector3(1e9, 1e9, 1e9)) },
+  uRLMax: { value: Array.from({ length: ROOMS }, () => new T.Vector3(-1e9, -1e9, -1e9)) },
+};
+const patched = new WeakSet();
+const GLSL = /* glsl */`
+{
+  int inRooms = 0;
+  for (int r = 0; r < ${ROOMS}; r++) {
+    if (r >= uRLRooms) break;
+    if (all(greaterThan(vRLWorld, uRLMin[r])) && all(lessThan(vRLWorld, uRLMax[r]))) inRooms |= 1 << r;
+  }
+  if (inRooms != 0) {
+    vec3 nW = normalize((vec4(geometryNormal, 0.0) * viewMatrix).xyz); // view to world (viewMatrix is orthonormal)
+    for (int i = 0; i < ${FITTINGS}; i++) {
+      if (i >= uRLCount) break;
+      vec4 rl = uRL[i];
+      if (rl.w <= 0.0 || ((inRooms >> int(uRLRoom[i])) & 1) == 0) continue;
+      vec3 toL = rl.xyz - vRLWorld; float d2 = dot(toL, toL); vec3 L = toL * inversesqrt(d2);
+      float lobe = 0.25 + 0.75 * clamp(L.y, 0.0, 1.0); // a ceiling panel throws its light downward (L points up to it)
+      reflectedLight.directDiffuse += rl.w * max(dot(nW, L), 0.0) * lobe / (d2 + 0.4) * uRLColor * BRDF_Lambert(material.diffuseColor);
+    }
+  }
+}`;
 
 export function createRoomLights(name, bounds) {
-  const uniforms = {
-    uRL: { value: Array.from({ length: MAX }, () => new T.Vector4(0, -100, 0, 0)) },
-    uRLCount: { value: 0 },
-    uRLColor: { value: new T.Color('#fff7ea') },
-    uRLMin: { value: bounds.min.clone() }, uRLMax: { value: bounds.max.clone() },
-  };
-  const fittings = [], patched = new WeakSet(), tag = name.replace(/\W/g, '');
+  const room = table.uRLRooms.value;
+  if (room >= ROOMS) throw new Error(`${name}: more than ${ROOMS} lit rooms`);
+  table.uRLRooms.value++; table.uRLMin.value[room].copy(bounds.min); table.uRLMax.value[room].copy(bounds.max);
+  const fittings = [];
   return {
     fittings,
     add(position, power, onLevel = l => {}) {
-      if (fittings.length >= MAX) throw new Error(`${name}: too many light fittings`);
-      const f = { index: fittings.length, position: position.clone(), power, on: true, level: 1, onLevel };
-      fittings.push(f); uniforms.uRLCount.value = fittings.length;
-      uniforms.uRL.value[f.index].set(position.x, position.y, position.z, power); onLevel(1);
+      const index = table.uRLCount.value;
+      if (index >= FITTINGS) throw new Error(`${name}: more than ${FITTINGS} light fittings in all`);
+      const f = { index, position: position.clone(), power, on: true, level: 1, onLevel };
+      fittings.push(f); table.uRLCount.value++; table.uRLRoom.value[index] = room;
+      table.uRL.value[index].set(position.x, position.y, position.z, power); onLevel(1);
       return f;
     },
     patch(material) {
       if (!material || patched.has(material) || !(material.isMeshStandardMaterial || material.isMeshLambertMaterial || material.isMeshPhongMaterial)) return;
       patched.add(material);
       const before = material.onBeforeCompile, key = material.customProgramCacheKey;
-      material.customProgramCacheKey = () => (key && key !== T.Material.prototype.customProgramCacheKey ? key.call(material) : '') + '|rl-' + tag;
+      material.customProgramCacheKey = () => (key && key !== T.Material.prototype.customProgramCacheKey ? key.call(material) : '') + '|rl';
       material.onBeforeCompile = (shader, renderer) => {
         before?.call(material, shader, renderer);
-        for (const [k, v] of Object.entries(uniforms)) shader.uniforms[k + tag] = v; // per-room names: one material may be patched by two rooms
-        shader.vertexShader = `varying vec3 vRLWorld${tag};\n` + shader.vertexShader.replace('#include <project_vertex>', `#include <project_vertex>\nvRLWorld${tag} = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
-        shader.fragmentShader = `#define RL_MAX${tag} ${MAX}
-uniform vec4 uRL${tag}[RL_MAX${tag}]; uniform int uRLCount${tag}; uniform vec3 uRLColor${tag}, uRLMin${tag}, uRLMax${tag}; varying vec3 vRLWorld${tag};
-` + shader.fragmentShader.replace('#include <lights_fragment_end>', `#include <lights_fragment_end>
-if (all(greaterThan(vRLWorld${tag}, uRLMin${tag})) && all(lessThan(vRLWorld${tag}, uRLMax${tag}))) {
-  vec3 nW = normalize((vec4(geometryNormal, 0.0) * viewMatrix).xyz); // view to world (viewMatrix is orthonormal)
-  for (int i = 0; i < RL_MAX${tag}; i++) {
-    if (i >= uRLCount${tag}) break;
-    vec4 rl = uRL${tag}[i];
-    if (rl.w <= 0.0) continue;
-    vec3 toL = rl.xyz - vRLWorld${tag}; float d2 = dot(toL, toL); vec3 L = toL * inversesqrt(d2);
-    float lobe = 0.25 + 0.75 * clamp(L.y, 0.0, 1.0); // a ceiling panel throws its light downward (L points up to it)
-    reflectedLight.directDiffuse += rl.w * max(dot(nW, L), 0.0) * lobe / (d2 + 0.4) * uRLColor${tag} * BRDF_Lambert(material.diffuseColor);
-  }
-}`);
+        Object.assign(shader.uniforms, table);
+        shader.vertexShader = 'varying vec3 vRLWorld;\n' + shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvRLWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+        shader.fragmentShader = `uniform vec4 uRL[${FITTINGS}]; uniform float uRLRoom[${FITTINGS}]; uniform int uRLCount, uRLRooms; uniform vec3 uRLColor, uRLMin[${ROOMS}], uRLMax[${ROOMS}]; varying vec3 vRLWorld;\n`
+          + shader.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + GLSL);
       };
       material.needsUpdate = true;
     },
@@ -57,7 +76,7 @@ if (all(greaterThan(vRLWorld${tag}, uRLMin${tag})) && all(lessThan(vRLWorld${tag
       for (const f of fittings) {
         const target = f.on ? 1 : 0; if (f.level === target) continue;
         f.level = Math.abs(f.level - target) < .01 ? target : T.MathUtils.damp(f.level, target, 16, dt);
-        uniforms.uRL.value[f.index].w = f.power * f.level; f.onLevel(f.level); changed = true;
+        table.uRL.value[f.index].w = f.power * f.level; f.onLevel(f.level); changed = true;
       }
       return changed;
     },
