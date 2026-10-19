@@ -12,7 +12,8 @@ export const department = {
 
 const EYE = 1.62, HALL = .164 + EYE, CORRIDOR = -.376 + EYE, WING = -.916 + EYE, LANDING = 4.044 + EYE, CLASS = 3.504 + EYE, LOWER = 2.964 + EYE, EAST = 4.704 + EYE, GROUND_E = .704 + EYE;
 
-// The walk: every stop is a real room in the building. Each holds at `eye`, framing `anchor` (the door, its sign, or the
+// The walk: every stop is a real room in the building. sign: the blade sign over a professor's door (their photo pours
+// out of it). Each holds at `eye`, framing `anchor` (the door, its sign, or the
 // board); `route` is the walk from the previous stop's eye along corridors, steps and stairs (every point on a floor or a
 // flight). group: which header link the stop belongs to. Coordinates are the main site's model (metres).
 export const chapters = [
@@ -49,13 +50,13 @@ export const chapters = [
       [2.67, HALL, .2], [2.67, 2.484 + EYE, -4.1], [2.3, 2.484 + EYE, -5.0], [.6, 2.484 + EYE, -5.15], [0, 2.484 + EYE, -4.1], [0, LANDING, -.7], [0, LANDING, .3]],
     eye: [-.45, LANDING, 1.25], anchor: [-2.55, 5.2, 3.4], fov: 56 },
   // the classroom wing: faculty rooms on the left, the classrooms at its far end down three steps
-  { id: 'fac-daisy', group: 'faculty', nav: 'Dr. A. Daisy Rani', where: 'Classroom wing, first floor', person: 'daisy',
+  { id: 'fac-daisy', group: 'faculty', nav: 'Dr. A. Daisy Rani', where: 'Classroom wing, first floor', person: 'daisy', sign: [-7.02, 6.12, 1.41],
     route: [[-1.4, LANDING, 2.0], [-2.4, LANDING, 2.17], [-3.98, LANDING, 2.17], [-4.62, CLASS, 2.17]],
     eye: [-4.6, CLASS, 2.5], anchor: [-6.55, 5.35, 1.2], fov: 54 },
-  { id: 'fac-kamala', group: 'faculty', nav: 'Dr. A. Kamala Kumari', where: 'Classroom wing, first floor', person: 'kamala',
+  { id: 'fac-kamala', group: 'faculty', nav: 'Dr. A. Kamala Kumari', where: 'Classroom wing, first floor', person: 'kamala', sign: [-10.52, 6.12, 1.41],
     route: [[-6.2, CLASS, 2.3]],
     eye: [-8.0, CLASS, 2.5], anchor: [-10.05, 5.35, 1.2], fov: 54 },
-  { id: 'hod', group: 'faculty', nav: 'Head of Department', where: 'Classroom wing, first floor', person: 'swapna',
+  { id: 'hod', group: 'faculty', nav: 'Head of Department', where: 'Classroom wing, first floor', person: 'swapna', sign: [-13.92, 6.12, 1.41],
     route: [[-9.6, CLASS, 2.3]],
     eye: [-11.4, CLASS, 2.5], anchor: [-13.45, 5.35, 1.2], fov: 54 },
   { id: 'classrooms', group: 'classrooms', nav: 'Classrooms II and III', where: 'End of the classroom wing',
@@ -65,14 +66,14 @@ export const chapters = [
     route: [[-23.15, LOWER, 1.2], [-23.15, LOWER, -1.8]],
     eye: [-23.15, LOWER, -4.3], anchor: [-24.2, 3.9, -6.73], fov: 56 },
   // the east corridor on the first floor: professors' rooms on the left, the labs at its end
-  { id: 'fac-patnaik', group: 'faculty', nav: 'Prof. M. Ramesh Patnaik', where: 'East corridor, first floor', person: 'patnaik',
+  { id: 'fac-patnaik', group: 'faculty', nav: 'Prof. M. Ramesh Patnaik', where: 'East corridor, first floor', person: 'patnaik', sign: [9.92, 7.12, 1.35],
     route: [[-23.15, LOWER, -1], [-22.6, LOWER, 1.8], [-21.64, LOWER, 2.17], [-20.7, CLASS, 2.17], [-12, CLASS, 2.2], [-4.62, CLASS, 2.17], [-3.98, LANDING, 2.17],
       [-2.4, LANDING, 2.17], [0, LANDING, 2.0], [2.6, LANDING, 2.1], [4.1, LANDING, 2.1], [4.9, EAST, 2.1]],
     eye: [6.9, EAST, 2.5], anchor: [9.55, 6.35, 1.25], fov: 54 },
-  { id: 'fac-ysrao', group: 'faculty', nav: 'Prof. Y. Srinivasa Rao', where: 'East corridor, first floor', person: 'ysrao',
+  { id: 'fac-ysrao', group: 'faculty', nav: 'Prof. Y. Srinivasa Rao', where: 'East corridor, first floor', person: 'ysrao', sign: [12.52, 7.12, 1.35],
     route: [[8.4, EAST, 2.3]],
     eye: [9.7, EAST, 2.5], anchor: [12.15, 6.35, 1.25], fov: 54 },
-  { id: 'fac-bhujanga', group: 'faculty', nav: 'Prof. A. Bhujanga Rao', where: 'East corridor, first floor', person: 'bhujanga',
+  { id: 'fac-bhujanga', group: 'faculty', nav: 'Prof. A. Bhujanga Rao', where: 'East corridor, first floor', person: 'bhujanga', sign: [17.02, 7.12, 1.35],
     route: [[11.6, EAST, 2.3]],
     eye: [14.2, EAST, 2.5], anchor: [16.65, 6.35, 1.25], fov: 54 },
   { id: 'lab-devicefab', group: 'labs', nav: 'Device Fab Lab', where: 'East wing, first floor',
@@ -94,8 +95,7 @@ export const chapters = [
 export const people = {
   swapna: { name: 'Dr. P. Swapna', role: 'Professor and Head of the Department', degrees: 'M.Tech, Ph.D (Andhra University, 2015)', area: 'Industrial process instrumentation', photo: '/media/faculty/swapna.webp',
     note: 'The department\u2019s present head. Her room is this door, under the blade sign; academic matters come here, while the department office handles admissions, certificates and fees.' },
-  daisy: { name: 'Dr. A. Daisy Rani', role: '', // post not yet confirmed
-    degrees: 'Ph.D (Andhra University, 2015)', area: 'Industrial process instrumentation', photo: '/media/faculty/daisy-rani.webp',
+  daisy: { name: 'Dr. A. Daisy Rani', role: 'Associate Professor', degrees: 'Ph.D (Andhra University, 2015)', area: 'MEMS and NEMS', photo: '/media/faculty/daisy-rani.webp',
     note: 'The first room in the classroom wing corridor.' },
   kamala: { name: 'Dr. A. Kamala Kumari', role: 'Associate Professor', degrees: 'M.Tech, Ph.D (Andhra University, 2015)', area: 'Digital systems and computer electronics', photo: '/media/faculty/kamala-kumari.webp',
     note: 'Head of the department from 2022.' },
@@ -107,15 +107,17 @@ export const people = {
 };
 
 // Each lab's own line: what it is for, as the B.Tech and M.Tech courses use it, and where its door is.
+// Each lab's own line, from the lab courses of the university's B.Tech (Instrumentation Engineering) scheme and the
+// department's research areas.
 export const labRooms = {
-  'lab-process': { title: 'Process Control Lab', lead: 'Straight ahead at the foot of the steps. Closed control loops of level, flow, pressure and temperature: tuning a controller and watching a plant answer it.' },
-  'lab-instruments': { title: 'Industrial Instruments Lab', lead: 'The transmitters and transducers of a working plant, measured, compared and calibrated: pressure, flow, level and temperature.' },
-  'lab-control': { title: 'Control Systems Laboratory', lead: 'Control theory at the bench: how a system responds, what keeps it stable, and how a controller shapes it.' },
-  'lab-dcs': { title: 'DCS Lab', lead: 'Distributed control systems, the plant-wide architecture that runs refineries and power stations, at the far end of the wing by the gate.' },
-  'lab-simulation': { title: 'Simulation Lab', lead: 'Instruments and control systems modelled and tested on the computer before they are built.' },
+  'lab-process': { title: 'Process Control Lab', lead: 'Straight ahead at the foot of the steps. The B.Tech\u2019s Process Control Lab: closed loops of level, flow, pressure and temperature, and a controller tuned to its best settings, judged by the quarter-decay ratio and the IAE, ISE and ITAE error criteria.' },
+  'lab-instruments': { title: 'Industrial Instruments Lab', lead: 'The Industrial Instruments Labs: the measuring instruments of a working plant, transmitters and transducers for pressure, flow, level and temperature, tested, compared and calibrated.' },
+  'lab-control': { title: 'Control Systems Laboratory', lead: 'The Control Systems Lab: how real systems answer a step or a sine, what keeps them stable, and the controllers that shape them.' },
+  'lab-dcs': { title: 'DCS Lab', lead: 'Where the final-year DCS and PLC Lab is taught: distributed control systems and programmable logic controllers, the architecture that runs refineries and power stations. At the far end of the wing, by the gate.' },
+  'lab-simulation': { title: 'Simulation Lab', lead: 'Instruments, plants and control loops modelled and tested on the computer before they are built.' },
   'lab-electronics': { title: 'Electronics Lab II', lead: 'The electronic circuits behind every instrument: amplifiers, filters, converters and signal conditioning. At the end of the passage past the Seminar Hall.' },
-  'lab-devicefab': { title: 'Device Fab Lab', lead: 'Where sensors and devices are made, the bench for the department\u2019s research in MEMS, thin films and nanotechnology.' },
-  'lab-biomedical': { title: 'Biomedical Instrumentation Lab', lead: 'Instruments that read the body: the signals of heart, muscle and brain, and how they are measured safely.' },
+  'lab-devicefab': { title: 'Device Fab Lab', lead: 'Where sensors and devices are made: the bench for the department\u2019s research in sensors, MEMS and nanotechnology.' },
+  'lab-biomedical': { title: 'Biomedical Instrumentation Lab', lead: 'The B.Tech\u2019s Biomedical Instrumentation Lab: instruments that read the body, the electrical signals of heart, muscle and brain, and how they are measured safely.' },
 };
 
 export const classroomRooms = {

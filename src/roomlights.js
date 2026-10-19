@@ -6,33 +6,31 @@ import * as T from 'three';
 // diffuse contribution from each fitting, inverse-square falloff, a downward lobe, limited to the room's box so nothing
 // leaks through its walls. Switching changes a uniform only: instant, and free everywhere else.
 // One table for every room (it was one shader term per room: each room's materials then compiled their own programs,
-// 140 of the campus's 337, and those programs were most of the loading time on an integrated GPU). Each fitting carries
-// its room; a fragment is lit by the fittings of the rooms whose boxes contain it, so nothing leaks through walls, and
-// every patched material shares one program key.
+// 140 of the campus's 337). The table is a small float texture, not uniform arrays: three re-uploads array uniforms on
+// every draw that switches material, which with 64 fittings cost several milliseconds a frame. Row 0: each fitting's
+// position and power; row 1: its room; rows 2 and 3: each room's box. A fragment is lit by the fittings of the rooms
+// whose boxes contain it, so nothing leaks through walls, and every patched material shares one program key.
 const ROOMS = 8, FITTINGS = 64;
-const table = {
-  uRL: { value: Array.from({ length: FITTINGS }, () => new T.Vector4(0, -100, 0, 0)) },
-  uRLRoom: { value: new Array(FITTINGS).fill(-1) },
-  uRLCount: { value: 0 },
-  uRLRooms: { value: 0 },
-  uRLColor: { value: new T.Color('#fff7ea') },
-  uRLMin: { value: Array.from({ length: ROOMS }, () => new T.Vector3(1e9, 1e9, 1e9)) },
-  uRLMax: { value: Array.from({ length: ROOMS }, () => new T.Vector3(-1e9, -1e9, -1e9)) },
-};
+const texels = new Float32Array(FITTINGS * 4 * 4);
+const tableTexture = new T.DataTexture(texels, FITTINGS, 4, T.RGBAFormat, T.FloatType);
+tableTexture.minFilter = tableTexture.magFilter = T.NearestFilter; tableTexture.needsUpdate = true;
+const row = (r, i) => (r * FITTINGS + i) * 4;
+const table = { uRLTable: { value: tableTexture }, uRLCount: { value: 0 }, uRLRooms: { value: 0 }, uRLColor: { value: new T.Color('#fff7ea') } };
 const patched = new WeakSet();
 const GLSL = /* glsl */`
 {
   int inRooms = 0;
   for (int r = 0; r < ${ROOMS}; r++) {
     if (r >= uRLRooms) break;
-    if (all(greaterThan(vRLWorld, uRLMin[r])) && all(lessThan(vRLWorld, uRLMax[r]))) inRooms |= 1 << r;
+    vec3 lo = texelFetch(uRLTable, ivec2(r, 2), 0).xyz, hi = texelFetch(uRLTable, ivec2(r, 3), 0).xyz;
+    if (all(greaterThan(vRLWorld, lo)) && all(lessThan(vRLWorld, hi))) inRooms |= 1 << r;
   }
   if (inRooms != 0) {
     vec3 nW = normalize((vec4(geometryNormal, 0.0) * viewMatrix).xyz); // view to world (viewMatrix is orthonormal)
     for (int i = 0; i < ${FITTINGS}; i++) {
       if (i >= uRLCount) break;
-      vec4 rl = uRL[i];
-      if (rl.w <= 0.0 || ((inRooms >> int(uRLRoom[i])) & 1) == 0) continue;
+      vec4 rl = texelFetch(uRLTable, ivec2(i, 0), 0);
+      if (rl.w <= 0.0 || ((inRooms >> int(texelFetch(uRLTable, ivec2(i, 1), 0).x)) & 1) == 0) continue;
       vec3 toL = rl.xyz - vRLWorld; float d2 = dot(toL, toL); vec3 L = toL * inversesqrt(d2);
       float lobe = 0.25 + 0.75 * clamp(L.y, 0.0, 1.0); // a ceiling panel throws its light downward (L points up to it)
       reflectedLight.directDiffuse += rl.w * max(dot(nW, L), 0.0) * lobe / (d2 + 0.4) * uRLColor * BRDF_Lambert(material.diffuseColor);
@@ -43,7 +41,9 @@ const GLSL = /* glsl */`
 export function createRoomLights(name, bounds) {
   const room = table.uRLRooms.value;
   if (room >= ROOMS) throw new Error(`${name}: more than ${ROOMS} lit rooms`);
-  table.uRLRooms.value++; table.uRLMin.value[room].copy(bounds.min); table.uRLMax.value[room].copy(bounds.max);
+  table.uRLRooms.value++;
+  texels.set([bounds.min.x, bounds.min.y, bounds.min.z, 0], row(2, room)); texels.set([bounds.max.x, bounds.max.y, bounds.max.z, 0], row(3, room));
+  tableTexture.needsUpdate = true;
   const fittings = [];
   return {
     fittings,
@@ -51,8 +51,9 @@ export function createRoomLights(name, bounds) {
       const index = table.uRLCount.value;
       if (index >= FITTINGS) throw new Error(`${name}: more than ${FITTINGS} light fittings in all`);
       const f = { index, position: position.clone(), power, on: true, level: 1, onLevel };
-      fittings.push(f); table.uRLCount.value++; table.uRLRoom.value[index] = room;
-      table.uRL.value[index].set(position.x, position.y, position.z, power); onLevel(1);
+      fittings.push(f); table.uRLCount.value++;
+      texels.set([position.x, position.y, position.z, power], row(0, index)); texels[row(1, index)] = room; tableTexture.needsUpdate = true;
+      onLevel(1);
       return f;
     },
     patch(material) {
@@ -64,7 +65,7 @@ export function createRoomLights(name, bounds) {
         before?.call(material, shader, renderer);
         Object.assign(shader.uniforms, table);
         shader.vertexShader = 'varying vec3 vRLWorld;\n' + shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvRLWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-        shader.fragmentShader = `uniform vec4 uRL[${FITTINGS}]; uniform float uRLRoom[${FITTINGS}]; uniform int uRLCount, uRLRooms; uniform vec3 uRLColor, uRLMin[${ROOMS}], uRLMax[${ROOMS}]; varying vec3 vRLWorld;\n`
+        shader.fragmentShader = 'uniform highp sampler2D uRLTable; uniform int uRLCount, uRLRooms; uniform vec3 uRLColor; varying vec3 vRLWorld;\n'
           + shader.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + GLSL);
       };
       material.needsUpdate = true;
@@ -76,7 +77,7 @@ export function createRoomLights(name, bounds) {
       for (const f of fittings) {
         const target = f.on ? 1 : 0; if (f.level === target) continue;
         f.level = Math.abs(f.level - target) < .01 ? target : T.MathUtils.damp(f.level, target, 16, dt);
-        table.uRL.value[f.index].w = f.power * f.level; f.onLevel(f.level); changed = true;
+        texels[row(0, f.index) + 3] = f.power * f.level; tableTexture.needsUpdate = true; f.onLevel(f.level); changed = true;
       }
       return changed;
     },

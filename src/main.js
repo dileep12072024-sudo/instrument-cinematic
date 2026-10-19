@@ -178,7 +178,9 @@ let lastResolutionChange = 0;
 // Previously this only ever lowered the pixel ratio, so every tab switch (one huge frame) blurred the scene for good.
 let readyAt = Infinity, cadence = 1, cadenceFloor = 1; // render every Nth display frame (1 = 60 fps, 2 = 30, 3 = 20); floor = fastest that held
 let resolutionCap = Infinity; // highest pixel ratio this device has proven it can sustain (session-long)
-const setRatio = ratio => renderer.setPixelRatio(ratio);
+// A new pixel ratio resizes, and so clears, the canvas that was just drawn: draw it again at once, or the browser shows
+// a blank frame (a grey flash mid-walk).
+const setRatio = ratio => { renderer.setPixelRatio(ratio); if (ready) { renderer.render(scene, camera); portfolio?.afterRender(); } };
 // Adaptive quality for weak GPUs. Goal: one steady state, never oscillation (sharp/soft switching reads as flashing).
 // Under load: (1) even 30 fps, (2) small resolution steps (x0.88) down to 0.8, (3) even 20 fps.
 // Every 20 s of stability it tries one step better; a step that fails becomes a permanent limit, so nothing flips back.
@@ -571,6 +573,7 @@ async function boot() {
       add(architecture.group); add(landscape.group); add(surroundings.sheds); return out; })(); })() });
   performance.mark('guide-built');
   if (window.__noStory) await prepareExploration(); // straight to the free camera: ready as before
+  else if (!reduced && !window.__noRise) { landscape.lodBias = 2.4; portfolio.warm(() => { landscape.updateTreeDetail(camera); renderer.shadowMap.needsUpdate = true; renderer.render(scene, camera); }); }
   ready = true; window.__portrait.ready = true; readyAt = performance.now();
   // The portfolio layer comes first: the story of the department over the live campus, then the doors into it.
   // Automated runs (checks, measurements) see the finished building in the exploration layer unless they ask for the
@@ -794,6 +797,7 @@ function animate(now) {
   // While a finger or mouse is dragging the view, draw every frame the display offers: input must track the hand.
   if ((needsRender || !reduced) && !(quality === 'auto' && !dragging && now - lastRendered < cadence * 1000 / 60 - 4)) {
     const interval = now - lastRendered;
+    if (landscape) landscape.lodBias = portfolio?.flying ? 2.4 : 1; // coarser trees while the arrival flight sweeps round
     landscape.updateTreeDetail?.(camera);
     for (const d of dispensers) d.update(now, Math.min(interval / 1000, .1));
     for (const c of casements) if (c.update(camera, Math.min(interval / 1000, .1))) needsRender = true;

@@ -368,9 +368,9 @@ export function buildClassroomWing(parent, m) {
   floor(6.1, -19.15, .9, 2.25, lf + .002, darkBand);
   const face = 1.02; // room-side wall face (local x)
   // Faculty blade signs over the room doors (103849 at 27-39 s): white boards, blue border, name, degrees and post.
-  // Dr. A. Daisy Rani's room is the first door (owner, 2026-10-19); her plate follows the others' pattern, with the Ph.D
-  // from the hall board and no post until it is confirmed.
-  for (const [u, name, degrees, post] of [[2.3, 'Dr.A. Daisy Rani', 'Ph.D', ''], [5.8, 'Dr.A. Kamala Kumari', 'M.Tech,Ph D', 'Associate Professor'], [9.2, 'Dr.P. Swapna', 'M.Tech,Ph.D', 'Professor']]) {
+  // Dr. A. Daisy Rani's room is the first door (owner, 2026-10-19); her plate follows the others' pattern: Ph.D from
+  // the hall board, post from the department's NAAC presentation.
+  for (const [u, name, degrees, post] of [[2.3, 'Dr.A. Daisy Rani', 'Ph.D', 'Associate Professor'], [5.8, 'Dr.A. Kamala Kumari', 'M.Tech,Ph D', 'Associate Professor'], [9.2, 'Dr.P. Swapna', 'M.Tech,Ph.D', 'Professor']]) {
     const board = texture((c, w, h) => {
       c.fillStyle = '#f4f3ee'; c.fillRect(0, 0, w, h); c.strokeStyle = '#2a4aa0'; c.lineWidth = 6; c.strokeRect(5, 5, w - 10, h - 10);
       c.fillStyle = '#1f2f80'; c.textBaseline = 'middle'; c.textAlign = 'center';

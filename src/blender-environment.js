@@ -299,11 +299,15 @@ export function batchTrees(state) {
   const trees = [...instances.values()], last = new T.Vector3(Infinity, 0, 0);
   state.treeDetail = trees; // per tree: centre, detail level, [batched mesh, instance, geometry per level]
   // Called before each render: pick each tree's detail level from its distance to the camera (cheap: a few dozen trees).
+  // lodBias > 1 counts every tree as further away: a fast-moving camera (the portfolio's arrival flight) gets coarser
+  // trees, which nobody can see at that speed, for a far lighter frame
+  let lastBias = 1;
+  state.lodBias = 1;
   state.updateTreeDetail = camera => {
-    if (camera.position.distanceToSquared(last) < .25) return false;
-    last.copy(camera.position); let changed = false;
+    if (camera.position.distanceToSquared(last) < .25 && state.lodBias === lastBias) return false;
+    last.copy(camera.position); lastBias = state.lodBias; let changed = false;
     for (const tree of trees) {
-      const d = tree.centre.distanceTo(camera.position), lod = tree.lod;
+      const d = tree.centre.distanceTo(camera.position) * state.lodBias, lod = tree.lod;
       let next = 0; LOD_STEPS.forEach((start, k) => { if (d > start + (lod > k ? -LOD_SLACK : LOD_SLACK)) next = k + 1; });
       if (next === lod) continue;
       tree.lod = next; changed = true;

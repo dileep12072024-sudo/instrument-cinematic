@@ -35,6 +35,9 @@ html.portfolio-mode #experience > :not(#viewport):not(#loader):not(#toast) { dis
 .pf-night { position: fixed; inset: 0; z-index: -2; pointer-events: none; opacity: 0; transition: opacity 2.2s var(--ease);
   background: radial-gradient(120% 90% at 70% 0%, #1a2a44 0%, #0d1628 45%, #070b14 100%); }
 #portfolio.waiting .pf-night { opacity: 1; transition: none; }
+/* during the arrival flight the page steps aside; it comes back as the camera settles */
+#portfolio .pf-hero, #portfolio .pf-nav, #portfolio .pf-rail, #portfolio .pf-scrim { transition: opacity 1.4s var(--ease); }
+#portfolio.flying .pf-hero, #portfolio.flying .pf-nav, #portfolio.flying .pf-rail, #portfolio.flying .pf-scrim { opacity: 0 !important; transition-duration: .7s; pointer-events: none; }
 #portfolio.waiting #portfolio.waiting .pf-cue { visibility: hidden; }
 #portfolio.waiting .pf-live .dot { animation: pf-pulse 1.4s var(--ease) infinite; }
 .pf-scrim { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;

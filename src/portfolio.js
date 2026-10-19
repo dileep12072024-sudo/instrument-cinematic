@@ -34,7 +34,8 @@ function markup() {
   let n = 0;
   const head = c => `<div class="pf-sec-head" data-rv="fade"><span class="k"><b>${String(++n).padStart(2, '0')}</b> ${esc(c.nav)}</span><span class="rule"></span><span class="k">${esc(c.where)}</span></div>`;
   const walk = i => `<div class="pf-walk" data-walk="${i}"></div>`;
-  const photo = p => p.photo ? `<div class="pf-side-lens" data-rv="fade"><figure class="pf-view pf-photo" data-photo="${p.photo}" data-cursor><span class="pf-view-fr" data-frame></span><figcaption><b>${esc(p.name)}</b>${p.role ? `<i>${esc(p.role)}</i>` : ''}</figcaption></figure></div>` : '';
+  // the plate's own entrance is the genie out of the door's sign (portfolio.js plates): only its caption fades in
+  const photo = p => p.photo ? `<div class="pf-side-lens"><figure class="pf-view pf-photo" data-photo="${p.photo}" data-cursor><span class="pf-view-fr" data-frame></span><figcaption data-rv="fade"><b>${esc(p.name)}</b>${p.role ? `<i>${esc(p.role)}</i>` : ''}</figcaption></figure></div>` : '';
   const person = (c, p, extra = '') => `${head(c)}
       <div class="pf-copy">
         <h2 class="pf-display">${esc(c.id === 'hod' ? 'Head of the Department.' : p.name)}</h2>
@@ -129,13 +130,14 @@ function markup() {
 }
 
 // -------------------------------------------------------------------------------------------------- the wordmark
-// "INSTRUMENT" standing on the front lawn: one plane per glyph, rising out of the ground after the building and
-// dissolving as the camera passes through it on the way to the porch.
+// "IST" over the front lawn (owner, 2026-10-19: the initials, floating, after Kage's wordmark): one plane per glyph, rising
+// out of the ground after the building, then hanging in the air with a slow drift of its own, and dissolving as the
+// camera passes through it on the way to the porch.
 async function buildWordmark(scene) {
-  const word = 'INSTRUMENT', height = 2.9, z = 15.5, offsetX = 6.9, group = new T.Group(); group.name = 'Portfolio wordmark'; scene.add(group);
+  const word = 'IST', height = 3.1, z = 31, offsetX = 4.6, group = new T.Group(); group.name = 'Portfolio wordmark'; scene.add(group);
   try { await document.fonts.load('700 200px "Instrument Sans"'); } catch {}
   const glyphs = [], measure = document.createElement('canvas').getContext('2d'); measure.font = '700 400px "Instrument Sans"';
-  const widths = [...word].map(ch => measure.measureText(ch).width / 400 * height * 1.04), gap = height * .1;
+  const widths = [...word].map(ch => measure.measureText(ch).width / 400 * height * 1.04), gap = height * .32; // wide tracking, as Kage sets its four letters
   const total = widths.reduce((a, b) => a + b, 0) + gap * (word.length - 1);
   let x = offsetX - total / 2;
   [...word].forEach((ch, i) => {
@@ -144,9 +146,9 @@ async function buildWordmark(scene) {
     const wash = g.createLinearGradient(0, 40, 0, 470); wash.addColorStop(0, '#f4efe0'); wash.addColorStop(.7, '#e6dfca'); wash.addColorStop(1, '#a99f86'); // whitewash, darker at the foot
     g.fillStyle = wash; g.fillText(ch, c.width / 2, 470);
     const map = new T.CanvasTexture(c); map.colorSpace = T.SRGBColorSpace; map.anisotropy = 8;
-    const material = new T.MeshStandardMaterial({ map, transparent: true, alphaTest: .02, roughness: .8, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .12, depthWrite: true, side: T.DoubleSide });
-    const mesh = new T.Mesh(new T.PlaneGeometry(w, height), material); mesh.position.set(x + w / 2, height / 2 - .25, z); mesh.renderOrder = 1;
-    group.add(mesh); glyphs.push({ mesh, material, base: mesh.position.y, delay: i * .07 }); x += w + gap;
+    const material = new T.MeshStandardMaterial({ map, transparent: true, alphaTest: .02, roughness: .8, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .3, depthTest: false, depthWrite: false, side: T.DoubleSide }); // lit a little from within, so it reads at night too
+    const mesh = new T.Mesh(new T.PlaneGeometry(w, height), material); mesh.position.set(x + w / 2, height / 2 + 2.1, z); mesh.renderOrder = 8; // floats over the scenery: no branch cuts a letter
+    group.add(mesh); glyphs.push({ mesh, material, base: mesh.position.y, delay: i * .14, phase: i * 2.1, rate: .55 + i * .07 }); x += w + gap;
   });
   return { group, glyphs };
 }
@@ -224,17 +226,25 @@ const CL_SEG = 48, CL_N = CL_SEG + 1, CL_DT = 1 / 120, CL_WAVE = 15, CL_STIFF = 
 const CLOTH = { wind: 1.6, speed: .5, amplitude: 34, drape: 26, brush: 2.05, brushSize: 64, damping: 1, light: .85, sheen: .22, focal: 800 }; // scaled to these ~200 px plates
 const clothVertex = /* glsl */`
   attribute vec4 aData; attribute vec2 aOffset;
-  uniform vec2 uRes, uOut; uniform float uBleed, uFocal;
-  varying vec2 vUv; varying vec3 vNormal; varying float vFold;
+  uniform vec2 uRes, uOut, uSrc, uPad; uniform float uFocal, uGenie;
+  varying vec2 vUv; varying vec3 vNormal; varying float vFold; varying float vGenie;
   void main() {
-    vUv = position.xy; float z = aData.x; vec2 nxy = aData.yz;
-    vNormal = vec3(nxy, sqrt(max(1. - dot(nxy, nxy), .04))); vFold = aData.w;
-    vec2 px = position.xy * uRes + aOffset + vec2(uBleed), ndc = px / uOut * 2. - 1.; ndc.y = -ndc.y;
+    vUv = position.xy; float z = aData.x * uGenie; vec2 nxy = aData.yz * uGenie;
+    vNormal = vec3(nxy, sqrt(max(1. - dot(nxy, nxy), .04))); vFold = mix(1., aData.w, uGenie);
+    vec2 local = position.xy * uRes + aOffset * uGenie;
+    // The genie (after macOS): the plate pours out of uSrc, the door's name plate, in plate pixels. Rows nearest the
+    // source lead; each row's width opens as it travels, so the plate funnels along a curve and lands square.
+    float row = 1. - position.y; // the top row is nearest a sign above the plate's top edge
+    float k = clamp(uGenie * 1.7 - row * .7, 0., 1.), ky = k * k * (3. - 2. * k), kw = pow(ky, 1.8);
+    vec2 centre = vec2(uRes.x * .5, local.y);
+    local = vec2(mix(uSrc.x, centre.x, pow(ky, .7)) + (local.x - centre.x) * mix(.03, 1., kw), mix(uSrc.y, local.y, ky));
+    vGenie = ky;
+    vec2 px = local + uPad, ndc = px / uOut * 2. - 1.; ndc.y = -ndc.y; // uPad: the plate's corner within the drawn area
     gl_Position = vec4(ndc, -z / uFocal, (uFocal - z) / uFocal);
   }`;
 const clothFragment = /* glsl */`
   uniform sampler2D tA, tB; uniform float uMix, uAlpha, uLight, uSheen, uEdge; uniform vec2 uRes;
-  varying vec2 vUv; varying vec3 vNormal; varying float vFold;
+  varying vec2 vUv; varying vec3 vNormal; varying float vFold; varying float vGenie;
   void main() {
     vec2 uv = vec2(vUv.x, 1. - vUv.y); // the texture's first row is its bottom (a photo loaded with flipY)
     vec3 c = mix(texture2D(tA, uv).rgb, texture2D(tB, uv).rgb, smoothstep(0., 1., uMix));
@@ -244,7 +254,7 @@ const clothFragment = /* glsl */`
     vec3 H = normalize(L + vec3(0., 0., 1.)); float flat_ = pow(H.z, 34.);
     c += uSheen * max(pow(max(dot(n, H), 0.), 34.) - flat_, 0.) / (1. - flat_) * mix(vec3(1.), c, .35);
     vec2 e = min(vUv, 1. - vUv) * uRes; c += smoothstep(1.2, .2, min(e.x, e.y)) * uEdge * vec3(.91, .89, .84); // a hairline that rides the folds
-    gl_FragColor = vec4(c, uAlpha);
+    gl_FragColor = vec4(c, uAlpha * smoothstep(0., .35, vGenie));
   }`;
 function createCloth() {
   const grid = new Float32Array(CL_N * CL_N * 3), idx = [];
@@ -257,7 +267,7 @@ function createCloth() {
   g.setAttribute('aData', data); g.setAttribute('aOffset', offset);
   const material = new T.ShaderMaterial({ vertexShader: clothVertex, fragmentShader: clothFragment, transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
     uniforms: { tA: { value: null }, tB: { value: null }, uMix: { value: 0 }, uAlpha: { value: 1 }, uLight: { value: CLOTH.light }, uSheen: { value: CLOTH.sheen }, uEdge: { value: .05 },
-      uRes: { value: new T.Vector2(1, 1) }, uOut: { value: new T.Vector2(1, 1) }, uBleed: { value: CL_BLEED }, uFocal: { value: CLOTH.focal } } });
+      uRes: { value: new T.Vector2(1, 1) }, uOut: { value: new T.Vector2(1, 1) }, uSrc: { value: new T.Vector2() }, uPad: { value: new T.Vector2(CL_BLEED, CL_BLEED) }, uGenie: { value: 1 }, uFocal: { value: CLOTH.focal } } });
   const mesh = new T.Mesh(g, material); mesh.frustumCulled = false;
   const scene = new T.Scene(); scene.add(mesh);
   let hCur = new Float32Array(CL_N * CL_N), hPrev = new Float32Array(CL_N * CL_N), hNext = new Float32Array(CL_N * CL_N);
@@ -357,19 +367,27 @@ function createPlates(renderer) {
   return {
     list,
     attach(el) {
-      const p = { cloth: createCloth(), el, frame: el.querySelector('[data-frame]') || el, tex: null, rect: null, alpha: 0 };
+      const p = { cloth: createCloth(), el, frame: el.querySelector('[data-frame]') || el, tex: null, rect: null, alpha: 0, genie: 0, want: 0, src: new T.Vector2() };
       // the photo's bytes go straight to the screen, like the copied frames the cloth was written for: no colour conversion
       loader.load(el.dataset.photo, t => { t.colorSpace = T.NoColorSpace; t.anisotropy = 4; p.tex = t; });
       list.push(p); return p;
     },
-    // per page frame: where each plate is, and its cloth; pointer: { x, y } in the page, or null. True while any shows.
-    update(dt, pointer, still, measureAlpha) {
+    invalidate() { for (const p of list) p.box = null; }, // the layout changed: measure again on the next frame
+    // per page frame: where each plate is, its genie and its cloth; pointer: { x, y } in the page, or null; here(el):
+    // { on, x, y }: whether the plate's stop is being read and where its door's sign is on screen. True while any shows.
+    update(dt, pointer, still, measureAlpha, here) {
       frame++;
       let moving = false;
       for (const p of list) {
-        if (frame % 10 === 0 || !p.rect) { p.alpha = measureAlpha(p.el); }
-        p.rect = p.frame.getBoundingClientRect(); // every frame: the page scrolls under it
-        if (!visible(p)) continue;
+        // where the plate is: measured (a layout) every 30th frame, and between those carried by the scroll alone
+        if (frame % 30 === 0 || !p.box) { const r = p.frame.getBoundingClientRect(); p.box = { left: r.left, top: r.top + scrollY, width: r.width, height: r.height }; p.alpha = measureAlpha(p.el); }
+        const top = p.box.top - scrollY;
+        p.rect = { left: p.box.left, top, width: p.box.width, height: p.box.height, right: p.box.left + p.box.width, bottom: top + p.box.height };
+        const h = here(p.el); p.want = h.on ? 1 : 0;
+        if (h.on) p.src.set(h.x - p.rect.left, h.y - p.rect.top);
+        const g = p.genie; p.genie = still ? p.want : p.genie + Math.sign(p.want - p.genie) * Math.min(Math.abs(p.want - p.genie), dt / .85);
+        if (p.genie !== g) moving = true;
+        if (!visible(p) || p.genie <= .001) continue;
         const r = p.rect, inside = pointer && pointer.x >= r.left - 10 && pointer.x <= r.right + 10 && pointer.y >= r.top - 10 && pointer.y <= r.bottom + 10;
         p.cloth.update(dt, r.width, r.height, inside ? pointer.x - r.left : null, inside ? pointer.y - r.top : null, still); moving = true;
       }
@@ -380,11 +398,15 @@ function createPlates(renderer) {
       const keepClear = renderer.autoClear; renderer.autoClear = false;
       let drew = false;
       for (const p of list) {
-        if (!visible(p)) continue;
+        if (!visible(p) || p.genie <= .001) continue;
+        // drawn over the plate with a margin for its folds, and while the genie runs, over the way to the door's sign too
         const r = p.rect, H = renderer.domElement.height / renderer.getPixelRatio(), B = CL_BLEED, u = p.cloth.material.uniforms;
-        renderer.setViewport(r.left - B, H - r.bottom - B, r.width + 2 * B, r.height + 2 * B); renderer.setScissor(r.left - B, H - r.bottom - B, r.width + 2 * B, r.height + 2 * B); renderer.setScissorTest(true);
-        u.tA.value = u.tB.value = p.tex; u.uMix.value = 0; u.uAlpha.value = p.alpha;
-        u.uRes.value.set(r.width, r.height); u.uOut.value.set(r.width + 2 * B, r.height + 2 * B);
+        let x0 = r.left - B, y0 = r.top - B, x1 = r.right + B, y1 = r.bottom + B;
+        if (p.genie < 1) { const sx = r.left + p.src.x, sy = r.top + p.src.y; x0 = Math.min(x0, sx - 30); y0 = Math.min(y0, sy - 30); x1 = Math.max(x1, sx + 30); y1 = Math.max(y1, sy + 30); }
+        renderer.setViewport(x0, H - y1, x1 - x0, y1 - y0); renderer.setScissor(x0, H - y1, x1 - x0, y1 - y0); renderer.setScissorTest(true);
+        u.uPad.value.set(r.left - x0, r.top - y0);
+        u.tA.value = u.tB.value = p.tex; u.uMix.value = 0; u.uAlpha.value = p.alpha; u.uGenie.value = p.genie; u.uSrc.value.copy(p.src);
+        u.uRes.value.set(r.width, r.height); u.uOut.value.set(x1 - x0, y1 - y0);
         renderer.render(p.cloth.scene, flatCam); drew = true;
       }
       if (drew) { const pr = renderer.getPixelRatio(), w = renderer.domElement.width / pr, h = renderer.domElement.height / pr; renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h); renderer.setScissor(0, 0, w, h); }
@@ -490,7 +512,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   const $ = s => root.querySelector(s), $$ = s => [...root.querySelectorAll(s)];
   const coarse = matchMedia('(pointer: coarse)').matches;
   const sections = $$('[data-cam]'), walks = $$('[data-walk]'), chapters = C.chapters;
-  const rig = { prog: 0, smooth: 0, mx: 0, my: 0, tmx: 0, tmy: 0, intro: 1, nx: 0, ny: 0 }; // intro 1: no fly-in (owner, 2026-10-19)
+  const rig = { prog: 0, smooth: 0, mx: 0, my: 0, tmx: 0, tmy: 0, intro: 1, fly: 1, nx: 0, ny: 0 }; // fly: the arrival flight, 0..1 (1: done)
   let segments = [], holds = [], maxScroll = 1, active = true, wordmark = null, wordT = reduced ? 99 : -1, lastChapter = -1, aspect = innerWidth / innerHeight;
   const pose = { p: new T.Vector3(), yaw: 0, pitch: 0, fov: 50, outdoors: true, veil: 0 };
   const dir = new T.Vector3(), right = new T.Vector3();
@@ -524,17 +546,44 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   const scrollFor = i => holds[i] ? holds[i][0] + (i === 0 ? 0 : Math.min(innerHeight * .12, (holds[i][1] - holds[i][0]) * .5)) : 0;
 
   // the arrival: a long-lens dolly in from further down the drive while the building rises
-  const introFrom = { p: new T.Vector3(1.2, 1.25, 74), yaw: 0, pitch: Math.atan2(5.2 - 1.25, 74), fov: 26 };
+  // The arrival (owner, 2026-10-19, after the reference construction film): while the building rises the camera flies
+  // round it from every side, fast, low where the ground storey breaks through, over the roofs as the upper storeys
+  // land, and then slows, gently, into the hero framing. rig.fly runs 0..1 over the rise; the pace eases out.
+  const flight = (() => {
+    const pts = [ // [eye, look-at, fov]
+      [[-12, 1.4, 27], [0, 2.6, 5], 58],     // low on the front lawn: the ground storey comes through the earth
+      [[15, 2.4, 25], [4, 3.6, 2], 56],      // sweep right, still low
+      [[39, 8, 13], [12, 4.5, 0], 52],       // the east wing's end
+      [[35, 20, -27], [4, 4.5, -2], 50],     // up over the rear corner
+      [[-6, 31, -33], [0, 4, 0], 50],        // high over the rear: the upper storeys landing
+      [[-44, 17, -4], [-12, 5, 0], 50],      // down the west side
+      [[-30, 8, 32], [-2, 6, 2], 46],        // round to the front-left
+      [[-8, 5.2, 43], [0, 7, 0], 41],
+      [[0, 4.2, 47], [0, 7.2, 0], 38],       // the hero framing (chapters[0])
+    ];
+    const eye = new T.CatmullRomCurve3(pts.map(p => V(p[0])), false, 'centripetal'), look = new T.CatmullRomCurve3(pts.map(p => V(p[1])), false, 'centripetal');
+    const fovAt = u => { const k = u * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(k)); return pts[i][2] + (pts[i + 1][2] - pts[i][2]) * (k - i); };
+    const L = new T.Vector3();
+    return (t, out) => {
+      const u = 1 - Math.pow(1 - clamp(t), 2.6); // fast, then a long gentle settle
+      eye.getPointAt(u, out.p); look.getPointAt(u, L);
+      const d = L.sub(out.p); out.yaw = yawOf(d); out.pitch = pitchOf(d); out.fov = fovAt(u); out.outdoors = true; out.veil = 0;
+    };
+  })();
   function apply() {
     const N = chapters.length - 1, k = clamp(rig.smooth, 0, N), i = Math.min(N - 1, Math.floor(k)), f = k - i;
     if (f < 1e-5 && k < N) { const c = chapters[i], F = framing(c, aspect); pose.p.set(...c.eye); pose.yaw = F.yaw; pose.pitch = F.pitch; pose.fov = F.fov; pose.outdoors = !!c.outdoors; pose.veil = 0; }
     else segments[i + 1].sample(f, pose);
     if (k >= N) { const c = chapters[N], F = framing(c, aspect); pose.p.set(...c.eye); pose.yaw = F.yaw; pose.pitch = F.pitch; pose.fov = F.fov; pose.outdoors = true; pose.veil = 0; }
-    const io = 1 - smooth(0, 1, rig.intro), e = io * io * (3 - 2 * io);
-    if (e > 0) { pose.p.lerp(introFrom.p, e); pose.yaw = lerpAngle(pose.yaw, introFrom.yaw, e); pose.pitch += (introFrom.pitch - pose.pitch) * e; pose.fov += (introFrom.fov - pose.fov) * e; }
+    const flying = rig.fly < 1;
+    if (flying) { // the flight, blended over its last stretch into the page's own hero pose (a wider lens on tall screens)
+      const p = pose.p.clone(), yaw = pose.yaw, pitch = pose.pitch, fov = pose.fov, w = smooth(.82, 1, rig.fly);
+      flight(rig.fly, pose);
+      pose.p.lerp(p, w); pose.yaw = lerpAngle(pose.yaw, yaw, w); pose.pitch += (pitch - pose.pitch) * w; pose.fov += (fov - pose.fov) * w;
+    }
     // hand-held parallax: generous outdoors, a breath indoors
-    const out = pose.outdoors ? 1 : 0, still = 1 - Math.min(1, Math.abs(rig.smooth - rig.prog) * 3);
-    const shift = (out ? .55 : .07) * (1 - smooth(0, 1.4, rig.smooth) * .5 * out), turn = (out ? .012 : .022) * still;
+    const out = pose.outdoors ? 1 : 0, still = flying ? 0 : 1 - Math.min(1, Math.abs(rig.smooth - rig.prog) * 3);
+    const shift = flying ? 0 : (out ? .55 : .07) * (1 - smooth(0, 1.4, rig.smooth) * .5 * out), turn = (out ? .012 : .022) * still;
     dir.set(Math.sin(pose.yaw) * Math.cos(pose.pitch), Math.sin(pose.pitch), Math.cos(pose.yaw) * Math.cos(pose.pitch));
     right.set(-Math.cos(pose.yaw), 0, Math.sin(pose.yaw));
     camera.position.copy(pose.p).addScaledVector(right, rig.mx * shift); camera.position.y += rig.my * shift * .5;
@@ -549,7 +598,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   let scrollY = 0;
   lenis.on('scroll', () => { scrollY = lenis.animatedScroll; rig.prog = progressFor(scrollY); });
   const goTo = i => { const y = scrollFor(i), d = Math.abs(y - scrollY) / innerHeight; lenis.scrollTo(y, { duration: reduced ? 0 : clamp(1.2 + d * .22, 1.2, 4.2), easing: x => x < .5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2, force: true }); };
-  function relayout() { build(); measure(); rig.prog = progressFor(scrollY); wisps?.resize(); }
+  function relayout() { build(); measure(); rig.prog = progressFor(scrollY); wisps?.resize(); plates?.invalidate(); }
   addEventListener('resize', relayout);
   new ResizeObserver(() => { measure(); rig.prog = progressFor(scrollY); }).observe($('.pf-doc')); // opening a <details> moves the holds
   root.addEventListener('click', e => {
@@ -639,7 +688,13 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   }
 
   // ------------------------------------------------------------------ live windows, chips and rows
-  const plates = createPlates(renderer);
+  const plates = createPlates(renderer), signAt = new T.Vector3();
+  // a plate is out while its stop is being read; it pours from (and back into) that door's name plate on screen
+  const plateHere = el => {
+    const k = +el.closest('[data-cam]').dataset.cam, on = Math.abs(rig.smooth - k) < .35 && rig.fly >= 1;
+    signAt.set(...(chapters[k].sign ?? chapters[k].anchor)).project(camera);
+    return { on, x: (signAt.x + 1) / 2 * innerWidth, y: (1 - signAt.y) / 2 * innerHeight };
+  };
   $$('.pf-photo').forEach(el => plates.attach(el));
   $$('.pf-chip').forEach(el => {
     el.addEventListener('pointerenter', () => $$('.pf-chip').forEach(o => o.classList.toggle('on', o === el)));
@@ -654,6 +709,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     if (!active || e.pointerType === 'touch') return;
     if (!pointer.seen) { pointer.x = e.clientX; pointer.y = e.clientY; cursor.classList.add('seen'); } // the ring starts under the hand, not mid-screen
     pointer.tx = e.clientX; pointer.ty = e.clientY; pointer.seen = true;
+    if (e.clientY < 90) nav.classList.remove('hide'); // the hidden nav comes back when the hand goes to it
     rig.tmx = e.clientX / innerWidth * 2 - 1; rig.tmy = -(e.clientY / innerHeight * 2 - 1);
     cursor.classList.toggle('act', !!e.target.closest?.('[data-cursor], a, button, summary'));
   }, { passive: true });
@@ -662,7 +718,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   document.addEventListener('pointerleave', () => cursor.classList.add('away'));
   document.addEventListener('pointerenter', () => cursor.classList.remove('away'));
 
-  buildWordmark(scene).then(w => { wordmark = w; for (const g of w.glyphs) g.mesh.position.y = g.base - 5; changed(); });
+  buildWordmark(scene).then(w => { wordmark = w; for (const g of w.glyphs) g.mesh.position.y = g.base - 6; changed(); });
 
   build(); measure(); rig.prog = progressFor(0); rig.smooth = rig.prog;
 
@@ -680,13 +736,14 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     if (reduced) { rig.intro = 1; wordT = 99; root.classList.add('arrived'); ring(true); heroParts.forEach(e => e.classList.add('rv-in')); return; }
     lenis.stop(); root.classList.remove('arrived');
     const tl = gsap.timeline({ delay, onComplete: () => { lenis.start(); root.classList.add('arrived'); ring(true); } });
-    tl.to({}, { duration: riseLength + 1.2 }, 0) // the camera holds on the hero framing while the building rises
+    // the hero steps aside for the flight and comes back as the camera settles
+    root.classList.add('flying');
+    tl.fromTo(rig, { fly: 0 }, { fly: 1, duration: riseLength + .6, ease: 'none' }, 0)
+      .call(() => root.classList.remove('flying'), null, riseLength - 1.4)
       .call(() => { wordT = 0; }, null, riseLength - .9)
       .call(() => { if (!heroShown) reveals.get($('#arrival .pf-display'))?.(); }, null, riseLength - .2)
       .call(() => heroParts.forEach((e, i) => setTimeout(() => e.classList.add('rv-in'), 120 + i * 95)), null, riseLength + .1);
-    // the nav comes in with the hero, unless it already did during the wait (a transform left on it would hold the phone
-    // menu sheet inside it, hence clearProps)
-    if (!heroShown) tl.from('.pf-nav, .pf-rail', { autoAlpha: 0, y: -10, duration: 1.1, ease: 'power3.out', clearProps: 'transform' }, riseLength + .2);
+    // the nav steps aside and returns with the hero through the .flying class (portfolio.css), not a tween of its own
   }
 
   let last = performance.now();
@@ -723,22 +780,38 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       // cursor: the ring trails the hand
       pointer.x += (pointer.tx - pointer.x) * .18; pointer.y += (pointer.ty - pointer.y) * .18;
       cursor.style.transform = `translate3d(${pointer.x.toFixed(1)}px,${pointer.y.toFixed(1)}px,0)`;
-      let moving = Math.abs(before - rig.smooth) > 1e-5 || Math.abs(rig.mx - rig.tmx) > 1e-3 || Math.abs(rig.my - rig.tmy) > 1e-3 || rig.intro < 1;
+      let moving = Math.abs(before - rig.smooth) > 1e-5 || Math.abs(rig.mx - rig.tmx) > 1e-3 || Math.abs(rig.my - rig.tmy) > 1e-3 || rig.intro < 1 || rig.fly < 1;
       if (wisps && wisps.update(dt, rig.tmx, rig.tmy, pointer.seen && !reduced)) moving = true;
       if (!reduced && leaves.update(dt, camera, pose.outdoors && rig.intro > .9, light)) moving = true;
-      if (plates.update(dt, pointer.seen ? { x: pointer.tx, y: pointer.ty } : null, reduced, alphaOf)) moving = true;
+      if (plates.update(dt, pointer.seen ? { x: pointer.tx, y: pointer.ty } : null, reduced, alphaOf, plateHere)) moving = true;
       if (wordmark) {
-        if (wordT >= 0 && wordT < 3) { wordT += dt; moving = true; }
+        if (wordT >= 0) wordT += dt;
         const near = 1 - smooth(.25, .75, rig.smooth); // gone by the time the camera reaches the porch
         wordmark.group.visible = near > .01 && wordT > 0;
-        for (const g of wordmark.glyphs) {
-          const k = smooth(g.delay, g.delay + .9, wordT), back = 1 + 1.7 * (k - 1) ** 3 + .7 * (k - 1) ** 2; // rises with a little overshoot
-          g.mesh.position.y = g.base - 5 * (1 - back); g.material.opacity = near;
+        if (wordmark.group.visible) {
+          moving = true;
+          for (const g of wordmark.glyphs) {
+            const k = smooth(g.delay, g.delay + 1.1, wordT), back = 1 + 1.7 * (k - 1) ** 3 + .7 * (k - 1) ** 2; // rises with a little overshoot
+            // then floats: each letter on its own slow swell, a little lift and lean, never in step with its neighbours
+            const f = reduced ? 0 : smooth(.6, 1.6, wordT - g.delay), t = wordT * g.rate + g.phase;
+            g.mesh.position.y = g.base - 6 * (1 - back) + f * (.16 * Math.sin(t) + .05 * Math.sin(t * 2.3));
+            g.mesh.rotation.z = f * .018 * Math.sin(t * .8 + 1); g.mesh.rotation.y = f * .05 * Math.sin(t * .6);
+            g.material.opacity = near;
+          }
         }
       }
       return moving;
     },
     // after main.js has drawn the frame: the live windows
+    get flying() { return rig.fly < 1; },
+    // the flight's opening view, drawn once while the page is still covered (the driver finishes a shader on its first
+    // draw; a whole new side of the campus otherwise stalls the first frames of the rise)
+    warm(draw) {
+      const keep = camera.position.clone(), q = camera.quaternion.clone(), fov = camera.fov;
+      flight(0, pose); camera.position.copy(pose.p); camera.lookAt(pose.p.clone().add(new T.Vector3(Math.sin(pose.yaw) * Math.cos(pose.pitch), Math.sin(pose.pitch), Math.cos(pose.yaw) * Math.cos(pose.pitch)))); camera.fov = pose.fov; camera.updateProjectionMatrix();
+      draw();
+      camera.position.copy(keep); camera.quaternion.copy(q); camera.fov = fov; camera.updateProjectionMatrix();
+    },
     // after main.js has drawn the frame: the photo plates over it
     afterRender() { if (active) plates.draw(); },
   };
