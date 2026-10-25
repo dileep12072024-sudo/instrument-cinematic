@@ -54,11 +54,12 @@ try {
   const t0 = Date.now();
   for (let i = a; i <= Math.min(b, plan.frames.length - 1); i++) {
     const item = plan.frames[i];
-    if (existsSync(join(out, `${item.key}.webp`)) && (!item.hold || existsSync(join(out, `${item.key}.d.webp`)))) continue;
+    const deep = item.fly >= 1; // every walk frame has depth: story.js re-projects the two frames either side to the pose between them
+    if (existsSync(join(out, `${item.key}.webp`)) && (!deep || existsSync(join(out, `${item.key}.d.webp`)))) continue;
     const prev = plan.frames[i - 1], shadows = !prev || prev.fly < 1 || prev.first !== item.first;
-    const [colour, depth] = JSON.parse(await ev(`JSON.stringify(__portrait.snapshot.shoot(${JSON.stringify(item)}, { quality: .74, shadows: ${shadows}, depth: ${!!item.hold}, moon: ${JSON.stringify(look.moon ?? null)} }))`));
+    const [colour, depth] = JSON.parse(await ev(`JSON.stringify(__portrait.snapshot.shoot(${JSON.stringify(item)}, { quality: .74, shadows: ${shadows}, depth: ${deep}, moon: ${JSON.stringify(look.moon ?? null)} }))`));
     save(item.key, '.webp', colour);
-    if (depth) save(item.key, '.d.webp', depth); // holds only: walking is its own 3D
+    if (depth) save(item.key, '.d.webp', depth);
     if (i % 50 === 0) console.log(`${i} ${item.key} ${((Date.now() - t0) / 1000).toFixed(0)} s`);
   }
   console.log('done in', ((Date.now() - t0) / 1000).toFixed(0), 's; errors', JSON.stringify(errors));

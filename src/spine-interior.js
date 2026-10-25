@@ -260,7 +260,7 @@ export function buildSpineInterior(parent, m) {
   onWall(px, passage.labEnd - .015, Math.PI, () => {
     panelDoor(0, base + .012, 0, .95, 2.14); ventilator(0, 3.47, 0);
   });
-  sign('MEASUREMENTS LAB', px, base + 2.41, passage.labEnd - .03, Math.PI, 1.1); // the room at the passage's end is the Measurements Lab (owner, 2026-10-19)
+  sign('ELECTRONICS LAB II', px, base + 2.41, passage.labEnd - .03, Math.PI, 1.1);
   group.userData.electronicsLabEntrance = { x: px, z: passage.labEnd };
   for (const side of [-1, 1]) {
     const runs = side < 0 ? [[end, front]] : [[end, passage.hallDoorZ - .54], [passage.hallDoorZ + .54, front]];
@@ -292,7 +292,8 @@ export function buildSpineInterior(parent, m) {
   group.userData.strongRoomDownstand = { bottom: base + 2.25, top: 3.8, depth: .36 };
   wall(px, end, 0, pw, base, 3.8, [{ x: .12, y: base + 1.09, w: 1.08, h: 2.18 }]);
   panelDoor(px + .12, base + .012, end + .015, 1.07, 2.16, 7); latch(px + .12, base + .61, end + .06);
-  sign('STRONG ROOM APLA', px + .12, base + 2.36, end + .026, 0, 1.15, '#7b2027');
+  // the room at the rear end of the passage is the Measurements Lab (owner, 2026-10-25)
+  sign('MEASUREMENTS LAB', px + .12, base + 2.36, end + .026, 0, 1.15, '#7b2027');
   onWall(px, pierZ + .185, 0, () => ventilator(0, 3.47, 0));
 
   const gateZ = front + .02, gateMetal = blue.clone(); gateMetal.color.set('#85918c'); gateMetal.metalness = .4;

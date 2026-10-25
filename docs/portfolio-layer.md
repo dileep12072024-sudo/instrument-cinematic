@@ -166,12 +166,14 @@ model loader is accepted there). Undo: `/campus/?live` still plays the story liv
 
 - `scripts/snapshots.mjs` drives Windows Chrome on the real GPU through `/campus/?live`: fixed date and hour (a clear
   afternoon, or the full moon of 26 October 2026 at night), the story's own camera poses (`portfolio.renderPlan`,
-  `poseFor`), every frame shot from the scene (`__portrait.snapshot`), with a half-size depth image at each stop.
-  Four sets: day and night, landscape 1280x720 and portrait 720x1280; about 2,000 frames each, ~6 minutes each.
+  `poseFor`), every frame shot from the scene (`__portrait.snapshot`), each walk frame with a half-size depth image.
+  Four sets: day and night, landscape 1280x720 and portrait 720x1280; about 2,000 frames each, ~11 minutes each.
 - `scripts/snapshots-video.sh` encodes the arrival flight (30 fps) to `flight.mp4` (~4.5 MB, plays while it streams).
-- `src/story.js` (the front page): the flight video, then the walk scrubbed by the scroll (frames fetched nearest first
-  in the direction of travel), and at each stop the frame re-projected through its depth image as the hand moves: the
-  3D parallax of the live site. Leaves, the cursor's motes, IST, the photos (genie, cloth) and the description cards
+- `src/story.js` (the front page): the flight video, then the walk scrubbed by the scroll (frames and depths fetched
+  nearest first in the direction of travel). The two frames either side of the camera are each re-projected through
+  their depth images to the camera's own pose and blended, so the walk moves continuously between frames a step apart
+  (a flat crossfade of two views flickered, owner 2026-10-25), and at a stop the hand-moved view keeps the live site's
+  3D parallax. Leaves, the cursor's motes, IST, the photos (genie, cloth) and the description cards
   (cloth) are drawn live over the frames by the same `portfolio.js`. Day or night by the hour in Visakhapatnam.
 - Battery: the page draws only when something changes; ambient motion runs at 30 fps; cloth sheets come to rest a few
   seconds after the hand leaves them; a page left alone draws nothing.

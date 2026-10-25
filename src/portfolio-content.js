@@ -17,10 +17,11 @@ const EYE = 1.62, HALL = .164 + EYE, CORRIDOR = -.376 + EYE, WING = -.916 + EYE,
 // board); `route` is the walk from the previous stop's eye along corridors, steps and stairs (every point on a floor or a
 // flight). group: which header link the stop belongs to. Coordinates are the main site's model (metres).
 export const chapters = [
+  // the arrival ends on the 3D model's own opening view, high on the front right (owner, 2026-10-25)
   { id: 'arrival', group: 'arrival', nav: 'Arrival', where: 'Outside, under today\u2019s sky', outdoors: true,
-    eye: [0, 4.2, 47], anchor: [0, 7.2, 0], fov: 38, frame: 'centre' },
+    eye: [42, 18, 80], anchor: [0, 13, 0], fov: 43, frame: 'centre' },
   { id: 'heritage', group: 'heritage', nav: 'Heritage', where: 'Entrance hall, ground floor',
-    route: [[0, 3.1, 33], [0, 2.15, 21], [0, HALL, 12.6], [0, HALL, 8.6], [.2, HALL, 6.4]],
+    route: [[30, 13, 64], [14, 7, 46], [3, 3.8, 36], [0, 3.1, 33], [0, 2.15, 21], [0, HALL, 12.6], [0, HALL, 8.6], [.2, HALL, 6.4]],
     eye: [.45, HALL, 5.4], anchor: [3.72, 2.55, 5.12], fov: 56 },
   { id: 'admissions', group: 'admissions', nav: 'Admissions', where: 'Department office, west corridor',
     route: [[.1, HALL, 3.4], [-2.6, HALL, 2.2], [-4.7, CORRIDOR, 2.17], [-10, CORRIDOR, 2.2], [-16.2, CORRIDOR, 2.3]],
@@ -50,11 +51,12 @@ export const chapters = [
     route: [[-23.0, WING, -3.6], [-23.0, WING, .8], [-22.4, WING, 2.17], [-21.3, CORRIDOR, 2.17], [-16, CORRIDOR, 2.2], [-10, CORRIDOR, 2.2], [-4.7, CORRIDOR, 2.17],
       [-2.6, HALL, 2.2], [0, HALL, 2.8], [2.6, HALL, 2.3], [3.65, HALL, 2.167], [4.7, GROUND_E, 2.167]],
     eye: [7.4, GROUND_E, 2.55], anchor: [5.45, 1.75, 1.1], fov: 56 },
-  { id: 'lab-measurements', group: 'labs', nav: 'Measurements Lab', where: 'End of the Seminar Hall passage',
-    route: [[10, GROUND_E, 2.2], [16, GROUND_E, 2.2], [21.6, GROUND_E, 2.2], [23.25, GROUND_E, 2.7]],
-    eye: [23.25, GROUND_E, 4.8], anchor: [23.25, 1.85, 7.85], fov: 56 },
+  // at the rear end of the Seminar Hall passage (the door the model's sign called the Strong Room; owner, 2026-10-25)
+  { id: 'lab-measurements', group: 'labs', nav: 'Measurements Lab', where: 'Rear of the Seminar Hall passage',
+    route: [[10, GROUND_E, 2.2], [16, GROUND_E, 2.2], [21.6, GROUND_E, 2.2], [23.25, GROUND_E, 1.4], [23.25, GROUND_E, -2.6]],
+    eye: [23.25, GROUND_E, -6.4], anchor: [23.37, 1.8, -11.2], fov: 56 },
   { id: 'guide', group: 'guide', nav: 'Finding your way', where: 'Library, first-floor landing',
-    route: [[23.2, GROUND_E, 2.6], [21, GROUND_E, 2.2], [12, GROUND_E, 2.2], [4.7, GROUND_E, 2.167], [3.65, HALL, 2.167], [2.67, HALL, 2.1],
+    route: [[23.25, GROUND_E, -2.6], [23.2, GROUND_E, 1.6], [21, GROUND_E, 2.2], [12, GROUND_E, 2.2], [4.7, GROUND_E, 2.167], [3.65, HALL, 2.167], [2.67, HALL, 2.1],
       [2.67, HALL, .2], [2.67, 2.484 + EYE, -4.1], [2.3, 2.484 + EYE, -5.0], [.6, 2.484 + EYE, -5.15], [0, 2.484 + EYE, -4.1], [0, LANDING, -.7], [0, LANDING, .3]],
     eye: [-.45, LANDING, 1.25], anchor: [-2.55, 5.2, 3.4], fov: 56 },
   // the classroom wing: faculty rooms on the left, the classrooms at its far end down three steps
@@ -106,128 +108,128 @@ export const chapters = [
 // Ph.D years from the hall board of Ph.D awardees; the years as head from the board of successive heads.
 export const people = {
   swapna: { name: 'Dr. P. Swapna', role: 'Professor and Head of the Department', degrees: 'M.Tech, Ph.D (Andhra University, 2015)', area: 'Industrial process instrumentation', photo: '/media/faculty/swapna.webp',
-    note: 'The department\u2019s present head. Her room is this door, under the blade sign; academic matters come here, while the department office handles admissions, certificates and fees.' },
+    note: 'Dr. Swapna heads the department and oversees its undergraduate, postgraduate and doctoral programmes. Academic matters are addressed to her office; admissions, certificates and fees are handled by the department office.' },
   daisy: { name: 'Dr. A. Daisy Rani', role: 'Associate Professor', degrees: 'Ph.D (Andhra University, 2015)', area: 'MEMS and NEMS', photo: '/media/faculty/daisy-rani.webp',
-    note: 'The first room in the classroom wing corridor.' },
+    note: 'Her teaching and research are in micro- and nano-electromechanical systems, one of the department’s principal research areas.' },
   kamala: { name: 'Dr. A. Kamala Kumari', role: 'Associate Professor', degrees: 'M.Tech, Ph.D (Andhra University, 2015)', area: 'Digital systems and computer electronics', photo: '/media/faculty/kamala-kumari.webp',
-    note: 'Head of the department from 2022.' },
-  patnaik: { name: 'Prof. M. Ramesh Patnaik', role: 'Professor', degrees: 'M.Tech, Ph.D (Andhra University, 2011), F.I.E', area: 'Industrial process instrumentation',
-    note: 'Head of the department from 2021.' },
+    note: 'Her teaching and research are in digital systems and computer electronics. She served as Head of the Department from 2022.' },
+  patnaik: { name: 'Prof. M. Ramesh Patnaik', role: 'Professor', degrees: 'M.Tech, Ph.D (Andhra University, 2011), F.I.E', area: 'Industrial process instrumentation', photo: '/media/faculty/ramesh-patnaik.webp',
+    note: 'A Fellow of the Institution of Engineers (India), he served as Head of the Department from 2021.' },
+  kotireddy: { name: 'Prof. D. V. Rama Koti Reddy', role: 'Professor', degrees: 'Ph.D (Andhra University, 1996)', area: 'Sensors and sensor networks, MEMS and nanotechnology', photo: '/media/faculty/rama-koti-reddy.webp' },
   ysrao: { name: 'Prof. Y. Srinivasa Rao', role: 'Professor', degrees: 'Ph.D', area: 'Microelectronics', photo: '/media/faculty/y-srinivasa-rao.webp', note: '' },
   bhujanga: { name: 'Prof. A. Bhujanga Rao', role: 'Professor', degrees: 'Ph.D (Andhra University, 2001)', area: 'Instrumentation', photo: '/media/faculty/bhujanga-rao.webp',
-    note: 'Head of the department from 2012; the first floor of this wing was inaugurated during his term, on 30 August 2015.' },
+    note: 'He served as Head of the Department from 2012. The first floor of the east wing was inaugurated during his tenure, on 30 August 2015.' },
 };
 
-// Each lab's own line: what it is for, as the B.Tech and M.Tech courses use it, and where its door is.
-// Each lab's own line, from the lab courses of the university's B.Tech (Instrumentation Engineering) scheme and the
-// department's research areas.
+// Each lab's description, from the lab courses of the university's B.Tech (Instrumentation Engineering) scheme and the
+// department's research areas. Descriptions only: where each room is belongs to the stop's own `where`.
 export const labRooms = {
-  'lab-instruments': { title: 'Industrial Instruments Lab', lead: 'The double door straight ahead at the foot of the steps. The Industrial Instruments Labs: the measuring instruments of a working plant, transmitters and transducers for pressure, flow, level and temperature, tested, compared and calibrated.' },
-  'lab-process': { title: 'Process Control Lab', lead: 'The B.Tech\u2019s Process Control Lab: closed loops of level, flow, pressure and temperature, and a controller tuned to its best settings, judged by the quarter-decay ratio and the IAE, ISE and ITAE error criteria.' },
-  'lab-dcs': { title: 'DCS Lab', lead: 'The first door from the gate. Where the final-year DCS and PLC Lab is taught: distributed control systems and programmable logic controllers, the architecture that runs refineries and power stations.' },
-  'lab-sensors': { title: 'Sensors and Transducers Lab', lead: 'How a measured quantity becomes a signal: strain, displacement, temperature, pressure and light, each through its transducer, characterised and calibrated.' },
-  'lab-control': { title: 'Control Systems Laboratory', lead: 'The Control Systems Lab: how real systems answer a step or a sine, what keeps them stable, and the controllers that shape them.' },
-  'lab-machines': { title: 'Machines Lab', lead: 'The electrical machines behind every plant: DC machines, transformers and induction motors, run and tested at the bench.' },
-  'lab-simulation': { title: 'Simulation Lab', lead: 'Instruments, plants and control loops modelled and tested on the computer before they are built.' },
-  'lab-measurements': { title: 'Measurements Lab', lead: 'At the end of the passage past the Seminar Hall. Electrical and electronic measurements: bridges, meters and oscilloscopes, and the error in every reading.' },
-  'lab-devicefab': { title: 'Device Fab Lab', lead: 'Where sensors and devices are made: the bench for the department\u2019s research in sensors, MEMS and nanotechnology.' },
-  'lab-biomedical': { title: 'Biomedical Instrumentation Lab', lead: 'The B.Tech\u2019s Biomedical Instrumentation Lab: instruments that read the body, the electrical signals of heart, muscle and brain, and how they are measured safely.' },
+  'lab-instruments': { title: 'Industrial Instruments Lab', lead: 'Practical training in the instruments of the process industry. Transmitters and transducers for pressure, flow, level and temperature are studied, tested and calibrated against reference standards.' },
+  'lab-process': { title: 'Process Control Lab', lead: 'Closed-loop control of level, flow, pressure and temperature. Students tune industrial controllers and evaluate their performance by the quarter-decay ratio and the IAE, ISE and ITAE criteria.' },
+  'lab-dcs': { title: 'DCS Lab', lead: 'The final-year laboratory for distributed control systems and programmable logic controllers, the automation architecture of refineries, power stations and process plants.' },
+  'lab-sensors': { title: 'Sensors and Transducers Lab', lead: 'The characterisation and calibration of transducers for strain, displacement, temperature, pressure and light, from the physical quantity to a measurable electrical signal.' },
+  'lab-control': { title: 'Control Systems Laboratory', lead: 'Experiments in the time and frequency response of physical systems, stability analysis, and the design of compensators and controllers.' },
+  'lab-machines': { title: 'Machines Lab', lead: 'Testing and performance analysis of DC machines, transformers and induction motors, the electrical machines that drive industrial plant.' },
+  'lab-simulation': { title: 'Simulation Lab', lead: 'Modelling and simulation of instruments, processes and control loops, so that designs can be analysed and validated before they are built.' },
+  'lab-measurements': { title: 'Measurements Lab', lead: 'Electrical and electronic measurement with bridges, meters and oscilloscopes, with emphasis on accuracy, calibration and the analysis of measurement error.' },
+  'lab-devicefab': { title: 'Device Fab Lab', lead: 'Fabrication and testing of sensors and microdevices, supporting the department’s research in sensors, MEMS and nanotechnology.' },
+  'lab-biomedical': { title: 'Biomedical Instrumentation Lab', lead: 'Instrumentation for physiological measurement: the acquisition of cardiac, muscular and neural signals (ECG, EMG and EEG) and the principles of patient safety.' },
 };
 
 export const classroomRooms = {
-  'classroom-ii': { title: 'Classroom II', lead: 'Down three steps at the end of the wing, on the right: a smart classroom with its benches facing the teaching platform, the boards and the projector.' },
-  'classroom-iii': { title: 'Classroom III', lead: 'Straight ahead at the foot of the steps. Opened with Classroom II as a smart classroom; the information plaque by its door records it.' },
-  'classroom-iv': { title: 'Classroom IV', lead: 'Along the side passage, past the Strong Room: the last teaching room in the wing.' },
+  'classroom-ii': { title: 'Classroom II', lead: 'A smart classroom for lectures, equipped with a projector and teaching boards, with seating facing a raised teaching platform.' },
+  'classroom-iii': { title: 'Classroom III', lead: 'A smart classroom commissioned together with Classroom II. The plaque beside its entrance records the inauguration.' },
+  'classroom-iv': { title: 'Classroom IV', lead: 'The third teaching room of the classroom wing, on the side passage beyond the Strong Room.' },
 };
 
 export const hero = {
   lines: ['Measuring', 'the world', 'since 1937.'],
-  lead: 'The Department of Instrument Technology, AU College of Engineering (A), Andhra University. Walk in: every chapter below stops at a real door in the building.',
-  cue: 'Scroll to walk in',
+  lead: 'Department of Instrument Technology, AU College of Engineering (A), Andhra University. A guided walk through the building: its heritage, laboratories, faculty and classrooms.',
+  cue: 'Scroll to begin',
   // the four floating tabs: each walks to the first stop of its group
   chips: [
-    { n: '01', title: 'Heritage', text: 'The boards in the entrance hall.', group: 'heritage' },
-    { n: '02', title: 'Laboratories', text: 'Ten labs, each at its own door.', group: 'labs' },
-    { n: '03', title: 'Faculty', text: 'Every professor, at their own room.', group: 'faculty' },
-    { n: '04', title: 'Classrooms', text: 'At the end of the classroom wing.', group: 'classrooms' },
+    { n: '01', title: 'Heritage', text: 'Established in 1937.', group: 'heritage' },
+    { n: '02', title: 'Laboratories', text: 'Ten teaching and research labs.', group: 'labs' },
+    { n: '03', title: 'Faculty', text: 'Professors and their offices.', group: 'faculty' },
+    { n: '04', title: 'Classrooms', text: 'Smart Classrooms II to IV.', group: 'classrooms' },
   ],
 };
 
 export const heritage = {
-  title: 'Measuring since 1937.',
-  lead: 'It began as a workshop that built instruments for the university, and grew into a department that teaches how to design, calibrate and trust them. The names of everyone who has led it are on the boards in front of you.',
+  title: 'Established in 1937.',
+  lead: 'The department began as an instrument manufacturing section serving the university, and has grown into a centre for teaching and research in instrumentation and control engineering. The boards in this hall record those who have led it.',
   events: [
     { year: 1926, text: 'Andhra University is founded in Visakhapatnam.' },
-    { year: 1937, text: 'An Instrument Manufacturing Section is started.' },
-    { year: 1946, text: 'It becomes part of the Department of Applied Physics: instrumentation, optics and electronics.' },
+    { year: 1937, text: 'An Instrument Manufacturing Section is established.' },
+    { year: 1946, text: 'The section joins the Department of Applied Physics, covering instrumentation, optics and electronics.' },
     { year: 1966, text: 'Research begins in thin-film technology, photo-elasticity and ultrasonics.' },
-    { year: 1990, text: 'Moves to the College of Engineering as the Department of Instrument Technology.' },
-    { year: 2001, text: 'The M.Tech in Instrumentation and Control begins.' },
+    { year: 1990, text: 'It moves to the College of Engineering as the Department of Instrument Technology.' },
+    { year: 2001, text: 'The M.Tech programme in Instrumentation and Control is introduced.' },
     { year: 2008, text: 'The west wing is inaugurated on 25 June by Prof. Y. C. Simhadri, Vice-Chancellor.' },
     { year: 2011, text: 'The renovated department is inaugurated on 8 May by Prof. Beela Satyanarayana, Vice-Chancellor.' },
-    { year: 2015, text: 'The first floor of the east wing opens on 30 August.' },
+    { year: 2015, text: 'The first floor of the east wing is inaugurated on 30 August.' },
   ],
-  stats: [['1937', 'Founded'], ['21', 'Heads of department'], ['10', 'Laboratories'], ['NBA', 'Accredited programmes']],
-  now: 'Andhra University holds NAAC A++ (CGPA 3.74, valid to 2030) and is ranked 23rd among Indian universities in NIRF 2025.',
+  stats: [['1937', 'Established'], ['21', 'Heads of department'], ['10', 'Laboratories'], ['NBA', 'Accredited programmes']],
+  now: 'Andhra University is accredited A++ by NAAC (CGPA 3.74, valid to 2030) and ranked 23rd among Indian universities in NIRF 2025.',
 };
 
 export const admissions = {
-  title: 'Three ways in.',
-  lead: 'The department office is the last door on the west corridor. Three programmes are taught in this building.',
+  title: 'Programmes and admissions.',
+  lead: 'The department offers undergraduate, postgraduate and doctoral programmes. Admission enquiries are handled by the department office on the west corridor.',
   list: [
     { name: 'B.Tech, Instrumentation Engineering', length: '4 years', entry: 'Admission through AP EAPCET, with 45% in physics, chemistry and mathematics (40% for reserved categories).' },
-    { name: 'M.Tech, Instrumentation and Control', length: '2 years', entry: 'GATE-qualified candidates are admitted first; the remaining seats are filled through AP PGECET.' },
-    { name: 'Ph.D', length: 'Research', entry: 'Sensors, MEMS, nanotechnology, instrumentation and automation, through the university’s research admissions.' },
+    { name: 'M.Tech, Instrumentation and Control', length: '2 years', entry: 'GATE-qualified candidates are admitted first; remaining seats are filled through AP PGECET.' },
+    { name: 'Ph.D', length: 'Research', entry: 'Through the university’s research admissions, in sensors, MEMS, nanotechnology, and instrumentation and automation.' },
   ],
-  objectivesTitle: 'What the B.Tech sets out to do',
+  objectivesTitle: 'Programme educational objectives (B.Tech)',
   objectives: [
-    'A solid foundation in mathematics, engineering sciences, electronics and instrumentation, for careers in industry, research and academics.',
-    'Engineering breadth to analyse, innovate and design new products, and to solve real problems for society.',
-    'An academic environment of excellence, leadership in multidisciplinary teams, and lifelong learning.',
-    'Professional ethics, communication and teamwork for open-ended investigation and research.',
-    'Entrepreneurship and innovation, leading efforts on social, technical and business challenges.',
+    'To provide a strong foundation in mathematics, engineering sciences, electronics and instrumentation for careers in industry, research and academia.',
+    'To develop the engineering breadth to analyse problems, innovate, and design products that serve society.',
+    'To foster academic excellence, leadership in multidisciplinary teams and a commitment to lifelong learning.',
+    'To instil professional ethics, effective communication and teamwork in investigation and research.',
+    'To encourage entrepreneurship and innovation in meeting social, technical and business challenges.',
   ],
 };
 
 export const labs = {
-  title: 'Where the measuring happens.',
-  lead: 'The walk calls at every lab in turn. The west wing holds six labs, the east side the Simulation and Measurements labs, and the Device Fab and Biomedical labs are upstairs in the east wing.',
+  title: 'Laboratories and research.',
+  lead: 'The department maintains ten laboratories: six in the west wing, the Simulation and Measurements labs on the east side of the ground floor, and the Device Fab and Biomedical Instrumentation labs on the first floor of the east wing.',
   list: [
-    { name: 'Industrial Instruments Lab', where: 'West wing, ahead of the corridor' },
+    { name: 'Industrial Instruments Lab', where: 'West wing, ground floor' },
     { name: 'Process Control Lab', where: 'West wing, front passage' },
     { name: 'Sensors and Transducers Lab', where: 'West wing, ground floor' },
     { name: 'Control Systems Laboratory', where: 'West wing, ground floor' },
     { name: 'Machines Lab', where: 'West wing, ground floor' },
     { name: 'DCS Lab', where: 'West wing, by the gate' },
-    { name: 'Device Fab Lab', where: 'East wing, first floor, end of the corridor' },
-    { name: 'Biomedical Instrumentation Lab', where: 'East wing, first floor, south passage' },
+    { name: 'Device Fab Lab', where: 'East wing, first floor' },
+    { name: 'Biomedical Instrumentation Lab', where: 'East wing, first floor' },
     { name: 'Simulation Lab', where: 'East corridor, ground floor' },
-    { name: 'Measurements Lab', where: 'End of the Seminar Hall passage' },
+    { name: 'Measurements Lab', where: 'Rear of the Seminar Hall passage' },
   ],
   research: ['Sensors and sensor networks', 'MEMS', 'Nanotechnology', 'Instrumentation and automation', 'Thin films, photo-elasticity and ultrasonics'],
   facts: [
-    'Projects funded by UGC, DST, AICTE and DRDO, with UGC Special Assistance Programme and DST FIST support.',
-    'About fifty research papers a year in IEEE, Springer and Elsevier journals.',
+    'Research projects funded by UGC, DST, AICTE and DRDO, with support under the UGC Special Assistance Programme and DST-FIST.',
+    'Approximately fifty research publications each year in IEEE, Springer and Elsevier journals.',
     'Testing and calibration of industrial instruments for VSP, L&T, Reliance and Ramky.',
   ],
 };
 
 export const guide = {
-  title: 'Finding your way.',
-  lead: 'You are on the first-floor landing. The department library is the door on your left; the classroom wing is straight through the glass doors.',
+  title: 'Student information.',
+  lead: 'The department library is on this first-floor landing. Facilities in the building, student support and campus services are listed below.',
   groups: [
-    { title: 'In the building', items: [
-      'Timetables: the glass case on the left wall of the entrance hall.',
-      'Smart Classrooms II, III and IV: through the classroom-wing doors on this landing, at the far end.',
-      'Laboratories: the west wing on the ground floor, and the east wing on this floor.',
-      'Department office: the last door on the west corridor, ground floor.',
+    { title: 'Within the department', items: [
+      'Timetables are displayed in the glass notice case in the entrance hall.',
+      'Smart Classrooms II, III and IV are at the far end of the classroom wing, first floor.',
+      'Laboratories occupy the west wing and the east corridor of the ground floor, and the east wing of the first floor.',
+      'The department office is at the end of the west corridor, ground floor.',
     ] },
-    { title: 'Help, whenever you need it', contacts: [
+    { title: 'Student support', contacts: [
       ['Anti-ragging squad', '9703831117'], ['Women’s grievance and redressal cell', '9948810852'], ['Minority cell', '9985369669'],
       ['Cell for differently abled persons', '7995106419'], ['SC/ST cell', '9908036203'],
     ] },
-    { title: 'Around the campus', items: [
-      'Dr. V. S. Krishna Library, the central library, is open every day including Sundays, except national holidays.',
+    { title: 'Campus services', items: [
+      'Dr. V. S. Krishna Library, the university’s central library, is open daily, including Sundays, except on national holidays.',
       'Training and Placement, AU College of Engineering: 0891 2844744, placement.aucea@andhrauniversity.edu.in.',
       'College of Engineering office: 0891 2844999 or 2754586, auceaprincipal@gmail.com.',
     ] },
@@ -236,14 +238,14 @@ export const guide = {
 
 // Faculty board in the entrance hall (newest source), with the door signs where the building shows the room.
 export const faculty = {
-  alsoNote: 'Also on the faculty: Prof. D. V. Rama Koti Reddy (sensors and sensor networks, MEMS and nanotechnology), head of the department from 2017. Every other professor\u2019s room is on this walk.',
-  staffTitle: 'Department office and laboratories',
+  alsoNote: 'Prof. D. V. Rama Koti Reddy (sensors and sensor networks, MEMS and nanotechnology), Head of the Department from 2017, is also a member of the faculty.',
+  staffTitle: 'Administrative and technical staff',
   staff: [
     ['S. Phani', 'Typist'], ['N. V. D. Ganesh', 'Junior Assistant'], ['P. T. Reddy', 'Junior Assistant'],
     ['B. Pydi Raju', 'Record Assistant'], ['Md. Khadar Baba', 'Record Assistant'], ['K. Ramanamma', 'Record Assistant'],
     ['S. Ramesh', 'Machine Minder Grade-I'], ['K. Appala Raju', 'Mechanic'], ['P. Srinuvasa Rao', 'Consolidated pay'],
   ],
-  headsTitle: 'Successive heads of the department',
+  headsTitle: 'Heads of the department',
   // the board's own spelling and dates; blank lines on the board are left out
   heads: [
     ['Prof. S. T. Krishna Swamy Chetty', 'to 1964'], ['Prof. T. V. Rame', ''], ['Prof. V. Rama Krishna Rao', '1966–78'], ['Prof. P. Sitarama Swamy', '1978–81'],
@@ -251,12 +253,12 @@ export const faculty = {
     ['Dr. R. Ramanujam', '1993–96'], ['Prof. P. L. H. Vara Prasad', '2010–12'], ['Prof. A. Bhujanga Rao', '2012–'], ['Prof. D. V. Rama Koti Reddy', '2017'],
     ['Dr. M. Ramesh Patnaik', '2021'], ['Dr. A. Kamala Kumari', '2022'], ['Dr. P. Swapna', 'present'],
   ],
-  headsNote: 'Twenty-one heads are numbered on the board; a few lines on it are no longer legible.',
+  headsNote: 'The board records twenty-one heads of the department; some entries are no longer legible.',
 };
 
 export const enter = {
   title: 'Step inside.',
-  lead: 'The whole building is here: every corridor, classroom and lab, under the real sky over Visakhapatnam right now.',
+  lead: 'Explore the complete building at your own pace: every corridor, laboratory and classroom, under the live sky over Visakhapatnam.',
   explore: 'Explore the campus',
   walk: 'Walk in as a student',
 };
@@ -269,5 +271,5 @@ export const credits = {
 export const footer = {
   address: ['Department of Instrument Technology', 'AU College of Engineering (A), Andhra University', 'Waltair Junction, Visakhapatnam 530003'],
   phones: [['University', '0891 2844000'], ['College of Engineering', '0891 2844999'], ['Training and Placement', '0891 2844744']],
-  note: 'An independent portrait of the department, reconstructed from photographs and film of the building. Not an official university site.',
+  note: 'An independent portrait of the department, reconstructed from photographs and video of the building. This is not an official university website.',
 };
