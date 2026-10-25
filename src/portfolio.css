@@ -122,6 +122,8 @@ body:has(> .story-canvas) { margin: 0; background: #0b1322; }
 .pf-cue { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; font-size: 9.5px; letter-spacing: .3em; text-transform: uppercase; color: var(--muted); }
 .pf-cue .track { width: 54px; height: 1px; background: var(--line); position: relative; overflow: hidden; }
 .pf-cue .track i { position: absolute; inset: 0; background: var(--lime); transform-origin: left; animation: pf-cue 2.8s var(--ease) infinite; }
+/* the page asleep (story.js, battery): the looping marks rest too */
+.story-asleep #portfolio * { animation-play-state: paused !important; }
 @keyframes pf-cue { 0% { transform: scaleX(0); } 50% { transform: scaleX(1); transform-origin: left; } 50.1% { transform-origin: right; } 100% { transform: scaleX(0); transform-origin: right; } }
 .pf-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px clamp(14px, 2vw, 34px); padding-top: 22px; border-top: 1px solid var(--line-soft); }
 .pf-chip { display: flex; flex-direction: column; gap: 6px; }

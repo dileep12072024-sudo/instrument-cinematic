@@ -757,7 +757,7 @@ const snapshot = (() => {
       rise.set(t); riseDust.set(t); riseDust.material.uniforms.uLight.value = 1 - .8 * sunlight.night;
       fadeTrees(!!item.outdoor);
       portfolio.poseFor(item, size.w / size.h);
-      if (moon) { const m = scene.getObjectByName('Photographic phased moon'); if (m) { m.position.copy(camera.position).addScaledVector(new THREE.Vector3(...moon.dir).normalize(), 240); m.lookAt(camera.position); m.scale.setScalar(moon.scale ?? 1); } }
+      if (moon) { const m = scene.getObjectByName('Photographic phased moon'); if (m) { m.position.copy(camera.position).addScaledVector(new THREE.Vector3(...moon.dir).normalize(), 240); m.lookAt(camera.position); m.scale.setScalar(moon.scale ?? 1); m.renderOrder = -1; } } // before the trees: a faded tree's depth would otherwise cut the moon into fragments
       landscape.updateTreeDetail(camera); cullForCamera();
       if (shadows || item.fly < 1) renderer.shadowMap.needsUpdate = true;
       renderer.render(scene, camera);

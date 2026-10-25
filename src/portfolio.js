@@ -370,11 +370,15 @@ function createCloth(opts = {}) {
 // The professors' photographs, hung as cloth (above) over the rectangle of their frame on the page. Drawn after the
 // main view; the frame on the page only holds the place and the caption.
 const CARD = { wind: .7, amplitude: 18, drape: 9, brush: 1.7, brushSize: 120, light: .95, sheen: .15, focal: 1100 };
+// The viewport's size, read once per resize: per-frame code never asks the window (after a style write that read
+// forces a whole style and layout pass; a scroll did it once per plate per frame).
+const view = { w: innerWidth, h: innerHeight };
+addEventListener('resize', () => { view.w = innerWidth; view.h = innerHeight; });
 function createPlates(renderer) {
   const flatCam = new T.Camera(), loader = new T.TextureLoader(), list = [];
   const ink = new T.DataTexture(new Uint8Array([10, 17, 32, 255]), 1, 1); ink.needsUpdate = true; // the night's ink, #0a1120
   let frame = 0;
-  const visible = p => p.rect && p.tex && p.rect.width >= 8 && p.rect.bottom > -60 && p.rect.top < innerHeight + 60 && p.alpha >= .02;
+  const visible = p => p.rect && p.tex && p.rect.width >= 8 && p.rect.bottom > -60 && p.rect.top < view.h + 60 && p.alpha >= .02;
   return {
     list,
     // a photo: pours out of its door's sign (the genie) and hangs as cloth; onIn: once it has landed
@@ -394,14 +398,19 @@ function createPlates(renderer) {
     invalidate() { for (const p of list) p.box = null; }, // the layout changed: measure again on the next frame
     // per page frame: where each plate is, its genie and its cloth; pointer: { x, y } in the page, or null; here(el):
     // { on, x, y }: whether the plate's stop is being read and where its door's sign is on screen. True while any shows.
-    update(dt, pointer, still, measureAlpha, here, near) {
+    // sy: the page's scroll position (from Lenis, not the window); scrolling: the page is moving (a card's sheet then
+    // hangs as it is unless the hand is on it: nobody reads a fold mid-scroll, and the simulation is the costly part)
+    update(dt, pointer, still, measureAlpha, here, near, sy, scrolling) {
       frame++;
       let moving = false;
       for (const p of list) {
         if (!near(p.el) && p.alpha <= .001 && (p.kind === 'card' || p.genie <= .001)) { p.box = null; p.calm = 0; continue; } // far off and out: nothing to do
-        // where the plate is: measured (a layout) every 30th frame, and between those carried by the scroll alone
-        if (frame % 30 === 0 || !p.box) { const r = p.frame.getBoundingClientRect(), d = p.pad ?? 0; p.box = { left: r.left - d, top: r.top + scrollY - d, width: r.width + 2 * d, height: r.height + 2 * d }; if (p.kind === 'photo') p.alpha = measureAlpha(p.el); }
-        const top = p.box.top - scrollY;
+        // where the plate is: measured (a layout) when it comes near and after the layout changes, and between those
+        // carried by the scroll alone; a photo's opacity (a style walk) every 30th frame
+        const fresh = !p.box;
+        if (fresh) { const r = p.frame.getBoundingClientRect(), d = p.pad ?? 0; p.box = { left: r.left - d, top: r.top + sy - d, width: r.width + 2 * d, height: r.height + 2 * d }; }
+        if (p.kind === 'photo' && (fresh || frame % 30 === 0)) p.alpha = measureAlpha(p.el);
+        const top = p.box.top - sy;
         p.rect = { left: p.box.left, top, width: p.box.width, height: p.box.height, right: p.box.left + p.box.width, bottom: top + p.box.height };
         const h = here(p.el); p.want = h.on && (!p.after || p.after.landed) ? 1 : 0;
         if (p.kind === 'card') { // a card fades in while its stop is being read
@@ -421,15 +430,17 @@ function createPlates(renderer) {
         // it is left hanging as it is and nothing is drawn for it until the hand comes back.
         p.calm = inside || p.genie < 1 || (p.kind === 'card' && Math.abs(p.alpha - p.want * .82) > .01) ? 0 : (p.calm || 0) + dt;
         if (p.calm > (p.kind === 'card' ? 2.5 : 4)) { // at rest the words settle back flat, where text is sharpest
-          if (p.words && p.leant) { p.leant = ''; p.words.style.transition = 'transform 1.2s cubic-bezier(.22, 1, .36, 1)'; p.words.style.transform = ''; }
+          if (p.words && p.leant) { p.leant = ''; p.words.style.transition = 'transform 1.2s cubic-bezier(.22, 1, .36, 1)'; p.words.style.transform = ''; setTimeout(() => { if (!p.leant) p.words.style.willChange = ''; }, 1300); }
           continue;
         }
+        if (p.kind === 'card' && scrolling && !inside) continue;
         p.cloth.update(dt, r.width, r.height, inside ? pointer.x - r.left : null, inside ? pointer.y - r.top : null, still); moving = true;
         if (p.words) { // the words lean with the sheet, a few degrees at most: read through the fold, never off it
           const l = p.cloth.lean, deg = v => Math.max(-3, Math.min(3, Math.atan(v * 1.6) * 180 / Math.PI)).toFixed(2);
           const rx = deg(-l.y), ry = deg(l.x), z = (l.z * .6).toFixed(1);
           const t = `perspective(1600px) rotateX(${rx}deg) rotateY(${ry}deg) translateZ(${z}px)`;
-          if (t !== p.leant) { p.leant = t; p.words.style.transition = ''; p.words.style.transform = t; }
+          // its own GPU layer while it moves (a transformed block of text is otherwise repainted every frame)
+          if (t !== p.leant) { if (!p.leant) p.words.style.willChange = 'transform'; p.leant = t; p.words.style.transition = ''; p.words.style.transform = t; }
         }
       }
       return moving;
@@ -649,7 +660,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   }
   // the vertical lens of a frame (rendered at snapshot.aspect) as the screen shows it, cover-fitted: a wider screen crops
   // the frame's top and bottom
-  const coverFov = f => { const W = innerWidth / innerHeight, A = snapshot.aspect; return W > A ? 2 * Math.atan(Math.tan(f * Math.PI / 360) * A / W) * 180 / Math.PI : f; };
+  const coverFov = f => { const W = view.w / view.h, A = snapshot.aspect; return W > A ? 2 * Math.atan(Math.tan(f * Math.PI / 360) * A / W) * 180 / Math.PI : f; };
 
   // ------------------------------------------------------------------ smooth scroll (Lenis), driven per frame from update()
   const lenis = new Lenis({ autoRaf: false, lerp: reduced ? 1 : .065, wheelMultiplier: .75, touchMultiplier: 1.2, syncTouch: false });
@@ -658,7 +669,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   const goTo = i => { const y = scrollFor(i), d = Math.abs(y - scrollY) / innerHeight; lenis.scrollTo(y, { duration: reduced ? 0 : clamp(1.2 + d * .22, 1.2, 4.2), easing: x => x < .5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2, force: true }); };
   function relayout() { build(); measure(); rig.prog = progressFor(scrollY); wisps?.resize(); plates?.invalidate(); }
   addEventListener('resize', relayout);
-  new ResizeObserver(() => { measure(); rig.prog = progressFor(scrollY); }).observe($('.pf-doc')); // opening a <details> moves the holds
+  new ResizeObserver(() => { measure(); rig.prog = progressFor(scrollY); plates?.invalidate(); }).observe($('.pf-doc')); // opening a <details> moves the holds
   root.addEventListener('click', e => {
     const door = e.target.closest('[data-enter]'); if (door) { onEnter(door.dataset.enter); return; }
     const rail = e.target.closest('[data-rail]'); if (rail) { goTo(+rail.dataset.rail); return; }
@@ -676,7 +687,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   let lastY = 0;
   function chrome() {
     nav.classList.toggle('stuck', scrollY > 40);
-    nav.classList.toggle('hide', !nav.classList.contains('menu-open') && scrollY > lastY + 4 && scrollY > innerHeight * .8);
+    nav.classList.toggle('hide', !nav.classList.contains('menu-open') && scrollY > lastY + 4 && scrollY > view.h * .8);
     if (scrollY < lastY - 4) nav.classList.remove('hide');
     lastY = scrollY;
     const k = Math.round(rig.smooth);
@@ -740,7 +751,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   ];
   let exiting = false;
   function heroExit() {
-    const t = clamp(scrollY / (innerHeight * .58));
+    const t = clamp(scrollY / (view.h * .58));
     if (t <= 0) { if (exiting) { exitSeq.forEach(o => { o.el.style.opacity = o.el.style.transform = o.el.style.filter = o.el.style.pointerEvents = o.el.style.transition = ''; }); exiting = false; } return; }
     exiting = true;
     exitSeq.forEach(o => {
@@ -759,7 +770,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   const plateHere = el => {
     const k = kOf(el), on = Math.abs(rig.smooth - k) < .35 && rig.fly >= 1;
     if (on) signAt.set(...(chapters[k].sign ?? chapters[k].anchor)).project(camera);
-    return { on, x: (signAt.x + 1) / 2 * innerWidth, y: (1 - signAt.y) / 2 * innerHeight };
+    return { on, x: (signAt.x + 1) / 2 * view.w, y: (1 - signAt.y) / 2 * view.h };
   };
   // photos first, then their words (owner, 2026-10-19): a stop's text comes in once its photo has poured out of the sign
   const revealSection = sec => { sec.querySelectorAll('[data-rv]').forEach((e, i) => setTimeout(() => e.classList.add('rv-in'), reduced ? 0 : 150 + i * 90)); sec.querySelectorAll('.pf-display').forEach(h => reveals.get(h)?.()); };
@@ -783,7 +794,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     if (!pointer.seen) { pointer.x = e.clientX; pointer.y = e.clientY; cursor.classList.add('seen'); } // the ring starts under the hand, not mid-screen
     pointer.tx = e.clientX; pointer.ty = e.clientY; pointer.seen = true; pointer.at = performance.now();
     if (e.clientY < 90) nav.classList.remove('hide'); // the hidden nav comes back when the hand goes to it
-    rig.tmx = e.clientX / innerWidth * 2 - 1; rig.tmy = -(e.clientY / innerHeight * 2 - 1);
+    rig.tmx = e.clientX / view.w * 2 - 1; rig.tmy = -(e.clientY / view.h * 2 - 1);
     cursor.classList.toggle('act', !!e.target.closest?.('[data-cursor], a, button, summary'));
   }, { passive: true });
   // the ring replaces the system pointer only on a fine pointer, only while the story shows, and only after the arrival
@@ -860,7 +871,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       // the motes' faint breath stops once the hand has been still a moment: a resting page draws nothing (battery)
       if (wisps && wisps.update(dt, rig.tmx, rig.tmy, pointer.seen && !reduced && performance.now() - (pointer.at || 0) < 1500)) moving = true;
       if (!reduced && leaves.update(dt, camera, pose.outdoors && rig.intro > .9, light)) moving = true;
-      if (plates.update(dt, pointer.seen ? { x: pointer.tx, y: pointer.ty } : null, reduced, alphaOf, plateHere, plateNear)) moving = true;
+      if (plates.update(dt, pointer.seen ? { x: pointer.tx, y: pointer.ty } : null, reduced, alphaOf, plateHere, plateNear, scrollY, Math.abs(rig.smooth - rig.prog) > 1e-3)) moving = true;
       if (wordmark) {
         if (wordT >= 0) wordT += dt;
         const near = 1 - smooth(.25, .75, rig.smooth); // gone by the time the camera reaches the porch
