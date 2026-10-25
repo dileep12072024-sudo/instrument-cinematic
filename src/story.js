@@ -37,24 +37,26 @@ const sun = new T.DirectionalLight(night ? '#9fb4d8' : '#fff1dc', night ? .5 : 2
 //   upload   one frame a tick sent to the GPU, nearest first (a 1280x720 upload is several ms on integrated graphics)
 // The backdrop draws the nearest uploaded frames either side of the camera, each re-projected through its depth to the
 // camera's own pose: a frame not in yet shows as a slightly wider blend, never as a jump.
-const have = new Set(), fetching = new Map(), gpu = new Map(), decoding = new Set(), ready = []; // have: frames whose bytes the worker holds
+const have = new Set(), fetching = new Map(), gpu = new Map(), decoding = new Set(), ready = []; // have: frames whose bytes a worker holds
 let fresh = true, pinned = new Set();
 const holdOf = c => c === 0 ? keyOf(1, 0) : keyOf(c, counts[c] - 1);
 const stops = counts.length; // stops 0 .. stops - 1
 const keep = new Set(counts.map((n, c) => holdOf(c)));
 const stats = { ticks: 0, exact: 0, gap: 0, none: 0 }; // for the test scripts: how close the frames drawn were
-// the worker (frame-worker.js) fetches, keeps and decodes the frames; here only what it holds is tracked
-const worker = new Worker(new URL('./frame-worker.js', import.meta.url), { type: 'module' }), waiting = new Map();
-worker.postMessage({ base });
-worker.onmessage = ({ data }) => {
+// the workers (frame-worker.js) fetch, keep and decode the frames; here only what they hold is tracked
+// two of them, each fetching and decoding its own half of the frames (odd and even), on separate cores
+const workers = [0, 1].map(() => new Worker(new URL('./frame-worker.js', import.meta.url), { type: 'module' })), waiting = new Map();
+const workerOf = key => workers[+key.slice(-3) % 2];
+const onmessage = ({ data }) => {
   const k = data.fetched ?? data.failed;
   if (k) { if (data.fetched) have.add(k); fetching.get(k)?.done(!!data.fetched); fetching.delete(k); trimBytes(); return; }
   const p = waiting.get(data.key); waiting.delete(data.key); p?.done(data.error ? null : data);
 };
+for (const w of workers) { w.postMessage({ base }); w.onmessage = onmessage; }
 const asked = (map, key, message) => {
   if (map.has(key)) return map.get(key).promise;
   let done; const promise = new Promise(r => done = r);
-  map.set(key, { promise, done }); worker.postMessage(message);
+  map.set(key, { promise, done }); workerOf(key).postMessage(message);
   return promise;
 };
 const fetchFrame = key => have.has(key) ? Promise.resolve(true) : asked(fetching, key, { fetch: key });
@@ -65,7 +67,7 @@ function trimBytes() {
   const forget = [];
   for (const k of have) { if (have.size - forget.length <= 640) break; if (!keep.has(k) && !gpu.has(k) && !decoding.has(k)) forget.push(k); }
   for (const k of forget) have.delete(k);
-  worker.postMessage({ forget });
+  for (const w of workers) w.postMessage({ forget });
 }
 async function decode(key) {
   decoding.add(key);
@@ -99,8 +101,10 @@ function wanted(i, jf, dir, step = 1) {
   const n = counts[i], j0 = dir >= 0 ? Math.floor(jf) : Math.ceil(jf), out = [], seen = new Set();
   const add = (wi, j) => { if (wi < 1 || wi >= stops || j < 0 || j >= counts[wi]) return; const k = keyOf(wi, j); if (!seen.has(k)) { seen.add(k); out.push(k); } };
   const s0 = dir >= 0 ? Math.floor(jf / step) * step : Math.ceil(jf / step) * step;
-  for (let d = 0; d <= 3; d++) add(i, Math.min(n - 1, Math.max(0, s0 + dir * step * d)));
-  add(i, Math.min(n - 1, Math.max(0, s0 - dir * step)));
+  // past this walk's end the next one goes on (its frame 0 is this walk's last pose), before its start the previous one
+  const near = j => j >= n ? add(i + 1, j - (n - 1)) : j < 0 ? (i > 1 && add(i - 1, counts[i - 1] - 1 + j)) : add(i, j);
+  for (let d = 0; d <= 3; d++) near(s0 + dir * step * d);
+  near(s0 - dir * step);
   for (const stride of [8, 4, 2, 1]) for (let d = stride; d <= 64; d += stride) {
     const j = j0 + dir * d;
     if (j >= 0 && j < n) add(i, j);
@@ -117,8 +121,9 @@ function schedule(i, jf, dir) {
   const list = wanted(i, jf, dir, pace > 28 ? 4 : pace > 12 ? 2 : 1);
   // bytes: six frames in flight
   for (const k of list) { if (fetching.size >= 6) break; if (!have.has(k) && !fetching.has(k)) fetchFrame(k); }
-  // decode: the frames either side of the camera and just ahead (the first five wanted), two at a time
-  for (const k of list.slice(0, 5)) { if (decoding.size >= 2) break; if (!gpu.has(k) && !decoding.has(k) && !ready.some(r => r.key === k) && have.has(k)) decode(k); }
+  // decode: the frames either side of the camera and just ahead (the first eight wanted), one per worker at a time
+  // (four at once kept every frame ready but took the main thread's core: one frame in ten ran 33 ms)
+  for (const k of list.slice(0, 8)) { if (decoding.size >= 2) break; if (!gpu.has(k) && !decoding.has(k) && !ready.some(r => r.key === k) && have.has(k)) decode(k); }
   // upload: one a tick, nearest first; decoded frames the camera has already passed are dropped
   ready.sort((a, b) => distance(a.key, i, jf) - distance(b.key, i, jf));
   while (ready.length && distance(ready[0].key, i, jf) > 12 && !keep.has(ready[0].key)) ready.shift();
@@ -241,12 +246,13 @@ function backdrop() {
   if (begun) schedule(i, jf, travel);
   // the nearest frames on the GPU either side of the camera (within a stretch of the walk)
   let j0 = -1, j1 = -1;
-  for (let j = Math.floor(jf); j >= Math.max(0, Math.floor(jf) - 48); j--) if (gpu.has(keyOf(i, j))) { j0 = j; break; }
-  for (let j = Math.ceil(jf); j <= Math.min(n - 1, Math.ceil(jf) + 48); j++) if (gpu.has(keyOf(i, j))) { j1 = j; break; }
+  const keyAt = j => j === 0 && i > 1 && !gpu.has(keyOf(i, 0)) ? keyOf(i - 1, counts[i - 1] - 1) : keyOf(i, j); // frame 0 = the stop before
+  for (let j = Math.floor(jf); j >= Math.max(0, Math.floor(jf) - 48); j--) if (gpu.has(keyAt(j))) { j0 = j; break; }
+  for (let j = Math.ceil(jf); j <= Math.min(n - 1, Math.ceil(jf) + 48); j++) if (gpu.has(keyAt(j))) { j1 = j; break; }
   if (j0 < 0 && j1 < 0) { stats.none++; return false; } // nothing near yet: the last picture stays
   if (j0 < 0) j0 = j1; if (j1 < 0) j1 = j0;
   stats.ticks++; if (j0 === Math.floor(jf) && j1 === Math.ceil(jf)) stats.exact++; stats.gap += j1 - j0;
-  const kA = keyOf(i, j0), kB = keyOf(i, j1), fa = gpu.get(kA), fb = gpu.get(kB);
+  const kA = keyAt(j0), kB = keyAt(j1), fa = gpu.get(kA), fb = gpu.get(kB);
   const mix = j1 === j0 ? 0 : Math.min(1, Math.max(0, (jf - j0) / (j1 - j0)));
   pinned = new Set([kA, kB]);
   let changed = false;
