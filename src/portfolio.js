@@ -202,7 +202,10 @@ function buildSegment(a, b, aspect) {
     if (a.outdoors && b.outdoors) { const k = smooth(0, len, s); yaw = lerpAngle(A.yaw, B.yaw, k); pitch = A.pitch + (B.pitch - A.pitch) * k; }
     const mid = Math.min(smooth(0, wa * 1.5, s), 1 - smooth(len - wb * 1.5, len, s));
     const fov = (A.fov + (B.fov - A.fov) * (s / len)) * (1 - mid) + walkFov * mid;
-    if (prev) cost += P[i].distanceTo(prev.p) + 1.5 * Math.abs(angle(prev.yaw, yaw)) + Math.abs(pitch - prev.pitch) + .02 * Math.abs(fov - prev.fov);
+    // a turn costs more than a step: the frames are spaced by cost, so turns get more of them (each re-aimed exactly);
+    // out in front of the building (z beyond the porch) a metre costs 0.4: all in view is far off, so the glide in from
+    // the overview and the climb out over the campus go by in fewer frames and fewer screens of scrolling
+    if (prev) cost += P[i].distanceTo(prev.p) * (P[i].z > 8.5 ? .4 : 1) + 2.2 * Math.abs(angle(prev.yaw, yaw)) + Math.abs(pitch - prev.pitch) + .02 * Math.abs(fov - prev.fov);
     rows.push(prev = { p: P[i], s, yaw, pitch, fov, cost });
   }
   return {
@@ -433,7 +436,11 @@ function createPlates(renderer) {
           if (p.words && p.leant) { p.leant = ''; p.words.style.transition = 'transform 1.2s cubic-bezier(.22, 1, .36, 1)'; p.words.style.transform = ''; setTimeout(() => { if (!p.leant) p.words.style.willChange = ''; }, 1300); }
           continue;
         }
-        if (p.kind === 'card' && scrolling && !inside) continue;
+        if (p.kind === 'card' && scrolling && !inside) { // hung as it is mid-scroll; shaped once if it came in mid-scroll
+          if (!p.shaped) { p.cloth.update(0, r.width, r.height, null, null, true); p.shaped = true; }
+          continue;
+        }
+        p.shaped = true;
         p.cloth.update(dt, r.width, r.height, inside ? pointer.x - r.left : null, inside ? pointer.y - r.top : null, still); moving = true;
         if (p.words) { // the words lean with the sheet, a few degrees at most: read through the fold, never off it
           const l = p.cloth.lean, deg = v => Math.max(-3, Math.min(3, Math.atan(v * 1.6) * 180 / Math.PI)).toFixed(2);
@@ -603,17 +610,20 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   const scrollFor = i => holds[i] ? holds[i][0] + (i === 0 ? 0 : Math.min(innerHeight * .12, (holds[i][1] - holds[i][0]) * .5)) : 0;
 
   // the arrival: a long-lens dolly in from further down the drive while the building rises
-  // The arrival (owner, 2026-10-25): no loading screen; the camera comes down out of the sky over the site, circles the
-  // building wide while it rises (west, rear, east, round to the front) and settles on the 3D model's own opening view,
-  // high on the front right. Wide and high the whole way: the campus is never crowded into the frame.
+  // The arrival (owner, 2026-10-25): no loading screen; out of the sky and round the department while it rises, to the
+  // 3D model's own opening view, high on the front right. Shot like a drone over a build: a short drop from the sky,
+  // tilting from straight down to an angle as the ground storey breaks through (from directly above, rising walls
+  // read as flat slabs appearing); then a low, close orbit, west, rear, east, climbing with the storeys as they land;
+  // then the pull-back to the overview, timed to settle as the last signs land. The camera keeps moving to the end.
   const flight = (() => {
     const pts = [ // [eye, look-at, fov]
-      [[-10, 104, 44], [0, 0, 4], 46],       // high in the sky, looking down on the site
-      [[-54, 70, 18], [0, 2, 0], 48],        // descending over the west
-      [[-62, 40, -42], [0, 4, 0], 50],       // the rear-west corner
-      [[2, 28, -70], [0, 5, 0], 50],         // behind the building: the storeys landing
-      [[60, 22, -34], [2, 6, 0], 48],        // the east wing's end
-      [[70, 19, 30], [2, 9, 0], 45],         // round to the front right
+      [[-6, 92, 48], [0, 0, 6], 46],         // in the sky over the site, looking down
+      [[-30, 40, 36], [0, 2, 2], 50],        // dropping to the front left: the ground storey seen breaking through
+      [[-60, 20, 8], [0, 4, 0], 52],         // along the west wing, clear of its roof
+      [[-28, 17, -38], [0, 5.5, -2], 52],    // the rear corner, the storeys stacking
+      [[22, 21, -42], [2, 7, -2], 50],       // across the back, climbing with them
+      [[52, 20, 0], [4, 8.5, 0], 48],        // the east wing's end
+      [[58, 19, 50], [2, 11, 0], 45],        // round to the front right, pulling back
       [[42, 18, 80], [0, 13, 0], 43],        // the model's opening view (chapters[0])
     ];
     const eye = new T.CatmullRomCurve3(pts.map(p => V(p[0])), false, 'centripetal'), look = new T.CatmullRomCurve3(pts.map(p => V(p[1])), false, 'centripetal');
@@ -621,7 +631,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     // sampled once (arc-length lookups per frame cost a millisecond or two of a 16 ms frame); read by interpolation
     const N = 1200, E = eye.getSpacedPoints(N), Lk = look.getSpacedPoints(N), L = new T.Vector3();
     return (t, out) => {
-      const u = 1 - Math.pow(1 - clamp(t), 1.7); // brisk out of the sky, easing all the way into the overview
+      const u = 1 - Math.pow(1 - clamp(t), 1.3); // nearly even, a gentle settle at the end: the orbit spans the rise
       const k = u * N, i = Math.min(N - 1, Math.floor(k)), f = k - i;
       out.p.lerpVectors(E[i], E[i + 1], f); L.lerpVectors(Lk[i], Lk[i + 1], f);
       const d = L.sub(out.p); out.yaw = yawOf(d); out.pitch = pitchOf(d); out.fov = fovAt(u); out.outdoors = true; out.veil = 0;
@@ -660,7 +670,8 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   }
   // the vertical lens of a frame (rendered at snapshot.aspect) as the screen shows it, cover-fitted: a wider screen crops
   // the frame's top and bottom
-  const coverFov = f => { const W = view.w / view.h, A = snapshot.aspect; return W > A ? 2 * Math.atan(Math.tan(f * Math.PI / 360) * A / W) * 180 / Math.PI : f; };
+  // (and the backdrop's 4% overscan, story.js)
+  const coverFov = f => { const W = view.w / view.h, A = snapshot.aspect, t = Math.tan(f * Math.PI / 360) / 1.04; return 2 * Math.atan(W > A ? t * A / W : t) * 180 / Math.PI; };
 
   // ------------------------------------------------------------------ smooth scroll (Lenis), driven per frame from update()
   const lenis = new Lenis({ autoRaf: false, lerp: reduced ? 1 : .065, wheelMultiplier: .75, touchMultiplier: 1.2, syncTouch: false });

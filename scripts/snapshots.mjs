@@ -47,14 +47,14 @@ try {
   await sleep(5000); // the hour eases in, the wet ground dries
   const info = await ev(`JSON.stringify(__portrait.snapshot.setup({ w: ${w}, h: ${h} }))`);
   const { aspect, riseLength } = JSON.parse(info);
-  const plan = JSON.parse(await ev(`JSON.stringify(__portrait.snapshot.plan({ aspect: ${aspect}, spacing: .32, flightSeconds: ${riseLength + .6}, fps: 30 }))`));
+  const plan = JSON.parse(await ev(`JSON.stringify(__portrait.snapshot.plan({ aspect: ${aspect}, spacing: .16, flightSeconds: ${riseLength + .6}, fps: 30 }))`));
   writeFileSync(join(out, 'manifest.json'), JSON.stringify({ set, shape, w, h, aspect, fps: 30, flight: plan.flight, segments: plan.segments }));
   const [a, b] = range ? range.split('..').map(Number) : [0, plan.frames.length - 1];
   console.log(`${plan.frames.length} frames (flight ${plan.flight}); shooting ${a}..${b}`);
   const t0 = Date.now();
   for (let i = a; i <= Math.min(b, plan.frames.length - 1); i++) {
     const item = plan.frames[i];
-    const deep = item.fly >= 1; // every walk frame has depth: story.js re-projects the two frames either side to the pose between them
+    const deep = !!item.hold; // depth only where the page rests: the hand's 3D at a stop (walking frames are only re-aimed)
     if (existsSync(join(out, `${item.key}.webp`)) && (!deep || existsSync(join(out, `${item.key}.d.webp`)))) continue;
     const prev = plan.frames[i - 1], shadows = !prev || prev.fly < 1 || prev.first !== item.first;
     const [colour, depth] = JSON.parse(await ev(`JSON.stringify(__portrait.snapshot.shoot(${JSON.stringify(item)}, { quality: .74, shadows: ${shadows}, depth: ${deep}, moon: ${JSON.stringify(look.moon ?? null)} }))`));

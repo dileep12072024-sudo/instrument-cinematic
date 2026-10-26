@@ -711,11 +711,15 @@ function cullForCamera() {
 // real scene at the story's own camera poses, each with a depth image for the snapshot page's 3D parallax.
 let snapshotting = false;
 const snapshot = (() => {
-  let size = null, depthMaterial = null, faded = null;
-  // Outdoors the trees appear only as they cross the screen (owner, 2026-10-19, after Kage's foreground trees): a tree
-  // fragment's opacity follows its distance from the centre of the frame, almost nothing over the building, whole at
-  // the edges, so as the camera moves each tree sweeps in at the side instead of standing in front of the department.
-  const treeFade = { value: 0 }, frameSize = { value: new THREE.Vector2(1, 1) };
+  let size = null, depthMaterial = null, faded = null, building = null;
+  // Outdoors, where a tree stands in front of the department it becomes a shadow (owner, 2026-10-25, after Kage's dark
+  // foreground foliage): those parts of it are drawn dark and a little see-through, so the building reads through
+  // them; a tree beside the building, or in front of sky and lawn, is drawn as it is. Which parts: a pass before the
+  // frame draws the department alone into a log-depth image (uBuild); a tree fragment nearer than the building at its
+  // pixel (eight taps round it and its own, for a soft edge) is in the way. (A first take faded every tree near the
+  // middle of the frame, those flanking the building too; a second shaded by distance from the camera, which left
+  // the trees hiding the building at the hero untouched.)
+  const treeFade = { value: 0 }, buildDepth = { value: null }, frame = { value: new THREE.Vector2(1, 1) };
   const fadeTrees = on => {
     if (!faded) {
       const mats = new Set();
@@ -723,14 +727,22 @@ const snapshot = (() => {
       faded = [...mats].map(m => [m, m.transparent]);
       for (const [m] of faded) {
         const before = m.onBeforeCompile, key = m.customProgramCacheKey;
-        m.customProgramCacheKey = () => (key && key !== THREE.Material.prototype.customProgramCacheKey ? key.call(m) : '') + '|edge-fade';
+        m.customProgramCacheKey = () => (key && key !== THREE.Material.prototype.customProgramCacheKey ? key.call(m) : '') + '|tree-shade';
         m.onBeforeCompile = (sh, r) => {
           before?.call(m, sh, r);
-          Object.assign(sh.uniforms, { uTreeFade: treeFade, uFrame: frameSize });
-          sh.fragmentShader = 'uniform float uTreeFade; uniform vec2 uFrame;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `#include <opaque_fragment>
-            { vec2 q = gl_FragCoord.xy / uFrame - .5; q.x *= uFrame.x / uFrame.y;
-              float d = length(q) / length(vec2(.5 * uFrame.x / uFrame.y, .5)); // 0 at the centre, 1 in a corner
-              gl_FragColor.a *= mix(1., mix(.05, 1., smoothstep(.36, .8, d)), uTreeFade); }`);
+          Object.assign(sh.uniforms, { uTreeFade: treeFade, uBuild: buildDepth, uFrame: frame });
+          sh.fragmentShader = 'uniform float uTreeFade; uniform sampler2D uBuild; uniform vec2 uFrame;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `#include <opaque_fragment>
+            if (uTreeFade > .5) {
+              float zt = -vViewPosition.z, o = 0.; // this fragment's view depth; o: the share of taps where it hides the building
+              for (int i = 0; i < 9; i++) {
+                float a = float(i) * 2.0944, r = i == 0 ? 0. : (i < 5 ? 10. : 22.);
+                float v = texture2D(uBuild, (gl_FragCoord.xy + r * vec2(cos(a + float(i)), sin(a + float(i)))) / uFrame).r;
+                float zb = .3 * exp((1. - v) * 6.9078);
+                o += v > .004 && zt < zb - max(1., zb * .05) ? 1. : 0.;
+              }
+              o /= 9.;
+              gl_FragColor.rgb *= mix(1., .2, o); gl_FragColor.a *= mix(1., .6, o);
+            }`);
         };
         m.needsUpdate = true;
       }
@@ -740,7 +752,7 @@ const snapshot = (() => {
   };
   return {
     setup({ w, h }) {
-      snapshotting = true; size = { w, h }; frameSize.value.set(w, h);
+      snapshotting = true; size = { w, h };
       renderer.setPixelRatio(1); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
       controls.enabled = false;
       for (const o of portfolio.overlays()) o.visible = false;
@@ -748,6 +760,7 @@ const snapshot = (() => {
       depthMaterial = new THREE.MeshDepthMaterial({ side: THREE.DoubleSide });
       depthMaterial.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('gl_FragColor = vec4( vec3( 1.0 - fragCoordZ ), opacity );',
         '// view depth, log-scaled from 0.3 m (white) to 300 m (black)\n\t\tgl_FragColor = vec4( vec3( 1.0 - clamp( log( max( vHighPrecisionZW[ 1 ], 0.3 ) / 0.3 ) / log( 1000.0 ), 0.0, 1.0 ) ), 1.0 );'); };
+      building = new THREE.WebGLRenderTarget(w, h, { depthBuffer: true }); buildDepth.value = building.texture; frame.value.set(w, h);
       return { aspect: w / h, riseLength: RISE_LENGTH / RISE_RATE };
     },
     plan: opts => portfolio.renderPlan(opts),
@@ -759,6 +772,13 @@ const snapshot = (() => {
       portfolio.poseFor(item, size.w / size.h);
       if (moon) { const m = scene.getObjectByName('Photographic phased moon'); if (m) { m.position.copy(camera.position).addScaledVector(new THREE.Vector3(...moon.dir).normalize(), 240); m.lookAt(camera.position); m.scale.setScalar(moon.scale ?? 1); m.renderOrder = -1; } } // before the trees: a faded tree's depth would otherwise cut the moon into fragments
       landscape.updateTreeDetail(camera); cullForCamera();
+      if (item.outdoor) { // the department alone, as log depth: where the trees are in its way (fadeTrees)
+        const dept = scene.getObjectByName('Reference-built department'), hidden = scene.children.filter(o => o !== dept && o.visible);
+        const bg = scene.background, fog = scene.fog;
+        hidden.forEach(o => { o.visible = false; }); scene.background = new THREE.Color(0); scene.fog = null; scene.overrideMaterial = depthMaterial;
+        renderer.setRenderTarget(building); renderer.render(scene, camera); renderer.setRenderTarget(null);
+        scene.overrideMaterial = null; scene.background = bg; scene.fog = fog; hidden.forEach(o => { o.visible = true; });
+      }
       if (shadows || item.fly < 1) renderer.shadowMap.needsUpdate = true;
       renderer.render(scene, camera);
       const colour = renderer.domElement.toDataURL('image/webp', quality);

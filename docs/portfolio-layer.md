@@ -166,18 +166,31 @@ model loader is accepted there). Undo: `/campus/?live` still plays the story liv
 
 - `scripts/snapshots.mjs` drives Windows Chrome on the real GPU through `/campus/?live`: fixed date and hour (a clear
   afternoon, or the full moon of 26 October 2026 at night), the story's own camera poses (`portfolio.renderPlan`,
-  `poseFor`), every frame shot from the scene (`__portrait.snapshot`), each walk frame with a half-size depth image.
-  Four sets: day and night, landscape 1280x720 and portrait 720x1280; about 2,000 frames each, ~11 minutes each.
-- `scripts/snapshots-video.sh` encodes the arrival flight (30 fps) to `flight.mp4` (~4.5 MB, plays while it streams).
-- `src/story.js` (the front page): the flight video, then the walk scrubbed by the scroll (frames and depths fetched
-  nearest first in the direction of travel). The two frames either side of the camera are each re-projected through
-  their depth images to the camera's own pose and blended, so the walk moves continuously between frames a step apart
-  (a flat crossfade of two views flickered, owner 2026-10-25), and at a stop the hand-moved view keeps the live site's
-  3D parallax. Leaves, the cursor's motes, IST, the photos (genie, cloth) and the description cards
-  (cloth) are drawn live over the frames by the same `portfolio.js`. Day or night by the hour in Visakhapatnam.
-- Battery: the page draws only when something changes; ambient motion runs at 30 fps; cloth sheets come to rest a few
-  seconds after the hand leaves them; a page left alone draws nothing.
-- Trees outdoors appear only as they cross the screen (after Kage's foreground trees): their opacity follows their
-  distance from the frame's centre, clear over the building, whole at the edges.
+  `poseFor`), every frame shot from the scene (`__portrait.snapshot`); walk frames 16 cm of "cost" apart (metres, a
+  metre in front of the porch counting 0.4, plus 2.2 a radian of turn), a half-size depth image only at the stops.
+  Four sets: day and night, landscape 1280x720 and portrait 720x1280; about 3,700 frames each, ~13 minutes each.
+- `scripts/snapshots-video.sh` encodes the arrival flight (30 fps) to `flight.mp4` (~5 MB, plays while it streams).
+- `src/story.js` (the front page): the flight video, then the walk scrubbed by the scroll. Frames come through three
+  budgets (owner 2026-10-25: no flicker, no skips, no lag): bytes fetched and kept by two workers (`frame-worker.js`),
+  coarse to fine ahead of the camera, the next 24 frames first; decoded to raw pixels on the workers, ahead of the
+  camera by its speed; one or two raw-pixel uploads a tick (an ImageBitmap upload was ~10 ms on integrated graphics).
+  The walk into the hall, the heaviest (foliage), is fetched while the flight plays. On screen: the two frames either
+  side of the camera, each only re-aimed to the camera's heading (exact; depth warps stretched near things), and
+  crossfaded; resting on a stop, its frame warped per pixel through its depth as the hand moves (the 3D), dissolved in
+  over 0.6 s and out over 0.15 s; and where the picture would change at once (a frame in late), the previous one
+  dissolves out over 0.15 s. Tried and dropped: per-frame and plane depth warps (tore and stretched), walks as H.264
+  chunks through WebCodecs (hardware decoding stalled the GPU on integrated graphics; software could not keep up).
+  Leaves, the cursor's motes, IST, the photos (genie, cloth) and the description cards (cloth) are drawn live over the
+  frames by the same `portfolio.js`. Day or night by the hour in Visakhapatnam.
+- Battery: the page draws only when something changes (a frame uploaded out of reach is not a change); ambient motion
+  runs at 30 fps; cloth sheets rest a few seconds after the hand leaves them; twelve seconds after the last input the
+  loop stops altogether (CSS loops paused) until the next scroll, touch, key, pointer move or resize.
+- Outdoors, where a tree stands in front of the department it becomes a shadow (after Kage's dark foreground foliage):
+  a pass before each frame draws the department alone as depth, and a tree fragment nearer than the building there is
+  drawn dark and a little see-through; trees beside the building, or before sky and lawn, are as they are (owner,
+  2026-10-25). The moon is drawn before the trees, so a faded tree's depth never cuts it.
+- Tests (C:\Users\Dileep\AppData\Local\Temp\ic-gpu, Windows Chrome over CDP, on the live link): `story-e2e.mjs`
+  (every stop, flight, idle), `scroll-visual.mjs` (every drawn frame's thumbnail while a wheel, trackpad or thumb
+  scrolls: flicker, unexplained jumps, freezes), `scroll-probe.mjs` (frame times), `idle-cpu.mjs`, `pipe-probe.mjs`.
 - `public/frames/` is not in git (reproducible); `scripts/deploy-preview.sh` builds and deploys without the flight's
   source frames.
