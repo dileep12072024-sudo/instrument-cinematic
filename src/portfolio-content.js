@@ -78,12 +78,15 @@ export const chapters = [
   { id: 'classroom-iii', group: 'classrooms', nav: 'Classroom III', where: 'End of the classroom wing',
     route: [[-23.15, LOWER, 3.2], [-23.2, LOWER, 2.5], [-24.0, LOWER, 2.5]],
     eye: [-25.2, LOWER, 2.5], anchor: [-31.5, 3.6, -1.2], fov: 60 },
+  // inside, like the other classrooms (owner, 2026-10-26): through its door off the side passage (world x -24.4,
+  // z -6.73; the room spans x -24.5..-33.8, z -5.2..-14.8, its teaching wall at z -5.2) to the side aisle, looking
+  // across the benches to the teaching wall
   { id: 'classroom-iv', group: 'classrooms', nav: 'Classroom IV', where: 'Classroom wing, side passage',
-    route: [[-24.0, LOWER, 2.5], [-23.3, LOWER, 2.25], [-23.15, LOWER, 1.1], [-23.15, LOWER, -1.8]],
-    eye: [-23.15, LOWER, -4.3], anchor: [-24.2, 3.9, -6.73], fov: 56 },
+    route: [[-24.0, LOWER, 2.5], [-23.3, LOWER, 2.25], [-23.15, LOWER, 1.1], [-23.15, LOWER, -3.2], [-23.3, LOWER, -6.0], [-24.4, LOWER, -6.73], [-25.3, LOWER, -7.6]],
+    eye: [-25.6, LOWER, -10.4], anchor: [-30.5, 4.2, -6.2], fov: 62 },
   // the east corridor on the first floor: professors' rooms on the left, the labs at its end
   { id: 'fac-patnaik', group: 'faculty', nav: 'Prof. M. Ramesh Patnaik', where: 'East corridor, first floor', person: 'patnaik', sign: [9.92, 7.12, 1.35],
-    route: [[-23.15, LOWER, -1], [-23.2, LOWER, 1.4], [-22.7, LOWER, 2.25], [-21.64, LOWER, 2.17], [-20.7, CLASS, 2.17], [-12, CLASS, 2.2], [-4.62, CLASS, 1.9], [-3.98, LANDING, 1.82],
+    route: [[-25.3, LOWER, -7.6], [-24.4, LOWER, -6.73], [-23.3, LOWER, -6.0], [-23.15, LOWER, -1], [-23.2, LOWER, 1.4], [-22.7, LOWER, 2.25], [-21.64, LOWER, 2.17], [-20.7, CLASS, 2.17], [-12, CLASS, 2.2], [-4.62, CLASS, 1.9], [-3.98, LANDING, 1.82],
       [-2.4, LANDING, 1.85], [0, LANDING, 2.0], [2.6, LANDING, 2.1], [4.1, LANDING, 2.1], [4.9, EAST, 2.1]],
     eye: [6.9, EAST, 2.5], anchor: [9.55, 6.35, 1.25], fov: 54 },
   { id: 'fac-ysrao', group: 'faculty', nav: 'Prof. Y. Srinivasa Rao', where: 'East corridor, first floor', person: 'ysrao', sign: [12.52, 7.12, 1.35],

@@ -286,7 +286,8 @@ export function buildClassroomWing(parent, m) {
     windowEnd = x + windowWidth / 2;
   }
   box((windowEnd + end) / 2, classroom.lowerFloor + 1.82, SW, end - windowEnd, 1.48, .16, plaster);
-  for (const x of doors) door(x, classroom.lowerFloor, -20.28, .96, x === doors.at(-1) ? 'CLASS ROOM - IV' : '', x === doors.at(-1));
+  // Class IV's door stands open like II and III's (the story walks in through it, owner 2026-10-26)
+  for (const x of doors) door(x, classroom.lowerFloor, -20.28, .96, x === doors.at(-1) ? 'CLASS ROOM - IV' : '', x === doors.at(-1), x === doors.at(-1) ? { open: -Math.PI * .48 } : {});
   // Wall telephones by the classroom doors (130612 at 40-56 and 113-116 s): a steel cradle box with a black handset, its
   // coiled cord hanging below, fed by a wire from a small white socket box. (x, y, z) is the wall face, ry turns +z out.
   function wallPhone(x, y, z, ry) {

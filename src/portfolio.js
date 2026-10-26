@@ -567,7 +567,8 @@ function createLeaves(scene) {
 }
 
 // ---------------------------------------------------------------------------------------------------- the layer
-// snapshot: { aspect, swayGate(k) } when the story is shown as pre-rendered frames (story.js): the poses are the frames'
+// snapshot: { aspect, swayGate(k), reach(k, prog), rate(k, dir), ready(stop) } when the story is shown as pre-rendered
+// frames (story.js); reach and rate keep the camera on frames that are in. The poses are the frames'
 // own (their aspect), the overlay camera's lens matches the frame as it is cropped to the screen, and the hand-held sway
 // is held to the stops whose depth image is in (swayGate). flightClock: the flight's 0..1 from the frames' video.
 export function createPortfolio({ scene, camera, renderer, reduced, onEnter, changed, snapshot = null, flightClock = null }) {
@@ -603,7 +604,11 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   }
   function progressFor(y) {
     for (let i = 0; i < holds.length; i++) {
-      if (y <= holds[i][1]) return y >= holds[i][0] || i === 0 ? i : i - 1 + (y - holds[i - 1][1]) / Math.max(1, holds[i][0] - holds[i - 1][1]);
+      if (y <= holds[i][1]) {
+        if (y >= holds[i][0] || i === 0) return i;
+        const k = i - 1 + (y - holds[i - 1][1]) / Math.max(1, holds[i][0] - holds[i - 1][1]);
+        return Math.abs(k - Math.round(k)) < .002 ? Math.round(k) : k; // a pixel off a stop is on it (a resize left 9.9991)
+      }
     }
     return holds.length - 1;
   }
@@ -677,7 +682,20 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   const lenis = new Lenis({ autoRaf: false, lerp: reduced ? 1 : .065, wheelMultiplier: .75, touchMultiplier: 1.2, syncTouch: false });
   let scrollY = 0;
   lenis.on('scroll', () => { scrollY = lenis.animatedScroll; rig.prog = progressFor(scrollY); });
-  const goTo = i => { const y = scrollFor(i), d = Math.abs(y - scrollY) / innerHeight; lenis.scrollTo(y, { duration: reduced ? 0 : clamp(1.2 + d * .22, 1.2, 4.2), easing: x => x < .5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2, force: true }); };
+  // A jump from the menu: to a near stop the camera walks there; further (over pre-rendered frames, which a long fast
+  // walk would outrun) the view fades through the veil, the page lands on the stop, and the view comes back up there.
+  let leap = null;
+  const goTo = i => {
+    const y = scrollFor(i), d = Math.abs(y - scrollY) / innerHeight;
+    if (snapshot && !reduced && Math.abs(i - rig.smooth) > 1.5) { leap = { to: i, y, veil: 0, phase: 'out' }; return; }
+    lenis.scrollTo(y, { duration: reduced ? 0 : clamp(1.2 + d * .22, 1.2, 4.2), easing: x => x < .5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2, force: true });
+  };
+  function leapStep(dt) {
+    if (!leap) return;
+    if (leap.phase === 'out') { leap.veil = Math.min(1, leap.veil + dt / .32); if (leap.veil >= 1) { lenis.scrollTo(leap.y, { immediate: true, force: true }); rig.prog = progressFor(leap.y); rig.smooth = rig.prog; leap.phase = 'land'; } }
+    else if (leap.phase === 'land') { if (snapshot.ready(Math.round(rig.smooth))) leap.phase = 'in'; } // the stop's frame up first
+    else { leap.veil = Math.max(0, leap.veil - dt / .45); if (leap.veil <= 0) leap = null; }
+  }
   function relayout() { build(); measure(); rig.prog = progressFor(scrollY); wisps?.resize(); plates?.invalidate(); }
   addEventListener('resize', relayout);
   new ResizeObserver(() => { measure(); rig.prog = progressFor(scrollY); plates?.invalidate(); }).observe($('.pf-doc')); // opening a <details> moves the holds
@@ -866,12 +884,20 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       const now = performance.now(); lenis.raf(now); last = now;
       const before = rig.smooth;
       if (flightOn) { rig.fly = clamp(flightClock()); if (rig.fly >= 1) flightOn = false; }
-      rig.smooth = reduced ? rig.prog : T.MathUtils.damp(rig.smooth, rig.prog, 5.2, dt);
+      // the camera follows the scroll; over pre-rendered frames it never outruns them (owner 2026-10-26: flicker and
+      // skipped frames when the scroll sped up or slowed down): it goes no further than the frames on the GPU reach,
+      // and no faster than they can come, so a quick flick is a glide that catches up, never a freeze or a jump
+      let target = rig.prog;
+      if (snapshot && !reduced && !leap) { const r = snapshot.reach(rig.smooth, rig.prog); target = clamp(target, r.lo, r.hi); }
+      let next = reduced ? target : T.MathUtils.damp(rig.smooth, target, 5.2, dt);
+      if (snapshot && !reduced && !leap) { const max = snapshot.rate(rig.smooth, Math.sign(target - rig.smooth)) * dt; next = rig.smooth + clamp(next - rig.smooth, -max, max); }
+      rig.smooth = clamp(next, 0, chapters.length - 1); // never before the start or past the end (a scroll during the flight left it at -0.002)
       if (Math.abs(rig.smooth - rig.prog) < 1e-4) rig.smooth = rig.prog;
+      leapStep(dt);
       rig.mx = T.MathUtils.damp(rig.mx, reduced ? 0 : rig.tmx, 2.6, dt); rig.my = T.MathUtils.damp(rig.my, reduced ? 0 : rig.tmy, 2.6, dt);
       apply();
       chrome(); heroExit();
-      $('.pf-veil').style.opacity = pose.veil.toFixed(3);
+      $('.pf-veil').style.opacity = Math.max(pose.veil, leap ? leap.veil : 0).toFixed(3);
       // the copy column's wash: full while a chapter is read indoors, lighter outdoors and on the walk
       const hold = 1 - Math.min(1, Math.abs(rig.smooth - Math.round(rig.smooth)) * 4);
       $('.pf-scrim').style.opacity = ((pose.outdoors ? .4 : .6) * (.45 + .55 * hold)).toFixed(3); // lighter: each description sits on its own card
@@ -907,7 +933,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     get flying() { return rig.fly < 1; },
     get fly() { return rig.fly; },
     // anything moving because of the visitor or the story (not the ambient leaves and cloth): drawn at full rate
-    get busy() { return rig.fly < 1 || Math.abs(rig.smooth - rig.prog) > 1e-4 || lenis.isScrolling; },
+    get busy() { return rig.fly < 1 || Math.abs(rig.smooth - rig.prog) > 1e-4 || lenis.isScrolling || !!leap; },
     get sway() { return sway; },
     get pose() { return pose; },
     // the pose a frame at scroll position k was shot from (story.js re-projects the frames to the pose between them)

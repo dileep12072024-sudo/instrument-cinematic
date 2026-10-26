@@ -46,7 +46,7 @@ const stats = { ticks: 0, exact: 0, gap: 0, none: 0 }; // for the test scripts: 
 // the workers (frame-worker.js) fetch, keep and decode the frames; here only what they hold is tracked
 // two of them, each fetching and decoding its own half of the frames (odd and even), on separate cores
 const workers = [0, 1].map(() => new Worker(new URL('./frame-worker.js', import.meta.url), { type: 'module' })), waiting = new Map();
-const workerOf = key => workers[+key.slice(-3) % 2];
+const workerOf = key => { const w = workers[+key.slice(-3) % 2]; if (!w) throw new Error(`no frame '${key}'`); return w; };
 const onmessage = ({ data }) => {
   const k = data.fetched ?? data.failed;
   if (k) { if (data.fetched) have.add(k); fetching.get(k)?.done(!!data.fetched); fetching.delete(k); trimBytes(); return; }
@@ -126,7 +126,9 @@ function schedule(i, jf, dir) {
   pace += (Math.min(200, Math.abs(g - paceJ) * 1000 / dt) - pace) * Math.min(1, dt / 250); paceAt = now; paceJ = g;
   // decoded where the camera will be by the time a frame is ready (~0.15 s at its speed), not where it is: in a quick
   // scroll every frame decoded at the camera's position was already behind it when it arrived, and was thrown away
-  const lead = Math.min(24, pace * .15), list = wanted(i, jf + dir * lead, dir, pace > 24 ? 2 : 1);
+  // every frame, in order (the camera waits for them, portfolio.js; taking every 2nd in a quick scroll crossfaded
+  // frames 0.8 m apart outdoors and toggled with the finer ones: a flicker)
+  const lead = Math.min(24, pace * .15), list = wanted(i, jf + dir * lead, dir, 1);
   for (const k of [keyOf(i, Math.floor(jf)), keyOf(i, Math.min(n - 1, Math.ceil(jf)))].reverse()) if (!list.includes(k)) list.unshift(k); // and the pair on screen now
   // bytes: up to twelve frames in flight, the next stretch first: what lies within 24 frames may use every slot, the
   // walk further ahead only spare ones (when all slots went to far frames, the near ones queued behind them and a
@@ -159,6 +161,7 @@ async function prefetchHolds() { for (let c = 0; c < stops; c++) await fetchFram
 
 // (i, jf): which walk and where in it, for scroll position k (stops); a stop is its walk's last frame
 function locate(k) {
+  k = Math.min(stops - 1, Math.max(0, k)); // never past the last stop (24.0001 asked for a walk 25)
   const c = Math.floor(k), f = k - c;
   if (f < 1e-4) return c === 0 ? [1, 0] : [c, counts[c] - 1];
   return [c + 1, f * (counts[c + 1] - 1)];
@@ -222,12 +225,16 @@ const back = new T.ShaderMaterial({
 });
 // the arrival's video on its own plain program: none of the walk's re-projection runs while it plays
 const flat = new T.ShaderMaterial({
-  uniforms: { tV: { value: tV }, uScale: back.uniforms.uScale },
+  uniforms: { tV: { value: tV }, uScale: back.uniforms.uScale, uAlpha: { value: 1 } },
   vertexShader: back.vertexShader,
-  fragmentShader: `uniform sampler2D tV; uniform vec2 uScale; varying vec2 vUv; ${grain} void main() { gl_FragColor = vec4(grain(texture2D(tV, .5 + (vUv - .5) * uScale).rgb), 1.); }`,
-  depthTest: false, depthWrite: false, toneMapped: false,
+  fragmentShader: `uniform sampler2D tV; uniform vec2 uScale; uniform float uAlpha; varying vec2 vUv; ${grain} void main() { gl_FragColor = vec4(grain(texture2D(tV, .5 + (vUv - .5) * uScale).rgb), uAlpha); }`,
+  depthTest: false, depthWrite: false, toneMapped: false, transparent: true,
 });
 const backScene = new T.Scene(), backCam = new T.Camera(), quad = new T.Mesh(new T.PlaneGeometry(2, 2), back); quad.frustumCulled = false; backScene.add(quad);
+// the flight's last video frame, dissolved over the hero's still for 0.45 s when the flight ends (the two differ a
+// little in compression and colour: switching at once was a visible step)
+const videoQuad = new T.Mesh(quad.geometry, flat); videoQuad.frustumCulled = false; videoQuad.renderOrder = 1; videoQuad.visible = false; backScene.add(videoQuad);
+let flightEnd = 0;
 function cover() { const W = innerWidth / innerHeight; back.uniforms.uScale.value.set(W > A ? 1 : W / A, W > A ? A / W : 1); }
 cover();
 
@@ -244,7 +251,8 @@ function frameCam(cam, q, vp, pos, fwd) {
   const m = cam.matrixWorld.elements; fwd.set(-m[8], -m[9], -m[10]);
 }
 
-let shownW = new Map(), shownPose = new Map(), prevKey = '', prevPose = 0, cutAt = performance.now(); // the dissolve over cuts
+let shownAt = null, camAt = 0, shownKey = '', shownPoseK = 0, prevKey = '', prevPose = 0, cutAt = performance.now(); // the dissolve over cuts
+const firstOf = counts.map((n, i) => counts.slice(1, i).reduce((a, c) => a + c, 0)); // each walk's first frame, counted along the story
 let lastView = '', travel = 1, lastK = 0, begun = false; const here = { i: 1, jf: 0 }; // here: the camera's walk and frame // begun: the flight has started (until then the video has the network)
 // what the backdrop shows this frame; true if it changed
 function backdrop() {
@@ -253,7 +261,13 @@ function backdrop() {
     quad.material = flat; lastView = '';
     return true; // a new video frame, every frame
   }
-  if (quad.material === flat) { quad.material = back; lastView = ''; }
+  if (quad.material === flat) { quad.material = back; lastView = ''; flightEnd = performance.now(); videoQuad.visible = true; }
+  if (videoQuad.visible) { // the handoff from the video
+    const t = (performance.now() - flightEnd) / 450;
+    flat.uniforms.uAlpha.value = 1 - t * t * (3 - 2 * t);
+    if (t >= 1) { videoQuad.visible = false; flat.uniforms.uAlpha.value = 1; }
+    fresh = true;
+  }
   const k = portfolio.progress; if (Math.abs(k - lastK) > 1e-5) travel = Math.sign(k - lastK); lastK = k;
   const [i, jf] = locate(k), n = counts[i];
   here.i = i; here.jf = jf;
@@ -268,14 +282,15 @@ function backdrop() {
   if (j0 < 0) j0 = j1; if (j1 < 0) j1 = j0;
   stats.ticks++; if (j0 === Math.floor(jf) && j1 === Math.ceil(jf)) stats.exact++; stats.gap += j1 - j0;
   const kA = keyAt(j0), kB = keyAt(j1), fa = gpu.get(kA), fb = gpu.get(kB);
-  // a cut? the frames' weights on screen against last tick's: smooth scrolling moves a few percent a tick; more than
-  // a third at once is a frame arriving late or a catch-up, and the last picture's main frame dissolves out over it
+  // a cut? where along the walk the picture shows (its frames' positions, weighted) against where it showed last tick,
+  // less the camera's own movement: more than a frame and a half that the camera did not move is a catch-up (frames
+  // came in late), and the last picture's main frame dissolves out over it. (Weighing the frames themselves took a
+  // finer frame arriving between two coarse ones for a cut: a dissolve at every slow-down, which flickered.)
   const now = performance.now(), dtc = Math.min(.1, (now - cutAt) / 1000); cutAt = now;
-  const mixNow = j1 === j0 ? 0 : Math.min(1, Math.max(0, (jf - j0) / (j1 - j0))), weights = new Map([[kA, 1 - mixNow]]); weights.set(kB, (weights.get(kB) || 0) + mixNow);
-  let jumpBy = 0; for (const key of new Set([...weights.keys(), ...shownW.keys()])) jumpBy += Math.abs((weights.get(key) || 0) - (shownW.get(key) || 0));
-  if (jumpBy > .66 && shownW.size) { const [pk] = [...shownW].sort((a, b) => b[1] - a[1])[0]; if (gpu.has(pk)) { prevKey = pk; prevPose = shownPose.get(pk); u.uPrev.value = 1; } }
+  const mixNow = j1 === j0 ? 0 : Math.min(1, Math.max(0, (jf - j0) / (j1 - j0))), at = firstOf[i] + j0 + (j1 - j0) * mixNow, cam = firstOf[i] + jf;
+  if (shownAt !== null && Math.abs((at - shownAt) - (cam - camAt)) > 1.5 && gpu.has(shownKey)) { prevKey = shownKey; prevPose = shownPoseK; u.uPrev.value = 1; stats.cuts = (stats.cuts || 0) + 1; }
   else if (u.uPrev.value > 0) u.uPrev.value = Math.max(0, u.uPrev.value - dtc / .15);
-  shownW = weights; shownPose = new Map([[kA, i - 1 + j0 / (n - 1)], [kB, i - 1 + j1 / (n - 1)]]);
+  shownAt = at; camAt = cam; shownKey = mixNow < .5 ? kA : kB; shownPoseK = i - 1 + (mixNow < .5 ? j0 : j1) / (n - 1);
   if (!gpu.has(prevKey)) u.uPrev.value = 0;
   // the stop's layer (the hand's 3D), while it is dissolved in at all
   const c = Math.round(k), stop = gpu.get(holdOf(c)), held = hand > 0 && stop?.d ? hand * hand * (3 - 2 * hand) : 0;
@@ -311,14 +326,34 @@ function backdrop() {
 // on, with the stop's layer dissolving in and out with it (backdrop): switching to the stop's frame at one instant,
 // or from it, was a visible cut.
 let hand = 0, handT = performance.now();
+// How far the camera may go (portfolio.js update): along the frames on the GPU from where it is, in the scroll's
+// direction, while they come at most two apart; and how fast: frames a second the pipeline sustains (the foliage
+// walks outdoors are the heaviest bytes). Frame 0 of a walk is the stop before it.
+const onGpu = (i, j) => gpu.has(keyOf(i, j)) || (j === 0 && i > 1 && gpu.has(keyOf(i - 1, counts[i - 1] - 1)));
+const posOf = (i, j) => i - 1 + j / (counts[i] - 1);
+function reach(k, prog) {
+  const dir = Math.sign(prog - k); if (!dir) return { lo: k, hi: k };
+  let [i, jf] = locate(k), j = dir > 0 ? Math.floor(jf + 1e-6) + 1 : Math.ceil(jf - 1e-6) - 1, best = k, gap = 0;
+  for (let step = 0; step < 48; step++) {
+    // a stop is crossed only on its own frame: the frames past it cannot stand in for it on screen (the camera
+    // skipped the hall's frame once, and it popped in late)
+    if (j > counts[i] - 1) { if (i + 1 >= stops || !onGpu(i, counts[i] - 1)) break; i++; j = 1; }
+    if (j < 0) { if (i - 1 < 1 || !onGpu(i, 0)) break; i--; j = counts[i] - 2; }
+    if (onGpu(i, j)) { best = posOf(i, j); gap = 0; } else if (++gap > 2) break;
+    j += dir;
+  }
+  return dir > 0 ? { lo: -1e9, hi: Math.max(k, best) } : { lo: Math.min(k, best), hi: 1e9 };
+}
+const rate = (k, dir) => { const i = Math.min(stops - 1, Math.max(1, dir >= 0 ? Math.floor(k + 1e-6) + 1 : Math.ceil(k - 1e-6))); return (i === 1 || i >= stops - 2 ? 45 : 90) / (counts[i] - 1); };
+const stopReady = c => gpu.has(holdOf(c));
 const swayGate = k => {
-  const now = performance.now(), dt = Math.min(.1, (now - handT) / 1000); handT = now;
+  const now = performance.now(), dt = Math.min(1 / 30, (now - handT) / 1000); handT = now; // a wake after a sleep is one step, not a leap
   const c = Math.round(k), on = Math.abs(k - c) < 1e-5 && !!gpu.get(holdOf(c))?.d; // exactly on it: the page has come to rest
   hand = on ? Math.min(1, hand + dt / .6) : Math.max(0, hand - dt / .15);
   return hand * hand * (3 - 2 * hand);
 };
 const portfolio = createPortfolio({
-  scene, camera, renderer, reduced, changed: () => {}, snapshot: { aspect: A, swayGate },
+  scene, camera, renderer, reduced, changed: () => {}, snapshot: { aspect: A, swayGate, reach, rate, ready: stopReady },
   flightClock: () => video.duration ? video.currentTime / video.duration : 0,
   onEnter: way => { location.href = `/campus/?${way}`; },
 });
@@ -350,11 +385,11 @@ else if (video.readyState >= 3) start();
 else { video.addEventListener('canplay', start, { once: true }); video.load(); setTimeout(() => { if (portfolio.fly >= 1 && video.paused) start(); }, 6000); }
 
 // ---------------------------------------------------------------------------------------------------- the loop
-// Drawn only when something changed. Ambient motion (leaves, cloth, IST's drift) runs at 30 frames a second; scrolling,
-// the flight and the hand at 60. Battery (owner, 2026-10-25): twelve seconds after the visitor's last input, with the
+// Drawn only when something changed: scrolling, the flight and the hand at the display's rate (up to 120 a second),
+// ambient motion (leaves, cloth, IST's drift) at about 30. Battery (owner, 2026-10-25): twelve seconds after the visitor's last input, with the
 // story at rest, the loop itself stops (ambient motion freezes where it is, nothing runs at all) until the next
 // scroll, touch, key, pointer move or resize.
-let last = performance.now(), odd = false, handAt = 0, inputAt = performance.now(), storyAt = 0, asleep = false; // storyAt: when the story itself last moved
+let last = performance.now(), drawnAt = 0, handAt = 0, inputAt = performance.now(), storyAt = 0, asleep = false; // storyAt: when the story itself last moved
 addEventListener('pointermove', () => { handAt = performance.now(); }, { passive: true });
 // one bad frame is reported and skipped, never allowed to stop the loop (the page would freeze)
 function frame(now) { try { tick(now); } catch (e) { console.error(e); } }
@@ -365,8 +400,12 @@ function tick(now) {
   const busy = portfolio.busy || now - handAt < 400;
   if (busy || changed) storyAt = now;
   if (begun && now - Math.max(inputAt, storyAt) > 12000) { asleep = true; renderer.setAnimationLoop(null); document.documentElement.classList.add('story-asleep'); return; }
-  if (!moving && !changed && !busy) return;
-  odd = !odd; if (!busy && !changed && odd) return;
+  if (!moving && !changed && !busy) return; // nothing changed: nothing drawn (0 Hz at rest)
+  // drawn at the display's own rate while anything is moving (60, 90, 120 Hz...), at most 120 a second on faster
+  // screens; ambient motion alone (leaves, cloth, IST) at about 30. All motion is timed, so any rate is smooth.
+  const since = now - drawnAt;
+  if (since < 1000 / 120 - 1 || (!busy && !changed && since < 1000 / 30 - 2)) return;
+  drawnAt = now;
   renderer.clear(); renderer.render(backScene, backCam); renderer.render(scene, camera); portfolio.afterRender();
 }
 const wake = () => { inputAt = performance.now(); if (asleep) { asleep = false; last = performance.now(); document.documentElement.classList.remove('story-asleep'); renderer.setAnimationLoop(frame); } };

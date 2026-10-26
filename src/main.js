@@ -712,9 +712,10 @@ function cullForCamera() {
 let snapshotting = false;
 const snapshot = (() => {
   let size = null, depthMaterial = null, faded = null, building = null;
-  // Outdoors, where a tree stands in front of the department it becomes a shadow (owner, 2026-10-25, after Kage's dark
-  // foreground foliage): those parts of it are drawn dark and a little see-through, so the building reads through
-  // them; a tree beside the building, or in front of sky and lawn, is drawn as it is. Which parts: a pass before the
+  // Outdoors, where a tree near the camera stands in front of the department it becomes a shadow (owner, 2026-10-25/26,
+  // after Kage's dark foreground foliage): those parts of it are drawn dark and a little see-through, still plainly a
+  // tree; a far tree, or one beside the building or before sky and lawn, is drawn as it is (owner: "those trees are
+  // becoming invisible unnecessarily"). Which parts: a pass before the
   // frame draws the department alone into a log-depth image (uBuild); a tree fragment nearer than the building at its
   // pixel (eight taps round it and its own, for a soft edge) is in the way. (A first take faded every tree near the
   // middle of the frame, those flanking the building too; a second shaded by distance from the camera, which left
@@ -740,8 +741,8 @@ const snapshot = (() => {
                 float zb = .3 * exp((1. - v) * 6.9078);
                 o += v > .004 && zt < zb - max(1., zb * .05) ? 1. : 0.;
               }
-              o /= 9.;
-              gl_FragColor.rgb *= mix(1., .2, o); gl_FragColor.a *= mix(1., .6, o);
+              o = o / 9. * (1. - smoothstep(14., 32., zt)); // only near the camera: a far tree in front of the building is as it is
+              gl_FragColor.rgb *= mix(1., .32, o); gl_FragColor.a *= mix(1., .8, o); // a dark silhouette, still plainly a tree
             }`);
         };
         m.needsUpdate = true;
