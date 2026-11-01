@@ -23,7 +23,8 @@ export const chapters = [
   { id: 'heritage', group: 'heritage', nav: 'Heritage', where: 'Entrance hall, ground floor',
     // through the doorway on the centre line and a step into the hall before turning to the boards: the open right
     // leaf reaches z 5.5 (architecture.js), and turning beside it filled the view with the door
-    route: [[30, 13, 64], [14, 7, 46], [3, 3.8, 36], [0, 3.1, 33], [0, 2.15, 21], [0, HALL, 12.6], [0, HALL, 8.6], [0, HALL, 6.4], [0, HALL, 5.1]],
+    // (11, 6.5, 46): clear of the jacaranda's crown, which the flight grazed at (14, 7, 46) (E2E 2026-11-01; leaves 1.5 m off, not 0.2)
+    route: [[30, 13, 64], [11, 6.5, 46], [3, 3.8, 36], [0, 3.1, 33], [0, 2.15, 21], [0, HALL, 12.6], [0, HALL, 8.6], [0, HALL, 6.4], [0, HALL, 5.1]],
     eye: [.3, HALL, 4.35], anchor: [3.72, 2.55, 5.12], fov: 56 },
   { id: 'admissions', group: 'admissions', nav: 'Admissions', where: 'Department office, west corridor',
     route: [[.1, HALL, 3.4], [-2.6, HALL, 2.2], [-4.7, CORRIDOR, 2.17], [-10, CORRIDOR, 2.2], [-16.2, CORRIDOR, 2.3]],
@@ -44,18 +45,23 @@ export const chapters = [
     route: [[-23.15, WING, 9.5], [-23.15, WING, 5.5], [-23.05, WING, 2.6], [-23.0, WING, 1.4]],
     eye: [-23.0, WING, .7], anchor: [-24.3, .85, -.95], fov: 56 },
   { id: 'lab-control', group: 'labs', nav: 'Control Systems Laboratory', where: 'West wing, ground floor',
-    route: [[-23.0, WING, -.2]],
-    eye: [-23.0, WING, -1.1], anchor: [-24.3, .85, -2.75], fov: 56 },
+    route: [[-23.0, WING, -1.6], [-23.0, WING, -3.3]],
+    eye: [-23.0, WING, -4.55], anchor: [-24.3, .85, -6.2], fov: 56 }, // its door past the windows (owner, 2026-10-26)
   { id: 'lab-machines', group: 'labs', nav: 'Machines Lab', where: 'West wing, ground floor',
-    route: [[-23.0, WING, -3.0], [-23.0, WING, -4.8]],
+    route: [[-23.0, WING, -5.2]],
     eye: [-23.0, WING, -5.9], anchor: [-24.3, .85, -7.7], fov: 56 },
   { id: 'lab-simulation', group: 'labs', nav: 'Simulation Lab', where: 'East corridor, ground floor',
     route: [[-23.0, WING, -3.6], [-23.15, WING, 1.1], [-22.55, WING, 2.3], [-21.3, CORRIDOR, 2.17], [-16, CORRIDOR, 2.2], [-10, CORRIDOR, 2.2], [-4.7, CORRIDOR, 2.17],
       [-2.6, HALL, 2.2], [0, HALL, 2.8], [2.6, HALL, 2.3], [3.65, HALL, 2.167], [4.7, GROUND_E, 2.167]],
     eye: [7.4, GROUND_E, 2.55], anchor: [5.45, 1.75, 1.1], fov: 56 },
+  // the Seminar Hall passage runs both ways from the corridor: Electronics Lab II at its north end, by the folding gate
+  // (spine-interior.js), seen first; then the walk turns about for the Measurements Lab at the rear (owner, 2026-11-01)
+  { id: 'lab-electronics', group: 'labs', nav: 'Electronics Lab II', where: 'North end of the Seminar Hall passage',
+    route: [[10, GROUND_E, 2.2], [16, GROUND_E, 2.2], [21.6, GROUND_E, 2.2], [23.25, GROUND_E, 2.7]],
+    eye: [23.25, GROUND_E, 3.6], anchor: [23.25, 2.0, 7.85], fov: 56 },
   // at the rear end of the Seminar Hall passage (the door the model's sign called the Strong Room; owner, 2026-10-25)
   { id: 'lab-measurements', group: 'labs', nav: 'Measurements Lab', where: 'Rear of the Seminar Hall passage',
-    route: [[10, GROUND_E, 2.2], [16, GROUND_E, 2.2], [21.6, GROUND_E, 2.2], [23.25, GROUND_E, 1.4], [23.25, GROUND_E, -2.6]],
+    route: [[23.25, GROUND_E, 2.6], [23.25, GROUND_E, 1.4], [23.25, GROUND_E, -2.6]],
     eye: [23.25, GROUND_E, -6.4], anchor: [23.37, 1.8, -11.2], fov: 56 },
   { id: 'guide', group: 'guide', nav: 'Finding your way', where: 'Library, first-floor landing',
     route: [[23.25, GROUND_E, -2.6], [23.2, GROUND_E, 1.6], [21, GROUND_E, 2.2], [12, GROUND_E, 2.2], [4.7, GROUND_E, 2.167], [3.65, HALL, 2.167], [2.67, HALL, 2.1],
@@ -92,8 +98,12 @@ export const chapters = [
   { id: 'fac-ysrao', group: 'faculty', nav: 'Prof. Y. Srinivasa Rao', where: 'East corridor, first floor', person: 'ysrao', sign: [12.52, 7.12, 1.35],
     route: [[8.4, EAST, 2.3]],
     eye: [9.7, EAST, 2.5], anchor: [12.15, 6.35, 1.25], fov: 54 },
+  // the plain door between them (owner, 2026-10-26: his room)
+  { id: 'fac-kotireddy', group: 'faculty', nav: 'Prof. D. V. Rama Koti Reddy', where: 'East corridor, first floor', person: 'kotireddy', sign: [14.62, 7.12, 1.35],
+    route: [[10.75, EAST, 2.3]],
+    eye: [11.8, EAST, 2.5], anchor: [14.25, 6.35, 1.25], fov: 54 },
   { id: 'fac-bhujanga', group: 'faculty', nav: 'Prof. A. Bhujanga Rao', where: 'East corridor, first floor', person: 'bhujanga', sign: [17.02, 7.12, 1.35],
-    route: [[11.6, EAST, 2.3]],
+    route: [[13.0, EAST, 2.3]],
     eye: [14.2, EAST, 2.5], anchor: [16.65, 6.35, 1.25], fov: 54 },
   { id: 'lab-devicefab', group: 'labs', nav: 'Device Fab Lab', where: 'East wing, first floor',
     route: [[17.6, EAST, 2.3]],
@@ -101,7 +111,7 @@ export const chapters = [
   { id: 'lab-biomedical', group: 'labs', nav: 'Biomedical Instrumentation Lab', where: 'East wing, first floor',
     route: [[21.6, EAST, 2.1], [22.85, EAST, 2.0], [23.27, EAST, .5], [23.27, EAST, -3.5]],
     eye: [23.27, EAST, -7.4], anchor: [23.27, 5.75, -11.2], fov: 54 },
-  { id: 'enter', group: 'enter', nav: 'Step inside', where: 'Over the north campus', outdoors: true,
+  { id: 'enter', group: 'enter', nav: 'Overview', where: 'Over the north campus', outdoors: true,
     route: [[23.27, EAST, -3.5], [23.0, EAST, 1.2], [21.4, EAST, 2.4], [20.4, EAST, 4.4], [19.8, 12.8, 6.2], [12, 15.6, 15], [4, 16.5, 34]],
     eye: [0, 15, 62], anchor: [0, 6.5, 0], fov: 40, frame: 'centre', through: [2.95, 6.4] }, // the front wall and the tree crowns before it, z from..to: crossed under a veil
   { id: 'foot', group: 'enter', nav: '', where: '', outdoors: true,
@@ -110,19 +120,20 @@ export const chapters = [
 ];
 
 // The people. Rooms, degrees and posts are from the door signs in the building; areas from the department's page; the
-// Ph.D years from the hall board of Ph.D awardees; the years as head from the board of successive heads.
+// Ph.D. years from the hall board of Ph.D. awardees; the years as head from the board of successive heads.
 export const people = {
-  swapna: { name: 'Dr. P. Swapna', role: 'Professor and Head of the Department', degrees: 'M.Tech, Ph.D (Andhra University, 2015)', area: 'Industrial process instrumentation', photo: '/media/faculty/swapna.webp',
+  swapna: { name: 'Dr. P. Swapna', role: 'Professor and Head of the Department', degrees: 'M.Tech, Ph.D. (Andhra University, 2015)', area: 'Industrial process instrumentation', photo: '/media/faculty/swapna.webp',
     note: 'Dr. Swapna heads the department and oversees its undergraduate, postgraduate and doctoral programmes. Academic matters are addressed to her office; admissions, certificates and fees are handled by the department office.' },
-  daisy: { name: 'Dr. A. Daisy Rani', role: 'Associate Professor', degrees: 'Ph.D (Andhra University, 2015)', area: 'MEMS and NEMS', photo: '/media/faculty/daisy-rani.webp',
+  daisy: { name: 'Dr. A. Daisy Rani', role: 'Associate Professor', degrees: 'Ph.D. (Andhra University, 2015)', area: 'MEMS and NEMS', photo: '/media/faculty/daisy-rani.webp',
     note: 'Her teaching and research are in micro- and nano-electromechanical systems, one of the department’s principal research areas.' },
-  kamala: { name: 'Dr. A. Kamala Kumari', role: 'Associate Professor', degrees: 'M.Tech, Ph.D (Andhra University, 2015)', area: 'Digital systems and computer electronics', photo: '/media/faculty/kamala-kumari.webp',
+  kamala: { name: 'Dr. A. Kamala Kumari', role: 'Associate Professor', degrees: 'M.Tech, Ph.D. (Andhra University, 2015)', area: 'Digital systems and computer electronics', photo: '/media/faculty/kamala-kumari.webp',
     note: 'Her teaching and research are in digital systems and computer electronics. She served as Head of the Department from 2022.' },
-  patnaik: { name: 'Prof. M. Ramesh Patnaik', role: 'Professor', degrees: 'M.Tech, Ph.D (Andhra University, 2011), F.I.E', area: 'Industrial process instrumentation', photo: '/media/faculty/ramesh-patnaik.webp',
+  patnaik: { name: 'Prof. M. Ramesh Patnaik', role: 'Professor', degrees: 'M.Tech, Ph.D. (Andhra University, 2011), F.I.E', area: 'Industrial process instrumentation', photo: '/media/faculty/ramesh-patnaik.webp',
     note: 'A Fellow of the Institution of Engineers (India), he served as Head of the Department from 2021.' },
-  kotireddy: { name: 'Prof. D. V. Rama Koti Reddy', role: 'Professor', degrees: 'Ph.D (Andhra University, 1996)', area: 'Sensors and sensor networks, MEMS and nanotechnology', photo: '/media/faculty/rama-koti-reddy.webp' },
-  ysrao: { name: 'Prof. Y. Srinivasa Rao', role: 'Professor', degrees: 'Ph.D', area: 'Microelectronics', photo: '/media/faculty/y-srinivasa-rao.webp', note: '' },
-  bhujanga: { name: 'Prof. A. Bhujanga Rao', role: 'Professor', degrees: 'Ph.D (Andhra University, 2001)', area: 'Instrumentation', photo: '/media/faculty/bhujanga-rao.webp',
+  kotireddy: { name: 'Prof. D. V. Rama Koti Reddy', role: 'Professor', degrees: 'Ph.D. (Andhra University, 1996)', area: 'Sensors and sensor networks, MEMS and nanotechnology', photo: '/media/faculty/rama-koti-reddy.webp',
+    note: 'His teaching and research are in sensors and sensor networks, MEMS and nanotechnology. He served as Head of the Department from 2017.' },
+  ysrao: { name: 'Prof. Y. Srinivasa Rao', role: 'Professor', degrees: 'Ph.D.', area: 'Microelectronics', photo: '/media/faculty/y-srinivasa-rao.webp', note: '' },
+  bhujanga: { name: 'Prof. A. Bhujanga Rao', role: 'Professor', degrees: 'Ph.D. (Andhra University, 2001)', area: 'Instrumentation', photo: '/media/faculty/bhujanga-rao.webp',
     note: 'He served as Head of the Department from 2012. The first floor of the east wing was inaugurated during his tenure, on 30 August 2015.' },
 };
 
@@ -136,6 +147,7 @@ export const labRooms = {
   'lab-control': { title: 'Control Systems Laboratory', lead: 'Experiments in the time and frequency response of physical systems, stability analysis, and the design of compensators and controllers.' },
   'lab-machines': { title: 'Machines Lab', lead: 'Testing and performance analysis of DC machines, transformers and induction motors, the electrical machines that drive industrial plant.' },
   'lab-simulation': { title: 'Simulation Lab', lead: 'Modelling and simulation of instruments, processes and control loops, so that designs can be analysed and validated before they are built.' },
+  'lab-electronics': { title: 'Electronics Lab II', lead: 'Analogue and digital electronic circuits, from amplifiers and oscillators to logic, the building blocks inside every instrument.' },
   'lab-measurements': { title: 'Measurements Lab', lead: 'Electrical and electronic measurement with bridges, meters and oscilloscopes, with emphasis on accuracy, calibration and the analysis of measurement error.' },
   'lab-devicefab': { title: 'Device Fab Lab', lead: 'Fabrication and testing of sensors and microdevices, supporting the department’s research in sensors, MEMS and nanotechnology.' },
   'lab-biomedical': { title: 'Biomedical Instrumentation Lab', lead: 'Instrumentation for physiological measurement: the acquisition of cardiac, muscular and neural signals (ECG, EMG and EEG) and the principles of patient safety.' },
@@ -154,7 +166,7 @@ export const hero = {
   // the four floating tabs: each walks to the first stop of its group
   chips: [
     { n: '01', title: 'Heritage', text: 'Established in 1937.', group: 'heritage' },
-    { n: '02', title: 'Laboratories', text: 'Ten teaching and research labs.', group: 'labs' },
+    { n: '02', title: 'Laboratories', text: 'Eleven teaching and research labs.', group: 'labs' },
     { n: '03', title: 'Faculty', text: 'Professors and their offices.', group: 'faculty' },
     { n: '04', title: 'Classrooms', text: 'Smart Classrooms II to IV.', group: 'classrooms' },
   ],
@@ -184,7 +196,7 @@ export const admissions = {
   list: [
     { name: 'B.Tech, Instrumentation Engineering', length: '4 years', entry: 'Admission through AP EAPCET, with 45% in physics, chemistry and mathematics (40% for reserved categories).' },
     { name: 'M.Tech, Instrumentation and Control', length: '2 years', entry: 'GATE-qualified candidates are admitted first; remaining seats are filled through AP PGECET.' },
-    { name: 'Ph.D', length: 'Research', entry: 'Through the university’s research admissions, in sensors, MEMS, nanotechnology, and instrumentation and automation.' },
+    { name: 'Ph.D.', length: 'Research', entry: 'Through the university’s research admissions, in sensors, MEMS, nanotechnology, and instrumentation and automation.' },
   ],
   objectivesTitle: 'Programme educational objectives (B.Tech)',
   objectives: [
@@ -198,7 +210,7 @@ export const admissions = {
 
 export const labs = {
   title: 'Laboratories and research.',
-  lead: 'The department maintains ten laboratories: six in the west wing, the Simulation and Measurements labs on the east side of the ground floor, and the Device Fab and Biomedical Instrumentation labs on the first floor of the east wing.',
+  lead: 'The department maintains eleven laboratories: six in the west wing, the Simulation, Electronics II and Measurements labs on the east side of the ground floor, and the Device Fab and Biomedical Instrumentation labs on the first floor of the east wing.',
   list: [
     { name: 'Industrial Instruments Lab', where: 'West wing, ground floor' },
     { name: 'Process Control Lab', where: 'West wing, front passage' },
@@ -209,6 +221,7 @@ export const labs = {
     { name: 'Device Fab Lab', where: 'East wing, first floor' },
     { name: 'Biomedical Instrumentation Lab', where: 'East wing, first floor' },
     { name: 'Simulation Lab', where: 'East corridor, ground floor' },
+    { name: 'Electronics Lab II', where: 'North end of the Seminar Hall passage' },
     { name: 'Measurements Lab', where: 'Rear of the Seminar Hall passage' },
   ],
   research: ['Sensors and sensor networks', 'MEMS', 'Nanotechnology', 'Instrumentation and automation', 'Thin films, photo-elasticity and ultrasonics'],
@@ -243,7 +256,6 @@ export const guide = {
 
 // Faculty board in the entrance hall (newest source), with the door signs where the building shows the room.
 export const faculty = {
-  alsoNote: 'Prof. D. V. Rama Koti Reddy (sensors and sensor networks, MEMS and nanotechnology), Head of the Department from 2017, is also a member of the faculty.',
   staffTitle: 'Administrative and technical staff',
   staff: [
     ['S. Phani', 'Typist'], ['N. V. D. Ganesh', 'Junior Assistant'], ['P. T. Reddy', 'Junior Assistant'],
@@ -262,10 +274,8 @@ export const faculty = {
 };
 
 export const enter = {
-  title: 'Step inside.',
-  lead: 'Explore the complete building at your own pace: every corridor, laboratory and classroom, under the live sky over Visakhapatnam.',
-  explore: 'Explore the campus',
-  walk: 'Walk in as a student',
+  title: 'The whole department.',
+  lead: 'Every corridor, laboratory and classroom you have walked through, under the live sky over Visakhapatnam. Contacts and directions are below.',
 };
 
 export const credits = {

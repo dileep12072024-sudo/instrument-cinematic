@@ -18,7 +18,7 @@ const row = (r, i) => (r * FITTINGS + i) * 4;
 const table = { uRLTable: { value: tableTexture }, uRLCount: { value: 0 }, uRLRooms: { value: 0 }, uRLColor: { value: new T.Color('#fff7ea') } };
 const patched = new WeakSet();
 const GLSL = /* glsl */`
-{
+if (uRLOn > 0.5) {
   int inRooms = 0;
   for (int r = 0; r < ${ROOMS}; r++) {
     if (r >= uRLRooms) break;
@@ -38,6 +38,26 @@ const GLSL = /* glsl */`
   }
 }`;
 
+// The room term on a material; lit = false carries it switched off (uRLOn = 0), so the building's other materials share
+// the room materials' programs: twins that differed only by this term cost ~1 s of compiling each (2026-11-01).
+// A material patched dark and later given to a room is switched on.
+export function patchRoomLights(material, lit = false) {
+  if (!material || !(material.isMeshStandardMaterial || material.isMeshLambertMaterial || material.isMeshPhongMaterial)) return;
+  if (patched.has(material)) { if (lit) material.userData.rlOn.value = 1; return; }
+  patched.add(material);
+  const on = material.userData.rlOn = { value: lit ? 1 : 0 };
+  const before = material.onBeforeCompile, key = material.customProgramCacheKey;
+  material.customProgramCacheKey = () => (key && key !== T.Material.prototype.customProgramCacheKey ? key.call(material) : '') + '|rl';
+  material.onBeforeCompile = (shader, renderer) => {
+    before?.call(material, shader, renderer);
+    Object.assign(shader.uniforms, table, { uRLOn: on });
+    shader.vertexShader = 'varying vec3 vRLWorld;\n' + shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvRLWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = 'uniform highp sampler2D uRLTable; uniform int uRLCount, uRLRooms; uniform vec3 uRLColor; uniform float uRLOn; varying vec3 vRLWorld;\n'
+      + shader.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + GLSL);
+  };
+  material.needsUpdate = true;
+}
+
 export function createRoomLights(name, bounds) {
   const room = table.uRLRooms.value;
   if (room >= ROOMS) throw new Error(`${name}: more than ${ROOMS} lit rooms`);
@@ -56,20 +76,7 @@ export function createRoomLights(name, bounds) {
       onLevel(1);
       return f;
     },
-    patch(material) {
-      if (!material || patched.has(material) || !(material.isMeshStandardMaterial || material.isMeshLambertMaterial || material.isMeshPhongMaterial)) return;
-      patched.add(material);
-      const before = material.onBeforeCompile, key = material.customProgramCacheKey;
-      material.customProgramCacheKey = () => (key && key !== T.Material.prototype.customProgramCacheKey ? key.call(material) : '') + '|rl';
-      material.onBeforeCompile = (shader, renderer) => {
-        before?.call(material, shader, renderer);
-        Object.assign(shader.uniforms, table);
-        shader.vertexShader = 'varying vec3 vRLWorld;\n' + shader.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\nvRLWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-        shader.fragmentShader = 'uniform highp sampler2D uRLTable; uniform int uRLCount, uRLRooms; uniform vec3 uRLColor; varying vec3 vRLWorld;\n'
-          + shader.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + GLSL);
-      };
-      material.needsUpdate = true;
-    },
+    patch(material) { patchRoomLights(material, true); },
     set(f, on) { f.on = on; },
     // Fade toward the switch state (an LED driver takes a moment); true while anything changes.
     update(dt) {
@@ -94,7 +101,7 @@ export function roomControls(room, { name, box: [x0, x1, y0, y1, z0, z1], panelR
   const bounds = new T.Box3(); for (const x of [x0 - .15, x1 + .15]) for (const y of [y0 - .2, y1 + .2]) for (const z of [z0 - .15, z1 + .15]) bounds.expandByPoint(world(x, y, z));
   const lights = createRoomLights(name, bounds);
   for (const r of panelRows) { r.glow ??= r.material.emissiveIntensity; r.fittings = r.positions.map(p => lights.add(world(...p), power, level => { r.material.emissiveIntensity = r.glow * Math.max(level, .03); })); }
-  const toggles = [...panelRows.map(r => ({ get: () => r.fittings[0].on, set: on => r.fittings.forEach(f => lights.set(f, on)) })), ...fanRows.map(() => ({ on: true }))];
+  const toggles = [...panelRows.map(r => ({ what: 'lights', get: () => r.fittings[0].on, set: on => r.fittings.forEach(f => lights.set(f, on)) })), ...fanRows.map(() => ({ what: 'fans', on: true }))];
   toggles.forEach(t => { if (!t.get) { t.get = () => t.on; t.set = on => { t.on = on; }; } });
   const { group: switches, clickables } = makeSwitchboard(room, { name, ...board, toggles });
   room.traverse(o => { if (o.isMesh) for (const mat of [o.material].flat()) lights.patch(mat); });
@@ -124,6 +131,7 @@ export function makeSwitchboard(parent, { name, position, turn, toggles }) {
     rocker.position.set(x, -.005, .012); led.position.set(x, .045, .0065); group.add(rocker, led);
     const show = () => { const on = t.get(); rocker.rotation.x = on ? .18 : -.18; led.material = on ? ledOn : ledOff; };
     rocker.userData.onClick = () => { t.set(!t.get()); show(); return true; }; show();
+    rocker.userData.what = t.what || 'switch'; rocker.userData.isOn = () => t.get(); // for the exploration's prompt (main.js)
     return rocker;
   });
   group.userData.clickables = clickables;

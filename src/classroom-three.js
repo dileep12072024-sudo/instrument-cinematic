@@ -176,8 +176,8 @@ export function buildClassThree(parent, m, floorY) {
   const wallRotors = [];
   // The back-wall fan and its switch sit on the pier between the windows at 4.25 and 6.3, not over a window (owner, 2026-10-18).
   for (const [x, z, direction] of [[.45, frontZ - .23, -1], [5.7, frontZ - .23, -1], [5.2, backZ + .28, 1]]) {
-    const y = ceiling - .64;
-    box(x, y - .12, z - direction * .11, .10, .28, .08, cream);
+    const y = ceiling - .64, wall = direction < 0 ? frontZ : backZ + .08, d = Math.abs(wall - z); // the wall face behind the fan (the back wall's inner face is backZ + .08: .32 thick on backZ - .08)
+    box(x, y - .12, z - direction * (.07 + d) / 2, .10, .28, d - .07, cream); // its bracket reaches the wall (it stopped 8-13 cm short; owner, 2026-11-01)
     for (const radius of [.09, .16, .23]) {
       const ring = new T.TorusGeometry(radius, .003, 4, 36); ring.translate(x, y, z); add(ring, seam);
     }
@@ -191,16 +191,16 @@ export function buildClassThree(parent, m, floorY) {
       const blade = new T.SphereGeometry(1, 10, 6), a = i * Math.PI * 2 / 3;
       blade.scale(.10, .045, .008); blade.rotateZ(a); blade.translate(Math.cos(a) * .1, Math.sin(a) * .1, 0); rotor.add(new T.Mesh(blade, steel));
     }
-    box(x + .12, floorY + 1.6, z - direction * .1, .18, .1, .03, cream);
-    rod([x + .12, floorY + 1.65, z - direction * .11], [x + .12, y - .2, z - direction * .11], .008, seam);
+    box(x + .12, floorY + 1.6, wall + direction * .015, .18, .1, .03, cream); // its switch flush on the wall (it hung 11 cm out, beside the door's board)
+    rod([x + .12, floorY + 1.65, wall + direction * .012], [x + .12, y - .2, wall + direction * .012], .008, seam);
   }
   box(-.83, floorY + .42, -21.4, .4, .84, .55, steel);
   box(-.83, floorY + .89, -21.4, .3, .10, .35, cream);
-  for (const [x, z, direction] of [[.15, backZ + .22, 1], [6.3, backZ + .22, 1], [2.5, frontZ - .22, -1]]) {
+  for (const [x, z, direction] of [[.15, backZ + .18, 1], [6.3, backZ + .18, 1], [2.5, frontZ - .10, -1]]) { // backs on the wall faces (backZ + .08, frontZ): they stood 4-12 cm off
     box(x, ceiling - .65, z, 1.12, .32, .20, cream);
     box(x, ceiling - .77, z + direction * .105, .98, .035, .025, steel);
     for (let k = 0; k < 3; k++) box(x, ceiling - .70 - k * .024, z + direction * .115, .96, .008, .02, seam);
-    box(x + .8, ceiling - .65, z - direction * .08, .16, .14, .06, cream);
+    box(x + .8, ceiling - .65, z - direction * .07, .16, .14, .06, cream);
     const cable = new T.CatmullRomCurve3([new T.Vector3(x + .4, ceiling - .78, z), new T.Vector3(x + .63, ceiling - .92, z), new T.Vector3(x + .8, ceiling - .7, z)]);
     add(new T.TubeGeometry(cable, 12, .007, 5, false), steel);
   }
@@ -235,6 +235,6 @@ export function buildClassThree(parent, m, floorY) {
   fanRows.push(wallRotors); // the wall fans (above) on their own switch
   // Each panel lights the room, switchboard beside the entrance door, fans spin (roomlights.js).
   roomControls(room, { name: 'Class III', box: [minX, maxX, floorY, ceiling, backZ, frontZ], panelRows, fanRows,
-    board: { position: [.5, floorY + 1.35, frontZ - .2], turn: Math.PI } });
+    board: { position: [.5, floorY + 1.35, frontZ - .007], turn: Math.PI } }); // the board flush on the wall face (frontZ; classroom-wing.js)
   return room;
 }

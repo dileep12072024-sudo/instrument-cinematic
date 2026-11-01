@@ -1,5 +1,15 @@
 import * as T from 'three';
 import { environmentObstacles } from './blender-environment.js';
+import { MeshBVH, acceleratedRaycast } from 'three-mesh-bvh';
+
+// Ground lookups through bounds trees: rays tested against every terrain triangle cost ~2.4 s of the load (2026-11-01
+// profile); the hits are the same. Indirect trees leave the geometry untouched, and they are dropped again after the
+// lookups, so a later edit to these meshes never meets a stale tree (the walk builds its own, avatar.js).
+function bounded(meshes) {
+  const made = [], raycasts = meshes.map(m => m.raycast);
+  for (const m of meshes) { if (!m.geometry.boundsTree) { m.geometry.boundsTree = new MeshBVH(m.geometry, { indirect: true }); made.push(m.geometry); } m.raycast = acceleratedRaycast; }
+  return () => { meshes.forEach((m, i) => { m.raycast = raycasts[i]; }); for (const g of made) delete g.boundsTree; };
+}
 
 // Video-guided surroundings (WhatsApp references 2026-10-12, frame-based review).
 // Observed: dark asphalt drive, red laterite earth, dense tree cover around the site, a hazy hill
@@ -56,7 +66,7 @@ function treeBelt(scene, landscape, renderer, views) {
   const variants = landscape.trees.filter(t => { let trimmed = false; t.traverse(o => { trimmed ||= !!o.userData.trimmedTriangles; }); return !trimmed; })
     .filter((_, i, all) => i % Math.max(1, Math.floor(all.length / 4)) === 0).slice(0, 4).map(t => captureImpostor(renderer, t));
   const random = rng(1928), down = new T.Vector3(0, -1, 0), ray = new T.Raycaster(), p = new T.Vector3();
-  const spots = variants.map(() => []);
+  const spots = variants.map(() => []), release = bounded([...terrain, ...hard]);
   for (let i = 0; i < 900 && spots.flat().length < 260; i++) {
     const angle = random() * Math.PI * 2, radius = 42 + Math.sqrt(random()) * 130;
     p.set(Math.sin(angle) * radius, 30, Math.cos(angle) * radius);
@@ -69,6 +79,7 @@ function treeBelt(scene, landscape, renderer, views) {
     if (spots.flat().some(s => Math.hypot(s.x - p.x, s.z - p.z) < 4.6)) continue;
     spots[Math.floor(random() * variants.length)].push({ x: p.x, y, z: p.z, s: .75 + random() * .55, r: random() * Math.PI });
   }
+  release();
   const group = new T.Group(); group.name = 'Distant tree belt (impostors)';
   const m = new T.Matrix4(), q = new T.Quaternion(), up = new T.Vector3(0, 1, 0);
   variants.forEach((v, k) => {
@@ -158,6 +169,7 @@ function leftSheds(scene, landscape) {
   const wall = new T.MeshStandardMaterial({ name: 'Shed lime-washed walls', map: grimeMap, roughness: .95 });
   const roof = new T.MeshStandardMaterial({ name: 'Shed weathered roof sheets', color: '#5f605c', roughness: .85, metalness: .1, side: T.DoubleSide });
   const doorway = new T.MeshStandardMaterial({ name: 'Shed doorways', color: '#2a2724', roughness: 1 });
+  const release = bounded([...hard, ...terrain]);
   for (const [x, z, w, d, turn] of [[-27, 31, 9, 4.6, .1], [-37.5, 27.5, 7, 4.2, -.05]]) {
     const corners = [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2], [0, 0]].map(([dx, dz]) => [x + dx * Math.cos(turn) + dz * Math.sin(turn), z - dx * Math.sin(turn) + dz * Math.cos(turn)]);
     let blocked = false, low = Infinity;
@@ -178,6 +190,7 @@ function leftSheds(scene, landscape) {
     shed.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
     group.add(shed);
   }
+  release();
   scene.add(group);
   return group;
 }

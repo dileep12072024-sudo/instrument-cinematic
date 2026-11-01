@@ -1,97 +1,55 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import { createIcons, PersonStanding, Eye, Copy, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check } from 'lucide';
 import { buildArchitecture, buildEntranceApron } from './architecture.js';
 import { loadBlenderEnvironment, prefetchEnvironment } from './blender-environment.js';
 import { buildSurroundings, placeFacadeTrees } from './surroundings.js';
 import { makeSwitchboard } from './roomlights.js';
 import { mergeStaticDetail, mergeGateParts, mergeByMaterialName, mergeStatic, resolveCoplanar } from './batching.js';
-import { createAvatar } from './avatar.js';
 import { footprint } from './footprint.js';
-import { Map as MapIcon, Volume2, VolumeX, Move } from 'lucide';
 import { createAmbience } from './ambience.js';
 import { createRain, rainfall, updateWind, isSheltered } from './weather-effects.js';
 import { createPuddles } from './puddles.js';
 import { campusMonth, leafLitter } from './seasons.js';
 import { regradeGround, rectangularAprons } from './regrade.js';
-import { createEntranceWalk } from './entrance-walk.js';
-import { createPanoramaLook } from './panorama-look.js';
 import { createLiveSky, lunarState, solarState, campusDate, skyDirection } from './sky.js';
 import { pieces } from './merge-pieces.js';
 import { createRise, createRiseDust, RISE_LENGTH, RISE_RATE } from './rise.js';
 import { createPortfolio } from './portfolio.js';
+import { loader3d } from './loader3d.js';
 import './style.css';
+// The reflection captures draw with the screen's own programs (capture() below): a second, linear set of every shader
+// cost ~29 s of compiling on the owner's GPU (2026-11-01). A negative exposure skips the tone mapping and the sRGB
+// encoding, so a capture stores the same linear light the render-target programs did; the screen is unchanged.
+THREE.ShaderChunk.tonemapping_fragment = THREE.ShaderChunk.tonemapping_fragment.replace('gl_FragColor.rgb = toneMapping', 'if ( toneMappingExposure >= 0.0 ) gl_FragColor.rgb = toneMapping');
+THREE.ShaderChunk.colorspace_fragment = '#ifdef TONE_MAPPING\nif ( toneMappingExposure >= 0.0 )\n#endif\n' + THREE.ShaderChunk.colorspace_fragment;
 
+if (new URLSearchParams(location.search).has('debug')) document.documentElement.classList.add('debug'); // the guide's position readout (style.css)
 const $ = s => document.querySelector(s);
-const icon = name => `<i data-lucide="${name}"></i>`;
-const icons = { PersonStanding, Eye, Copy, Move, Volume2, VolumeX, Map: MapIcon, ArrowUpRight, ArrowLeft, ArrowRight, Play, Pause, X, Plus, Minus, RotateCcw, Maximize, Minimize, Sun, Sunset, Moon, Camera, MapPin, Aperture, DoorOpen, Info, Compass, ChevronDown, Check };
-const refreshIcons = () => createIcons({ icons, attrs: { 'stroke-width': 1.5 } });
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; // the story decides where the page starts (arrival)
+// The loading screen (loader3d.js), already on the page and moving: each stage of the build names itself on it
+const loading = loader3d({ reduced });
+// In the marks' real order, each naming the step that starts there; it only moves forward (E2E 2026-11-01: it went back).
+{ const stages = [['architecture-built', 'Growing the landscape'], ['env-trees-placed', 'Planting the trees'], ['surroundings-built', 'Setting the light'],
+    ['lighting-set', 'Compiling the light'], ['textures-uploaded', 'Raising the walls'], ['models-uploaded', 'Finishing the light'], ['shaders-compiled', 'Opening the doors']];
+  let reached = -1; // read at each paint (an observer's callback waited for an idle main thread: the late stages never showed)
+  window.__stageNow = () => { for (let i = stages.length - 1; i > reached; i--) if (performance.getEntriesByName(stages[i][0]).length) { reached = i; loading.status(stages[i][1]); break; } }; }
 const small = () => innerWidth < 700;
-const chapters = [
-  { name: 'The arrival', title: 'Instrument<br><em>Technology.</em>', note: 'Andhra University, Visakhapatnam', eye: [42, 18, 80], target: [0, 13, 0] },
-  { name: 'The entrance', title: 'A familiar<br><em>welcome.</em>', note: 'At the heart of the department', eye: [5, 6.3, 31], target: [0, 6, 6] },
-  { name: 'East courtyard', title: 'Light, shade.<br><em>And possibility.</em>', note: 'The eastern wing', eye: [4, 7.5, 31], target: [22, 6.5, 8] },
-  { name: 'West wing', title: 'A quieter<br><em>perspective.</em>', note: 'Beneath the trees of North Campus', eye: [-5, 6, 4.8], target: [-22, 4.7, 9.125] },
-];
+// The four viewpoints the distant tree belt keeps clear (surroundings.js): the old campus views, kept so the belt stands
+// exactly where it did.
+const chapters = [{ eye: [42, 18, 80], target: [0, 13, 0] }, { eye: [5, 6.3, 31], target: [0, 6, 6] }, { eye: [4, 7.5, 31], target: [22, 6.5, 8] }, { eye: [-5, 6, 4.8], target: [-22, 4.7, 9.125] }];
 $('#app').innerHTML = `
-  <main id="experience" aria-label="Instrument Technology interactive campus">
+  <main id="experience" aria-label="Instrument Technology campus">
     <div id="viewport"></div><div class="shade" aria-hidden="true"></div>
-    <header class="topbar">
-      <a href="#" class="brand" aria-label="Instrument Technology home"><span class="brand-mark" aria-hidden="true">IT<span></span></span><span>ANDHRA UNIVERSITY<small>A CAMPUS PORTRAIT</small></span></a>
-      <nav aria-label="Main navigation"><button id="to-story" class="text-btn">The department</button><span class="nav-divider"></span><button id="about" class="icon-btn" aria-label="About this portrait" data-tip="About this portrait">${icon('info')}</button><span class="nav-divider"></span><button id="film" class="film-btn">${icon('play')}<span>Play the journey</span></button></nav>
-    </header>
-    <div class="scene-meta"><span class="live-dot"></span><span id="scene-mode">LIVE EXPLORATION</span><span class="meta-line"></span><span id="time-label">16:30 / AFTERNOON</span><span class="meta-line weather-divider"></span><span id="weather-label" class="weather-live">SYNCING SKY</span></div>
-    <div class="scene-number" aria-hidden="true"><span id="scene-number">01</span><small>/ 04</small></div>
-    <section class="scene-heading"><p class="eyebrow" id="eyebrow">THE DEPARTMENT / NORTH CAMPUS</p><h1>${chapters[0].title}</h1><p class="scene-note">${icon('map-pin')}<span id="scene-note">${chapters[0].note}</span></p><div class="heading-actions"><button id="explore" class="primary-btn">Enter the courtyard ${icon('arrow-up-right')}</button></div></section>
-    <div class="scene-tools" aria-label="Scene tools">
-      <button class="icon-btn" id="light" aria-label="Light and quality" aria-expanded="false" data-tip="Light & quality">${icon('sun')}</button>
-      <button class="icon-btn" id="orbit" aria-label="Orbit building" aria-pressed="false" data-tip="Orbit building">${icon('compass')}</button>
-      <button class="icon-btn" id="panorama" aria-label="Panorama exploration" aria-pressed="false" data-tip="Panorama exploration">${icon('move')}</button>
-      <button class="icon-btn" id="avatar-mode" aria-label="Walk as a person" aria-pressed="false" data-tip="Walk as a person">${icon('person-standing')}</button>
-      <button class="icon-btn mobile-plan" id="mobile-plan" aria-label="View building from above" data-tip="Overhead view">${icon('map')}</button>
-      <span class="tools-divider"></span>
-      <button class="icon-btn" id="zoom-in" aria-label="Zoom in" data-tip="Zoom in">${icon('plus')}</button>
-      <button class="icon-btn" id="zoom-out" aria-label="Zoom out" data-tip="Zoom out">${icon('minus')}</button>
-      <button class="icon-btn" id="reset" aria-label="Reset view" data-tip="Reset view">${icon('rotate-ccw')}</button>
-      <span class="tools-divider"></span>
-      <button class="icon-btn" id="capture" aria-label="Save photograph" data-tip="Save photograph">${icon('camera')}</button>
-      <button class="icon-btn" id="fullscreen" aria-label="Full screen" data-tip="Full screen">${icon('maximize')}</button>
-    </div>
-    <section id="light-panel" class="light-panel" hidden aria-label="Scene settings"><div class="panel-title">The light of a place<button class="icon-btn" id="light-close" aria-label="Close settings">${icon('x')}</button></div><div class="light-presets"><button data-hour="10" aria-label="Morning light">${icon('sun')}<span>Daylight</span></button><button data-hour="16.5" class="selected" aria-label="Afternoon light">${icon('sunset')}<span>Afternoon</span></button><button data-hour="18.8" aria-label="Blue hour">${icon('moon')}<span>Blue hour</span></button></div><label class="range-label" for="hour">Time of day <output id="hour-output">16:30</output></label><input id="hour" type="range" min="8" max="19" value="16.5" step="0.1"/><div class="quality-row"><label for="quality">Render quality</label><select id="quality"><option value="auto">Adaptive</option><option value="high">High</option><option value="low">Performance</option></select></div><label class="motion-row" for="motion">Camera drift<input type="checkbox" id="motion" ${reduced ? '' : 'checked'} /></label></section>
-    <div class="entrance-actions"><button id="door" class="door-action" hidden aria-pressed="false">${icon('door-open')}<span>Open the doors</span></button><button id="enter-hall" class="primary-btn" hidden>${icon('arrow-up-right')}<span>Step inside</span></button></div>
-    <section id="avatar-panel" class="avatar-panel" hidden aria-label="Walking guide">
-      <p id="avatar-readout" class="avatar-readout" role="status">Preparing the guide…</p>
-      <div class="avatar-actions"><button id="avatar-eye" class="text-btn" aria-pressed="false">${icon('eye')}<span>Eye view</span></button><button id="avatar-copy" class="text-btn">${icon('copy')}<span>Copy position</span></button><button id="avatar-exit" class="text-btn">${icon('x')}<span>Exit</span></button></div>
-      <p class="avatar-help">W A S D or arrow keys to walk · Q / E or ← → to turn · Shift to run · drag to look around</p>
-    </section>
-    <div class="avatar-pad" aria-label="Movement controls"><button data-move="forward" aria-label="Walk forward">▲</button><button data-move="left" aria-label="Turn left">◀</button><button data-move="back" aria-label="Walk back">▼</button><button data-move="right" aria-label="Turn right">▶</button></div>
-    <section id="walk-panel" class="walk-panel" hidden aria-label="Entrance walkthrough"><span id="walk-location">The threshold</span><div class="walk-controls"><button id="walk-back" class="icon-btn" aria-label="Previous entrance viewpoint" data-tip="Previous viewpoint">${icon('arrow-left')}</button><button id="walk-play" class="icon-btn" aria-label="Play entrance walkthrough" aria-pressed="false" data-tip="Play walkthrough"><span class="walk-play-icon">${icon('play')}</span><span class="walk-pause-icon" hidden>${icon('pause')}</span></button><input id="walk-progress" type="range" min="0" max="1000" value="0" aria-label="Position along the entrance walkthrough"/><button id="walk-forward" class="icon-btn" aria-label="Next entrance viewpoint" data-tip="Next viewpoint">${icon('arrow-right')}</button><button id="walk-exit" class="icon-btn" aria-label="Return to courtyard" data-tip="Return to courtyard">${icon('x')}</button></div></section>
-    <button id="plan" class="plan" aria-label="View building from above" data-tip="Overhead view"><canvas width="220" height="120" aria-hidden="true"></canvas><span>NORTH CAMPUS ${icon('arrow-up-right')}</span></button>
-    <footer class="chapter-bar"><div class="chapter-caption"><span>THE CAMPUS</span><small>Four perspectives. One place.</small></div><nav class="chapters" aria-label="Camera viewpoints">${chapters.map((c, i) => `<button data-chapter="${i}" class="chapter ${i === 0 ? 'active' : ''}" aria-pressed="${i === 0}"><span>0${i + 1}</span><strong>${c.name}</strong><span class="chapter-line"></span></button>`).join('')}</nav><button id="next" class="next-btn" aria-label="Next viewpoint">${icon('arrow-right')}</button></footer>
-    <div id="journey-track" class="journey-track" hidden><span></span></div>
     <div id="loader" class="loader"><span class="loading-mark">IT</span><p>Raising the department</p><span class="load-track"><span></span></span><small id="loading-status">Preparing the campus</small><button id="begin" class="begin-btn" hidden>Enter</button><small class="begin-note">Opens in full screen.</small></div>
     <div id="toast" role="status" hidden></div>
-  </main>
-  <dialog id="about-dialog" class="about-dialog"><div class="dialog-top"><span class="eyebrow">ABOUT THE PORTRAIT</span><button class="icon-btn close-dialog" aria-label="Close about">${icon('x')}</button></div><h2>Built around<br><em>a real place.</em></h2><p>Department of Instrument Technology.<br>Andhra University, Visakhapatnam.</p><p>This independent architectural portrait is reconstructed from the supplied campus photographs, video, and footprint. The blue structural frame, open corridors, entrance, and different wing heights follow those references.</p><p>Geometry is constructed directly in Three.js. Dimensions, hidden elevations, planting, and materials are interpreted; this is not a measured survey or a photogrammetric scan.</p><a href="https://www.google.com/maps/search/?api=1&query=Andhra+University+Department+of+Instrument+Technology" target="_blank" rel="noopener" class="text-btn">Find the department ${icon('arrow-up-right')}</a><div class="credits">Original photographs & footage supplied by the project owner. Sky lighting: <a href="https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky" target="_blank" rel="noopener">Poly Haven / CC0</a>.<br>This site keeps anonymous visit statistics (device type, browser, approximate city, visit times). No names or IP addresses are stored.</div></dialog>`;
-$('#about').insertAdjacentHTML('afterend', `<button id="sound" class="icon-btn" aria-label="Mute ambient sound" aria-pressed="true" data-tip="Mute ambient sound">${icon('volume-2')}</button>`);
-$('#walk-location').insertAdjacentHTML('beforebegin', '<select id="walk-route" aria-label="Interior route"><option value="hall">Central hall</option><option value="right">Ground-floor right wing</option><option value="seminar">Seminar Hall surrounds</option><option value="classroom">Upstairs classroom wing</option></select>');
-$('#walk-route').insertAdjacentHTML('beforeend', '<option value="stairs">Stairs: ground to roof</option><option value="terraceLeft">Classroom-wing terrace</option><option value="upperCorridor">Second-floor right corridor</option><option value="terraceRight">Upper right terrace</option>');
-$('#light-panel').insertAdjacentHTML('beforeend', '<label class="range-label" for="ambient-volume">Ambient volume <output id="volume-output">40%</output></label><input id="ambient-volume" type="range" min="0" max="100" value="40" step="1"/>');
-$('#light-panel').insertAdjacentHTML('beforeend', '<label class="motion-row" for="live-clock">Live campus time<input id="live-clock" type="checkbox" checked /></label><p id="weather-detail" class="weather-detail" role="status">Fetching campus weather</p><p id="forecast" class="weather-detail"></p><a class="weather-source" href="https://open-meteo.com/" target="_blank" rel="noopener">Weather: Open-Meteo</a>');
-$('#hour').min = 0; $('#hour').max = 23.99;
-$('#weather-detail').insertAdjacentHTML('afterend', '<p id="moon-detail" class="weather-detail"></p>');
-refreshIcons();
-$("#walk-route").insertAdjacentHTML("beforeend", '<option value="classII">Class Room II</option><option value="classIII">Class Room III</option>');
+  </main>`;
 const sound = createAmbience();
 function updateSoundButton() {
   const active = sound.enabled;
-  $('#sound').setAttribute('aria-pressed', active);
-  $('#sound').setAttribute('aria-label', active ? 'Mute ambient sound' : 'Unmute ambient sound');
-  $('#sound').dataset.tip = active ? 'Mute ambient sound' : 'Unmute ambient sound';
-  $('#sound').innerHTML = icon(active ? 'volume-2' : 'volume-x');
-  refreshIcons();
+  const b = $('#sound'); if (!b) return; // in the story's header (portfolio.js)
+  b.setAttribute('aria-pressed', active); b.setAttribute('aria-label', active ? 'Mute ambient sound' : 'Unmute ambient sound');
+  b.textContent = active ? 'Sound on' : 'Sound off';
 }
 let soundActivationBound = true;
 function resumeDefaultSound() {
@@ -118,6 +76,7 @@ const loadBar = () => $('.load-track>span');
 const environmentDownload = renderer ? prefetchEnvironment(p => {
   const bar = loadBar(); if (bar) { bar.style.animation = 'none'; bar.style.transform = `scaleX(${p.toFixed(3)})`; }
   if (p < 1) $('#loading-status').textContent = `Downloading the campus ${Math.round(p * 100)}%`;
+  if (p < 1) loading.status('Downloading the department');
 }) : null;
 environmentDownload?.catch(() => {}); // handled where it is awaited
 const skyDownload = renderer ? new HDRLoader().loadAsync('/media/sky.hdr') : null;
@@ -125,24 +84,10 @@ skyDownload?.catch(() => {});
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#b6c5c9'); scene.fog = new THREE.Fog('#b6c5c9', 80, 300);
 const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 500);
-let controls, architecture, landscape, surroundings, entranceWalk, panoramaLook, avatar;
-let selected = 0, transition = null, journey = false, journeyStart = 0, isOrbiting = false, doorsOpen = false, hour = 16.5, targetHour = 16.5;
+let architecture, landscape, surroundings;
+let doorsOpen = false, hour = 16.5, targetHour = 16.5;
 const hallSwitch = { lights: true, fan: true, porch: true }; // entrance hall switch box: wall tubes, fan, porch tube
-let ready = false, drift = !reduced, quality = 'auto', needsRender = true, lastRendered = 0, lastShadowUpdate = 0;
-let interactive = false, dragging = 0, avatarMovedAt = 0;
-let panorama = false;
-function setPanorama(enabled) {
-  panorama = enabled;
-  $('#panorama').setAttribute('aria-pressed', enabled);
-  $('#experience').classList.toggle('panorama-view', enabled);
-  if (!controls) return;
-  controls.enabled = !enabled && !entranceWalk?.active;
-  controls.enablePan = enabled;
-  controls.screenSpacePanning = true;
-  controls.minDistance = enabled ? 2 : 13;
-  controls.maxPolarAngle = enabled ? Math.PI - .01 : Math.PI * .485;
-  controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
-}
+let ready = false, needsRender = true, lastRendered = 0, lastShadowUpdate = 0, dragging = 0;
 const sun = new THREE.DirectionalLight('#ffe8c5', 3.5);
 sun.position.set(-34, 39, 30); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -55; sun.shadow.camera.right = 55; sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40; sun.shadow.camera.far = 180;
@@ -158,6 +103,7 @@ const entranceLight = new THREE.PointLight('#fff0cc', 0, 14, 2);
 entranceLight.name = 'Entrance tube light';
 entranceLight.position.set(0, 3.30, 7.32);
 entranceLight.castShadow = true;
+entranceLight.shadow.autoUpdate = false; // its map is redrawn only when something it sees moves (doors) or once the building stands: every 4th frame it was 6 views of the campus, lit or not (re-test 2026-11-01)
 entranceLight.shadow.mapSize.set(512, 512);
 entranceLight.shadow.camera.near = .025;
 entranceLight.shadow.camera.far = 14;
@@ -239,21 +185,12 @@ const sky = createLiveSky(scene, camera);
 function updateMoon(now = Date.now()) {
   const state = lunarState(liveClock ? new Date(now) : campusDate(targetHour, now), LOCATION);
   Object.assign(moonState, state, { label: moonLabel(state.phase, state.illumination), updatedAt: now });
-  sky.phase(state); updateWeatherLabel(); needsRender = true;
-  $('#moon-detail').textContent = `Moon: ${(state.illumination * 100).toFixed(1)}% illuminated`;
+  sky.phase(state); needsRender = true;
 }
 
 const rain = createRain(scene, camera);
 let puddles;
 
-function updateWeatherLabel() {
-  const temp = weatherState.temperature == null ? '' : ` / ${Math.round(weatherState.temperature)}°C`;
-  const weather = weatherState.loaded ? `${weatherState.stale ? 'LAST REPORT / ' : ''}${weatherState.summary}${temp}` : weatherState.summary;
-  $('#weather-label').textContent = `${weather} / ${moonState.label}`;
-  $('#weather-label').title = 'Latest campus weather and lunar phase; moon size and placement are artistic';
-  $('#weather-detail').textContent = weatherState.loaded ? `${weatherState.stale ? 'Last available' : 'Reported'} ${new Date(weatherState.observedAt).toLocaleTimeString('en-IN', { timeZone: LOCATION.timezone, hour: '2-digit', minute: '2-digit' })} IST / Wind ${Math.round(weatherState.windSpeed)} km/h` : weatherState.summary;
-  $('#forecast').textContent = weatherState.forecast;
-}
 
 function updateWetMaterials() {
   const wet = weatherState.rainFactor;
@@ -309,11 +246,10 @@ async function loadWeather() {
     // Hourly rain over the past two days warm-starts the puddles, once.
     weatherState.rainHistory = forecast?.time?.map((t, i) => ({ t: t * 1000, mm: Number(forecast.precipitation?.[i]) || 0 })) || [];
     if (puddles && !puddles.warmed) { puddles.history(weatherState.rainHistory); puddles.warmed = true; }
-    updateWetMaterials(); updateLighting(hour); updateWeatherLabel();
+    updateWetMaterials(); updateLighting(hour);
   } catch {
     weatherState.stale = true;
     if (!weatherState.loaded) weatherState.summary = 'WEATHER UNAVAILABLE';
-    updateWeatherLabel();
     weatherRetry = setTimeout(() => { if (!document.hidden) loadWeather(); }, 30000);
   }
 }
@@ -347,185 +283,85 @@ function updateLighting(h) {
   }
   needsRender = true;
 }
-function formatTime(h) { const m = Math.round(h * 60) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; }
 function setHour(h, { manual = true } = {}) {
   if (manual) liveClock = false;
-  $('#live-clock').checked = liveClock;
   targetHour = h;
   if (reduced) hour = h;
   updateLighting(hour); updateMoon();
-  $('#hour').value = h; $('#hour-output').textContent = formatTime(h);
-  const sunAtTime = solarState(liveClock ? new Date() : campusDate(h), LOCATION);
-  const period = sunAtTime.altitude < -6 ? 'NIGHT' : sunAtTime.altitude < 4 ? (sunAtTime.azimuth < 180 ? 'DAWN' : 'DUSK') : h < 12 ? 'MORNING' : 'AFTERNOON';
-  $('#time-label').textContent = `${formatTime(h)} IST / ${liveClock ? 'LIVE' : 'PREVIEW'} / ${period}`;
-  document.querySelectorAll('[data-hour]').forEach(b => { b.classList.toggle('selected', Math.abs(+b.dataset.hour - h) < .2); b.setAttribute('aria-pressed', Math.abs(+b.dataset.hour - h) < .2); });
 }
-function fly(eye, target, duration = 2600) {
-  if (!controls) return;
-  transition = { start: performance.now(), duration: reduced ? 1 : duration, from: camera.position.clone(), to: new THREE.Vector3(...eye), fromTarget: controls.target.clone(), toTarget: new THREE.Vector3(...target) };
-  needsRender = true;
-}
-function cameraFor(index) {
-  const c = chapters[index];
-  if (small() && index === 3) return [-1, 7, 26];
-  if (small() && index === 2) return [0, 8, 30];
-  const target = new THREE.Vector3(...c.target), eye = new THREE.Vector3(...c.eye);
-  if (small()) eye.sub(target).multiplyScalar(index === 0 ? 2.4 : 1.25).add(target);
-  return eye.toArray();
-}
-function updateChapter(index) {
-  selected = index;
-  document.querySelectorAll('[data-chapter]').forEach(b => { const active = +b.dataset.chapter === index; b.classList.toggle('active', active); b.setAttribute('aria-pressed', active); });
-  $('h1').innerHTML = chapters[index].title;
-  $('#scene-note').textContent = chapters[index].note;
-  $('#scene-number').textContent = `0${index + 1}`;
-  $('#eyebrow').textContent = index === 0 ? 'THE DEPARTMENT / NORTH CAMPUS' : `PERSPECTIVE 0${index + 1} / NORTH CAMPUS`;
-  $('#door').hidden = index !== 1;
-  $('#enter-hall').hidden = index !== 1;
-  $('.heading-actions').hidden = index !== 0;
-  $('#experience').classList.toggle('detail-view', index !== 0);
-}
-function selectChapter(index) {
-  if (avatar?.active) leaveAvatar();
-  if (entranceWalk?.active) leaveHall(false);
-  setPanorama(false);
-  $('#experience').classList.remove('footprint-view');
-  stopJourney(); setOrbit(false); interactive = false; updateChapter(index);
-  if (controls) controls.maxPolarAngle = Math.PI * .485;
-  fly(cameraFor(index), chapters[index].target);
-}
-function setOrbit(enabled) {
-  isOrbiting = enabled; $('#orbit').setAttribute('aria-pressed', enabled);
-  if (controls) {
-    controls.autoRotate = enabled; controls.autoRotateSpeed = .35;
-    // Constant-speed orbit needs no input inertia; preserve damping for manual exploration.
-    controls.enableDamping = !enabled;
-  }
-}
-function stopJourney() {
-  journey = false; $('#journey-track').hidden = true; $('#film').innerHTML = `${icon('play')}<span>Play the journey</span>`;
-  $('#film').setAttribute('aria-pressed', 'false'); $('#scene-mode').textContent = 'LIVE EXPLORATION'; refreshIcons();
-}
-function startJourney() {
-  if (avatar?.active) leaveAvatar();
-  if (!ready) return;
-  if (entranceWalk?.active) leaveHall(false);
-  if (journey) return stopJourney();
-  setPanorama(false);
-  transition = null; interactive = false; setOrbit(false); journey = true; journeyStart = performance.now();
-  tourFrom.copy(camera.position); tourLookFrom.copy(controls.target);
-  $('#film').innerHTML = `${icon('pause')}<span>Pause the journey</span>`; $('#film').setAttribute('aria-pressed', 'true');
-  $('#scene-mode').textContent = 'THE CAMPUS / IN MOTION'; $('#journey-track').hidden = false; refreshIcons();
-}
-const tourFrom = new THREE.Vector3(), tourLookFrom = new THREE.Vector3();
-const tourCurve = new THREE.CatmullRomCurve3([[42, 31, 76], [21, 17, 49], [5, 6.3, 31], [9, 8, 30], [34, 18, 42], [0, 32, 72], [-13, 10, 37], [-30, 30, 64], [42, 31, 76]].map(p => new THREE.Vector3(...p)));
-const lookCurve = new THREE.CatmullRomCurve3([[0, 5, 0], [0, 6, 2], [0, 6, 3], [18, 6, 0], [20, 5, 0], [0, 5, 0], [-18, 4, 0], [-9, 5, 0], [0, 5, 0]].map(p => new THREE.Vector3(...p)));
 
 function resize() {
   if (!renderer) return;
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight);
   scene.fog.near = small() ? 160 : 80; scene.fog.far = small() ? 450 : 300;
-  if (!interactive && !journey && !entranceWalk?.active && !portfolio?.active) { camera.position.fromArray(cameraFor(selected)); controls.target.fromArray(chapters[selected].target); transition = null; }
   needsRender = true;
 }
-function drawPlan() {
-  const c = $('.plan canvas'), x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height);
-  x.fillStyle = '#dee5d744'; x.strokeStyle = '#e7eed9'; x.lineWidth = 1.3;
-  const scale = 2.65;
-  for (const p of footprint) {
-    const left = 110 + (p.x - p.width / 2) * scale, top = 54 + (p.z - p.depth / 2) * scale;
-    x.fillRect(left, top, p.width * scale, p.depth * scale); x.strokeRect(left, top, p.width * scale, p.depth * scale);
-  }
-  if (camera) { x.fillStyle = '#d5e9a7'; x.beginPath(); x.arc(110 + camera.position.x * .85, 63 + camera.position.z * .5, 3, 0, Math.PI * 2); x.fill(); }
-}
+// After the next frame has painted (a task queued from the frame callback runs once that frame is done).
+const painted = () => { window.__stageNow(); return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve))); };
 async function boot() {
   if (!renderer) return;
+  await loading.shown(); // the loading screen's motion handed to the compositor before the build holds the main thread
+  // the campus's own sound, on by default (owner, 2026-10-27: "sound on by default as earlier"); quieter or off in the
+  // settings. Made first: its noise buffers took 15 ms alone but ~15 s next to the GPU's shader compiles (2026-11-01 profile).
+  sound.setEnabled(true).then(updateSoundButton).catch(updateSoundButton); updateSoundButton();
   renderer.setPixelRatio(defaultPixelRatio()); renderer.setSize(innerWidth, innerHeight);
   { const pointers = new Set(), canvas = renderer.domElement, up = e => { pointers.delete(e.pointerId); dragging = pointers.size; };
     canvas.addEventListener('pointerdown', e => { pointers.add(e.pointerId); dragging = pointers.size; });
     for (const type of ['pointerup', 'pointercancel']) addEventListener(type, up); addEventListener('blur', () => { pointers.clear(); dragging = 0; }); }
+  renderer.debug.checkShaderErrors = false; // its info-log reads are a GPU round trip per program; the shaders are fixed
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .94;
-  renderer.domElement.tabIndex = 0; renderer.domElement.setAttribute('aria-label', 'Interactive building. Arrow keys rotate, plus and minus zoom, Home returns to arrival.');
+  renderer.domElement.setAttribute('aria-hidden', 'true'); // the story's copy carries the content; the view is its picture
   $('#viewport').append(renderer.domElement);
-  controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true; controls.dampingFactor = .055;
-  // The story layer exists from the start, so a visitor can step in while the campus is still being built: Enter is
-  // live at once, and the hero shows over the night until the building is ready to rise (owner, 2026-10-19: loading
-  // must feel quick). Automated runs (checks, measurements) see the finished building in the exploration layer unless
-  // they ask for the story (__story) or the rise (__playRise).
+  // The story over the live campus is the site (owner, 2026-11-01: the walk is removed for now; the model is unchanged).
+  // Automated runs skip the Enter gate and the rise unless they ask for it (__playRise).
   const automated = navigator.webdriver || window.__autoBegin || /[?&]auto\b/.test(location.search);
-  // This page is the live campus (/campus/): the story is the pre-rendered one at the site's root (src/story.js), whose
-  // doors land here, ?explore for the free camera or ?walk for the guide. ?live still plays the story live, here.
-  const params = new URLSearchParams(location.search), liveStory = params.has('live') || window.__story;
-  if (!liveStory || (automated && !window.__story)) { window.__noStory = true; window.__noRise = true; window.__enterWay = params.has('walk') ? 'walk' : 'explore'; }
   if (automated && !window.__playRise) window.__noRise = true;
   document.body.append($('#loader')); // above every layer: #experience is fixed (its own stacking context), the story sits over it
-  portfolio = createPortfolio({ scene, camera, renderer, reduced: reduced || !!window.__noRise, changed: () => { needsRender = true; }, onEnter: way => leaveStory(way) });
+  portfolio = createPortfolio({ scene, camera, renderer, reduced: reduced || !!window.__noRise, changed: () => { needsRender = true; } });
+  $('#sound').onclick = async () => { $('#sound').disabled = true; try { await sound.setEnabled(!sound.enabled); } catch { toast('Ambient sound could not start. Please try again.'); } finally { $('#sound').disabled = false; updateSoundButton(); } };
+  updateSoundButton();
   // No gate (owner, 2026-10-19: the site ships as an app, so no full-screen request): the story shows at once, its hero
   // over the night while the campus is built, and the building rises as soon as it is ready.
-  if (!automated && !window.__noStory) { entered = true; controls.enabled = false; portfolio.wait(); $('#loader').hidden = true; }
-  controls.minDistance = 13; controls.maxDistance = 260; controls.maxPolarAngle = Math.PI * .485; controls.minPolarAngle = .001; controls.enablePan = false; controls.zoomSpeed = .7; controls.rotateSpeed = .5;
-  camera.position.fromArray(cameraFor(0)); controls.target.fromArray(chapters[0].target); controls.update();
-  controls.addEventListener('start', () => { transition = null; interactive = true; stopJourney(); setOrbit(false); });
-  controls.addEventListener('change', () => { needsRender = true; });
-  entranceWalk = createEntranceWalk(camera, renderer.domElement, () => leaveHall(), () => { needsRender = true; });
-  panoramaLook = createPanoramaLook(camera, renderer.domElement, () => panorama && !entranceWalk.active, () => {
-    const direction = camera.getWorldDirection(new THREE.Vector3());
-    controls.target.copy(camera.position).addScaledVector(direction, 15);
-    needsRender = true;
-  });
-  $('#loading-status').textContent = 'Reconstructing the architecture';
-  await new Promise(resolve => requestAnimationFrame(resolve));
+  if (!automated) { entered = true; portfolio.wait(); $('#loader').hidden = true; }
+  $('#loading-status').textContent = 'Reconstructing the architecture'; loading.status('Reconstructing the architecture');
+  await painted(); // the loader's status is painted before the build holds the thread
   pieces.tagging = true; // every merged wall, slab and pane keeps its own centre, for the rise (rise.js)
   architecture = buildArchitecture(scene);
   architecture.mergedDrawCalls = mergeStaticDetail(architecture.group); // ~400 fewer draw calls
   pieces.tagging = false;
   westFittings = architecture.group.getObjectByName('West wing fittings');
-  dispensers = architecture.group.getObjectByName('West wing ground floor (video-built)')?.userData.dispensers || [];
+  dispensers = architecture.group.getObjectByName('West wing ground floor (video-built)')?.userData.dispensers || []; // they pour on their own clock (props); the walk started them
   // The hall's switch box on the east wall (entrance photos): wall tubes, ceiling fan, porch tube light.
   makeSwitchboard(architecture.interior.group, { name: 'Entrance hall', position: [3.675, 1.281, 6.568], turn: -Math.PI / 2, toggles: [
-    { get: () => hallSwitch.lights, set: on => { hallSwitch.lights = on; architecture.interior.tubes.emissiveIntensity = on ? 1.7 : .05; } },
-    { get: () => hallSwitch.fan, set: on => { hallSwitch.fan = on; } },
-    { get: () => hallSwitch.porch, set: on => { hallSwitch.porch = on; architecture.materials.porchTube.emissiveIntensity = on ? 2 : .05; updateLighting(hour); } }] });
+    { what: 'lights', get: () => hallSwitch.lights, set: on => { hallSwitch.lights = on; architecture.interior.tubes.emissiveIntensity = on ? 1.7 : .05; } },
+    { what: 'fan', get: () => hallSwitch.fan, set: on => { hallSwitch.fan = on; } },
+    { what: 'porch light', get: () => hallSwitch.porch, set: on => { hallSwitch.porch = on; architecture.materials.porchTube.emissiveIntensity = on ? 2 : .05; updateLighting(hour); } }] });
   architecture.group.traverse(o => { if (o.userData.casements) casements.push(o.userData.casements); // windows that open
     if (o.userData.clickables) clickables.push(...o.userData.clickables); if (o.userData.update) roomUpdates.push(o.userData.update); if (o.userData.interior) interiors.push(o.userData.interior); }); // switches, fans, room lights
-  { // A tap or click (not a drag) on a water machine within reach starts it pouring.
-    const canvas = renderer.domElement, ray = new THREE.Raycaster(), at = new THREE.Vector2(); let down = null;
-    canvas.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
-    canvas.addEventListener('pointerup', e => {
-      if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8 || performance.now() - down.t > 500) return;
-      const r = canvas.getBoundingClientRect(); at.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
-      ray.setFromCamera(at, camera); ray.far = 8;
-      const hit = ray.intersectObjects(dispensers.map(d => d.hit), false)[0];
-      if (hit && dispensers.find(d => d.hit === hit.object).start(sound)) { needsRender = true; return; }
-      const control = ray.intersectObjects(clickables, false)[0]; // a switch on a switchboard
-      if (control && control.object.userData.onClick()) { needsRender = true; return; }
-      ray.far = 25; // windows: tap one to open or close it (both leaves swing outward)
-      const pane = ray.intersectObjects(casements.map(c => c.group), true).find(h => h.object.userData.casement);
-      if (pane) { casements.find(c => c.windows.includes(pane.object.userData.casement)).toggle(pane.object.userData.casement); needsRender = true; }
-    });
-  }
   // Small building parts (signs, latches, fans, props): bounds once; skipped while they would cover under ~8 pixels.
   architecture.group.updateMatrixWorld(true);
   architecture.group.traverse(o => { if (!o.isMesh || o.isInstancedMesh || !o.visible) return; o.geometry.computeBoundingSphere(); const s = o.geometry.boundingSphere.clone().applyMatrix4(o.matrixWorld); if (s.radius < 1.2) smallParts.push([o, s]); });
   resolveCoplanar(architecture.group); // no flicker where two surfaces share a plane
   architecture.interior.lights.forEach(light => { light.userData.on = light.intensity; light.intensity = 0; }); // lit inside the hall only
   $('#loading-status').textContent = 'Finding the light';
-  await new Promise(resolve => requestAnimationFrame(resolve));
+  await painted();
   $('#loading-status').textContent = 'Growing the Blender landscape';
   performance.mark('architecture-built');
-  // One filter for the sky and every reflection probe: each new generator recompiled its shaders (~1.6 s apiece).
-  reflectionFilter = new THREE.PMREMGenerator(renderer);
+  const reflectionFilter = new THREE.PMREMGenerator(renderer);
   try {
     const hdr = await skyDownload; hdr.mapping = THREE.EquirectangularReflectionMapping;
     const env = reflectionFilter.fromEquirectangular(hdr);
-    scene.environment = env.texture; scene.background = hdr; scene.backgroundBlurriness = .02; scene.backgroundRotation.y = 1.9; scene.environmentRotation.y = 1.9;
+    // the background from the same filtered sky: a blurred background is drawn from a filtered map, and handing three the
+    // raw one had it filter it inside the first frame, which then built 19 programs over again (17-55 s on the owner's GPU)
+    scene.environment = env.texture; scene.background = env.texture; scene.backgroundBlurriness = .02; scene.backgroundRotation.y = 1.9; scene.environmentRotation.y = 1.9;
   } catch { console.warn('Sky map unavailable. Using daylight fallback.'); }
+  reflectionFilter.dispose();
   performance.mark('sky-ready');
   rise = createRise(); rise.attach(architecture.group); rise.attach(litWindowGroup); rise.set(-1); // patched before any shader compiles: no stall later
   landscape = await loadBlenderEnvironment(scene, group => { rectangularAprons(group); regradeGround(group); placeFacadeTrees(group); }, environmentDownload);
-  const breathe = () => new Promise(resolve => requestAnimationFrame(resolve)); // let the loader paint between stages
+  const breathe = painted; // let the page paint between stages
   await breathe();
   buildEntranceApron(landscape.group);
   puddles = createPuddles(landscape); puddles.attach(); rain.ground = (x, z) => puddles.heightAt(x, z);
@@ -537,7 +373,7 @@ async function boot() {
   await breathe();
   landscape.month = campusMonth();
   leafLitter(scene, landscape.trees, (x, z) => puddles.heightAt(x, z), { time: landscape.wind, strength: landscape.windStrength, direction: landscape.windDirection }, landscape.month);
-  landscape.batchTrees(); // after the impostor belt captured the individual trees
+  await landscape.batchTrees(); // after the impostor belt captured the individual trees (their detail levels were made meanwhile, in a worker)
   mergeStatic(surroundings.sheds); // 24 separate shed parts
   for (const root of [landscape.group, surroundings.sheds]) root.traverse(o => { // small scenery joins the far-away skip
     if (!o.isMesh || o.isInstancedMesh || o.isBatchedMesh || !o.visible) return; o.geometry.computeBoundingSphere(); const sphere = o.geometry.boundingSphere.clone().applyMatrix4(o.matrixWorld); if (sphere.radius < 1.2) smallParts.push([o, sphere]); });
@@ -557,51 +393,66 @@ async function boot() {
   rise.attach(architecture.group, scene); // again: parts built since that share the building's materials get their centres
   riseDust = createRiseDust(footprint, (x, z) => puddles.heightAt(x, z)); scene.add(riseDust.points);
   $('#loading-status').textContent = 'Compiling the light';
-  await compileShadowShaders();
-  const defaultAudio = sound.setEnabled(true);
-  updateSoundButton();
-  defaultAudio.then(updateSoundButton).catch(updateSoundButton);
+  // Every model's buffers go to the GPU while it compiles: three uploads them on an object's first draw, which cost ~3.8 s
+  // inside the first frame (2026-11-01 profile). Stand-ins share each geometry under one plain program, queued first,
+  // and draw nothing (no colour, no depth).
+  const uploads = new THREE.Scene(), unseen = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false }), geometries = new Set();
+  scene.traverse(o => { if ((o.isMesh || o.isPoints || o.isLine) && o.geometry?.attributes.position && !geometries.has(o.geometry)) {
+    geometries.add(o.geometry); const m = new THREE.Mesh(o.geometry, unseen); m.frustumCulled = false; uploads.add(m); } });
+  const uploadsCompiled = renderer.compileAsync(uploads.children[0] || uploads, camera, uploads); // one program serves them all
+  // the shadow passes' programs and the screen's, compiled together (one after the other cost ~16 s; E2E report H2)
+  const shadowsCompiled = compileShadowShaders();
   setInterval(() => { if (!document.hidden) loadWeather(); }, 5 * 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - weatherState.updatedAt > 5 * 60000) loadWeather(); });
   performance.mark('reflections-captured');
-  await renderer.compileAsync(scene, camera);
-  performance.mark('shaders-compiled');
+  const compiled = Promise.all([shadowsCompiled, renderer.compileAsync(scene, camera), portfolio.compile()]);
   // Upload every texture now: three uploads a texture the first time its object is drawn, so turning the view in the
-  // panorama stalled ~0.1 s whenever something new came into sight (measured mid-drag on the owner's laptop).
+  // panorama stalled ~0.1 s whenever something new came into sight (measured mid-drag on the owner's laptop). Done while
+  // the GPU compiles (its threads, not this one): it ran ~3 s after the compile before.
   { const seen = new Set(); scene.traverse(o => { for (const m of [o.material].flat()) if (m) for (const v of Object.values(m)) if (v?.isTexture && !v.isRenderTargetTexture && !seen.has(v)) { seen.add(v); renderer.initTexture(v); } }); }
   performance.mark('textures-uploaded');
-  // Walkable guide: collides with the building and ground, never with foliage or effects.
-  avatar = createAvatar({ scene, camera, canvas: renderer.domElement, changed: () => { needsRender = true; }, collidables: (() => {
-    let list; return () => list ||= (() => { const out = []; const add = root => root?.traverse(o => { if (o.isMesh && o.visible !== false && !o.isInstancedMesh && !o.userData.windHeight && !/Batched trees|Live rain|sky|cloud|moon|horizon|Distant/i.test(o.name + (o.parent?.name || ''))) out.push(o); });
-      add(architecture.group); add(landscape.group); add(surroundings.sheds); return out; })(); })() });
-  performance.mark('guide-built');
-  if (window.__noStory) await prepareExploration(); // straight to the free camera: ready as before
-  else if (!reduced && !window.__noRise) { landscape.lodBias = 2.4; portfolio.warm(() => { landscape.updateTreeDetail(camera); renderer.shadowMap.needsUpdate = true; renderer.render(scene, camera); }); }
+  await uploadsCompiled;
+  { const clear = renderer.autoClear, shadows = renderer.shadowMap.needsUpdate; renderer.autoClear = false; renderer.shadowMap.needsUpdate = false;
+    try { renderer.render(uploads, camera); } finally { renderer.autoClear = clear; renderer.shadowMap.needsUpdate = shadows; unseen.dispose(); } }
+  performance.mark('models-uploaded');
+  // Each program is finished (its uniforms read) as soon as the GPU reports it compiled, while the rest still compile:
+  // three does this on a program's first draw, one after another, which held the first frame ~12 s (2026-11-01).
+  { let done = false; compiled.then(() => { done = true; }, () => { done = true; });
+    const gl = renderer.getContext(), parallel = gl.getExtension('KHR_parallel_shader_compile'), finished = new Set();
+    const finish = all => { for (const p of renderer.info.programs) if (!finished.has(p) && (all || !parallel || gl.getProgramParameter(p.program, parallel.COMPLETION_STATUS_KHR))) { finished.add(p); p.getUniforms(); } };
+    while (!done) { finish(false); window.__stageNow(); await new Promise(r => setTimeout(r, 16)); }
+    await compiled; finish(true); }
+  performance.mark('shaders-compiled');
+  if (!reduced && !window.__noRise) { landscape.lodBias = 2.4; portfolio.warm(() => { landscape.updateTreeDetail(camera); renderer.shadowMap.needsUpdate = true; staticShadows(); renderer.render(scene, camera); }); }
   ready = true; window.__portrait.ready = true; readyAt = performance.now();
-  // The portfolio layer comes first: the story of the department over the live campus, then the doors into it.
-  // Automated runs (checks, measurements) see the finished building in the exploration layer unless they ask for the
-  // story (__story) or the rise (__playRise).
-  if (!window.__noStory) { controls.enabled = false; portfolio.show(); }
+  portfolio.show();
   renderer.render(scene, camera);
   // One tap to begin (owner, 2026-10-18: full screen by default). Browsers only allow full screen, and sound, from a
   // tap, click or key, so the loader ends on an Enter button; that one gesture goes full screen, starts the ambience
   // and starts the building rising. Automated runs (and our test scripts) skip it.
-  if (automated || entered || window.__noStory) begin(false); // in already: the building rises now (or the campus opens)
+  if (automated || entered) begin(false); // in already: the building rises now (or the campus opens)
   else { $('#loader').classList.add('gate'); $('#loading-status').textContent = ''; const go = $('#begin'); go.hidden = false; go.focus({ preventScroll: true }); go.onclick = () => begin(true); }
   loadWeather();
-  drawPlan(); resize(); requestAnimationFrame(animate);
+  resize(); requestAnimationFrame(animate);
 }
 // Shadow-map shaders are only built when shadows first render, synchronously (~6 s here). Compile them ahead, in
 // parallel: give each shadow caster the exact material three's shadow pass will use, then restore it.
 // The shadow passes' programs, for everything under root. compile() creates the programs synchronously and only their
 // readiness is waited for, so the shadow materials are swapped back at once: the scene is never left in its shadow dress
 // while other work runs.
+// The lights whose maps are drawn once (the porch and the hall lights), drawn with the building standing: the warm-up
+// runs before the rise, and maps drawn underground were redrawn on entering the hall. One shadow pass, then the rise
+// goes back where it was.
+function staticShadows() {
+  const t = rise.time; rise.set(1e6); entranceLight.shadow.needsUpdate = true; architecture.interior.lights.forEach(l => { l.shadow.needsUpdate = true; });
+  renderer.shadowMap.needsUpdate = true; renderer.render(scene, camera); rise.set(t); // behind the loader, never shown
+}
 function compileShadowShaders(root = scene) {
   const kinds = new Set();
   scene.traverse(o => { if (o.isLight && o.castShadow) kinds.add(o.isPointLight ? 'distance' : 'depth'); });
   const flip = { [THREE.FrontSide]: THREE.BackSide, [THREE.BackSide]: THREE.FrontSide, [THREE.DoubleSide]: THREE.DoubleSide };
   const plain = { depth: new THREE.MeshDepthMaterial(), distance: new THREE.MeshDistanceMaterial() };
-  const pending = [];
+  const pending = [], target = new THREE.WebGLRenderTarget(1, 1);
   for (const kind of kinds) {
     const swapped = [];
     root.traverseVisible(o => {
@@ -611,11 +462,18 @@ function compileShadowShaders(root = scene) {
       Object.assign(shadow, { side: m.shadowSide ?? flip[m.side], alphaMap: m.alphaMap, alphaTest: m.alphaToCoverage ? .5 : m.alphaTest, map: m.map, displacementMap: m.displacementMap, displacementScale: m.displacementScale });
       swapped.push([o, m]); o.material = shadow;
     });
+    // compile() walks every object, hidden ones too: the rest go without a material for the call, or their screen
+    // materials would compile a linear set for this target (44 programs, ~29 s on the owner's GPU)
+    const casters = new Set(swapped.map(([o]) => o)), blank = [];
+    root.traverse(o => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.material && !casters.has(o)) { blank.push([o, o.material]); o.material = null; } });
     const fog = scene.fog; scene.fog = null; // the shadow pass renders without the scene, so without fog
+    // and into its map: a render target bound, so the programs are its own (linear, untonemapped). Compiled for the
+    // screen, all 19 were built again inside the first frame (17-55 s on the owner's GPU).
+    const previous = renderer.getRenderTarget(); renderer.setRenderTarget(target);
     try { pending.push(renderer.compileAsync(root, camera, scene)); }
-    finally { scene.fog = fog; for (const [o, m] of swapped) o.material = m; }
+    finally { renderer.setRenderTarget(previous); scene.fog = fog; for (const [o, m] of [...swapped, ...blank]) o.material = m; }
   }
-  return Promise.all(pending);
+  return Promise.all(pending).finally(() => target.dispose());
 }
 let previous = performance.now(), frames = 0, hallLit = false, hallFanSpeed = 1;
 let rise, riseDust, riseStart = 0, riseClock = 0; // the arrival: the building rising out of the land; its own clock
@@ -624,81 +482,38 @@ function goFullscreen() { // the whole page, so the story scrolls in full screen
   const el = document.documentElement, ask = el.requestFullscreen || el.webkitRequestFullscreen;
   if (!document.fullscreenElement && ask) try { const r = ask.call(el, { navigationUI: 'hide' }); r?.catch?.(() => {}); } catch {}
 }
-function openDoors() { doorsOpen = true; $('#door span').textContent = 'Close the doors'; $('#door').setAttribute('aria-pressed', 'true'); }
+function openDoors() { doorsOpen = true; }
 function begin(gesture) {
   performance.mark('begin');
   if (gesture) { goFullscreen(); resumeDefaultSound(); }
-  if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; } else { riseStart = 1; riseClock = -.75 * RISE_RATE; } // the arrival, once the loader has faded
+  if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = entranceLight.shadow.needsUpdate = true; architecture.interior.lights.forEach(l => { l.shadow.needsUpdate = true; }); } else { riseStart = 1; riseClock = -.75 * RISE_RATE; } // the arrival, once the loader has faded
   // the story walks in through the front doors
-  if (window.__noStory) leaveStory(window.__enterWay || 'explore'); else { openDoors(); portfolio.play(RISE_LENGTH / RISE_RATE, .75); }
+  openDoors(); portfolio.play(RISE_LENGTH / RISE_RATE, .75); arrival();
+  loading.finish(); // the view flies into the views as the building starts to rise (the campus page: once it is open)
   $('#loader').classList.add('loaded'); setTimeout(() => $('#loader').hidden = true, reduced ? 0 : 700); needsRender = true;
 }
-let reflectionFilter, explorationReady = null, explored = false;
-// The reflection captures and the shader warm-up serve the free camera (glass and puddles seen up close, the panorama's
-// turns). The story starts without them, its glass lit by the sky's own reflection, and they run once, behind the
-// loader, when the visitor first leaves the story (they cost ~30 s of the load on an integrated GPU).
-function prepareExploration() {
-  return explorationReady ||= (async () => {
-    const glass = [architecture.materials.glass, architecture.materials.rearGlass, architecture.materials.entranceReflectiveGlass];
-    glass.forEach(material => { material.visible = false; });
-    // Shaders compile in parallel off the main thread: first the reflection probes' linear (untonemapped) variants,
-    // then the screen's. Compiling them inside the first render froze the page for ~20 s on integrated GPUs.
-    // The reflections show the building and the sky; the 7-million-triangle campus environment around it is left out of
-    // them (it cost ~45 s of the load on an integrated GPU, compiling and drawing into twenty-four cube faces).
-    const environment = scene.getObjectByName('Blender campus environment'), environmentShown = environment?.visible;
-    if (environment) environment.visible = false;
-    const probeTarget = new THREE.WebGLCubeRenderTarget(4, { type: THREE.HalfFloatType });
-    renderer.setRenderTarget(probeTarget);
-    try { await renderer.compileAsync(scene, camera); } finally { renderer.setRenderTarget(null); probeTarget.dispose(); }
-    performance.mark('probe-shaders-compiled');
-    try {
-      for (const [i, position] of [[0, 6, 20], [0, 6, -9], [0, 2.2, 7.25]].entries()) {
-        // The entrance needs a crisp reflection; capture it once, without a per-frame render pass.
-        const probe = new THREE.WebGLCubeRenderTarget(i === 2 ? 512 : 128, { type: THREE.HalfFloatType });
-        const probeCamera = new THREE.CubeCamera(.2, 180, probe);
-        try {
-          probeCamera.position.fromArray(position); probeCamera.update(renderer, scene); performance.mark(`probe-${i}-rendered`);
-          glass[i].envMap = reflectionFilter.fromCubemap(probe.texture).texture;
-          glass[i].needsUpdate = true;
-        } finally {
-          probe.dispose();
-        }
-      }
-      // Ground-level view in front of the building for the puddles (one capture; parallax is not tracked).
-      { const probe = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType }), cam = new THREE.CubeCamera(.1, 200, probe);
-        try { cam.position.set(0, .35, 15); cam.update(renderer, scene); puddles.setReflection(reflectionFilter.fromCubemap(probe.texture).texture); } finally { probe.dispose(); } }
-    } finally {
-      glass.forEach(material => { material.visible = true; });
-      if (environment) environment.visible = environmentShown;
-    }
-    reflectionFilter.dispose();
-    performance.mark('reflections-captured');
-    await renderer.compileAsync(scene, camera); // the glass and puddles, recompiled with their new reflections
-    // Draw the scene once in six directions: ANGLE (D3D11) finishes each shader the first time it draws on screen, so
-    // the first turn of the panorama stalled 0.1-0.6 s per new view.
-    const facing = camera.quaternion.clone(), ahead = new THREE.Vector3();
-    for (const d of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, .01], [0, -1, .01]]) { camera.lookAt(ahead.copy(camera.position).add(new THREE.Vector3(...d))); renderer.render(scene, camera); }
-    camera.quaternion.copy(facing);
-    explored = true; performance.mark('exploration-ready');
-  })();
+// The arrival plays once a session (E2E report H1): not again on a reload, nor on Back to the story (which comes back
+// to the same place, H3), nor on a link to a chapter (M1); any key, click, wheel or touch ends it, and the building
+// stands at once.
+function arrival() {
+  const nav = performance.getEntriesByType('navigation')[0]?.type, saved = +(sessionStorage.getItem('storyY') || 0);
+  // A refresh opens the story from its beginning (owner, 2026-10-27): its saved place and the chapter in its address
+  // (which follows the reading) are both set aside. Back returns to the place; a chapter link opened afresh goes there.
+  const returnY = nav === 'back_forward' ? saved : 0;
+  if (nav === 'reload') { if (location.hash) history.replaceState(history.state, '', location.pathname + location.search); portfolio.lenis.scrollTo(0, { immediate: true, force: true }); }
+  const hashIdx = nav !== 'reload' && location.hash.length > 1 ? portfolio.sectionIndex(decodeURIComponent(location.hash.slice(1))) : -1;
+  const end = () => {
+    if (!portfolio.introPlaying) return;
+    portfolio.skipIntro(); rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; needsRender = true;
+    if (returnY > 0 && hashIdx < 0) portfolio.jumpTo(returnY); else if (hashIdx > 0) portfolio.jumpTo(portfolio.scrollFor(hashIdx));
+  };
+  if (reduced || sessionStorage.getItem('introSeen') === '1' || returnY > 0 || hashIdx > 0) end();
+  else for (const e of ['keydown', 'wheel', 'touchstart', 'pointerdown']) addEventListener(e, () => { if (portfolio.introPlaying) end(); }, { passive: true });
+  sessionStorage.setItem('introSeen', '1');
 }
-async function leaveStory(way) {
-  if (!explored) {
-    const loader = $('#loader'); loader.hidden = false; loader.classList.remove('loaded', 'gate'); $('#loading-status').textContent = 'Opening the campus';
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); await prepareExploration();
-    loader.classList.add('loaded'); setTimeout(() => { loader.hidden = true; }, reduced ? 0 : 700);
-  }
-  portfolio.hide(); scrollTo(0, 0); controls.enabled = true; camera.fov = 43; camera.updateProjectionMatrix();
-  controls.target.copy(camera.position).add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(30)); controls.update();
-  if (way === 'walk') enterAvatar(); else selectChapter(0);
-  renderer.domElement.focus({ preventScroll: true }); needsRender = true;
-}
-function showStory() {
-  if (avatar?.active) leaveAvatar(); if (entranceWalk?.active) leaveHall(false);
-  setPanorama(false); stopJourney(); setOrbit(false); transition = null; controls.enabled = false; openDoors(); portfolio.show(); needsRender = true;
-}
+addEventListener('pagehide', () => { if (portfolio?.active) sessionStorage.setItem('storyY', String(Math.round(portfolio.placeY()))); });
 let westFittings = null, dispensers = [], casements = [], clickables = [], roomUpdates = [], interiors = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
-// What the camera can see: far small parts skipped, rooms' fittings only from inside (shared by the loop and snapshots).
+// What the camera can see: far small parts skipped, rooms' fittings only from inside (the loop's).
 function cullForCamera() {
   if (westFittings) westFittings.visible = westBox.distanceToPoint(camera.position) < 30; // far away they are sub-pixel
   // Every draw call costs CPU and GPU-process time on ANGLE: ~170 tiny ones made every few frames late (p90 50 ms).
@@ -707,134 +522,16 @@ function cullForCamera() {
   for (const { bounds, parts } of interiors) { const inside = bounds.distanceToPoint(camera.position) < 1.5; for (const p of parts) p.visible = inside; }
 }
 
-// Snapshots (portfolio/tools/snapshots.mjs drives this over the DevTools protocol): the story's frames, shot from the
-// real scene at the story's own camera poses, each with a depth image for the snapshot page's 3D parallax.
-let snapshotting = false;
-const snapshot = (() => {
-  let size = null, depthMaterial = null, faded = null, building = null;
-  // Outdoors, where a tree near the camera stands in front of the department it becomes a shadow (owner, 2026-10-25/26,
-  // after Kage's dark foreground foliage): those parts of it are drawn dark and a little see-through, still plainly a
-  // tree; a far tree, or one beside the building or before sky and lawn, is drawn as it is (owner: "those trees are
-  // becoming invisible unnecessarily"). Which parts: a pass before the
-  // frame draws the department alone into a log-depth image (uBuild); a tree fragment nearer than the building at its
-  // pixel (eight taps round it and its own, for a soft edge) is in the way. (A first take faded every tree near the
-  // middle of the frame, those flanking the building too; a second shaded by distance from the camera, which left
-  // the trees hiding the building at the hero untouched.)
-  const treeFade = { value: 0 }, buildDepth = { value: null }, frame = { value: new THREE.Vector2(1, 1) };
-  const fadeTrees = on => {
-    if (!faded) {
-      const mats = new Set();
-      scene.traverse(o => { if (o.isBatchedMesh && /Batched trees/.test(o.name)) mats.add(o.material); if (/tree belt/i.test(o.name)) o.traverse(m => { if (m.material) mats.add(m.material); }); });
-      faded = [...mats].map(m => [m, m.transparent]);
-      for (const [m] of faded) {
-        const before = m.onBeforeCompile, key = m.customProgramCacheKey;
-        m.customProgramCacheKey = () => (key && key !== THREE.Material.prototype.customProgramCacheKey ? key.call(m) : '') + '|tree-shade';
-        m.onBeforeCompile = (sh, r) => {
-          before?.call(m, sh, r);
-          Object.assign(sh.uniforms, { uTreeFade: treeFade, uBuild: buildDepth, uFrame: frame });
-          sh.fragmentShader = 'uniform float uTreeFade; uniform sampler2D uBuild; uniform vec2 uFrame;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `#include <opaque_fragment>
-            if (uTreeFade > .5) {
-              float zt = -vViewPosition.z, o = 0.; // this fragment's view depth; o: the share of taps where it hides the building
-              for (int i = 0; i < 9; i++) {
-                float a = float(i) * 2.0944, r = i == 0 ? 0. : (i < 5 ? 10. : 22.);
-                float v = texture2D(uBuild, (gl_FragCoord.xy + r * vec2(cos(a + float(i)), sin(a + float(i)))) / uFrame).r;
-                float zb = .3 * exp((1. - v) * 6.9078);
-                o += v > .004 && zt < zb - max(1., zb * .05) ? 1. : 0.;
-              }
-              o = o / 9. * (1. - smoothstep(14., 32., zt)); // only near the camera: a far tree in front of the building is as it is
-              gl_FragColor.rgb *= mix(1., .32, o); gl_FragColor.a *= mix(1., .8, o); // a dark silhouette, still plainly a tree
-            }`);
-        };
-        m.needsUpdate = true;
-      }
-    }
-    treeFade.value = on ? 1 : 0;
-    for (const [m, t] of faded) if (m.transparent !== (on || t)) { m.transparent = on || t; m.needsUpdate = true; }
-  };
-  return {
-    setup({ w, h }) {
-      snapshotting = true; size = { w, h };
-      renderer.setPixelRatio(1); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
-      controls.enabled = false;
-      for (const o of portfolio.overlays()) o.visible = false;
-      if (landscape) landscape.lodBias = 1;
-      depthMaterial = new THREE.MeshDepthMaterial({ side: THREE.DoubleSide });
-      depthMaterial.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('gl_FragColor = vec4( vec3( 1.0 - fragCoordZ ), opacity );',
-        '// view depth, log-scaled from 0.3 m (white) to 300 m (black)\n\t\tgl_FragColor = vec4( vec3( 1.0 - clamp( log( max( vHighPrecisionZW[ 1 ], 0.3 ) / 0.3 ) / log( 1000.0 ), 0.0, 1.0 ) ), 1.0 );'); };
-      building = new THREE.WebGLRenderTarget(w, h, { depthBuffer: true }); buildDepth.value = building.texture; frame.value.set(w, h);
-      return { aspect: w / h, riseLength: RISE_LENGTH / RISE_RATE };
-    },
-    plan: opts => portfolio.renderPlan(opts),
-    // item: from plan(); returns [colour webp data URL, depth webp data URL at half size, or null]
-    shoot(item, { quality = .8, shadows = false, moon = null, depth = false } = {}) {
-      const t = item.fly < 1 ? item.fly * (RISE_LENGTH + .6 * RISE_RATE) : 1e6;
-      rise.set(t); riseDust.set(t); riseDust.material.uniforms.uLight.value = 1 - .8 * sunlight.night;
-      fadeTrees(!!item.outdoor);
-      portfolio.poseFor(item, size.w / size.h);
-      if (moon) { const m = scene.getObjectByName('Photographic phased moon'); if (m) { m.position.copy(camera.position).addScaledVector(new THREE.Vector3(...moon.dir).normalize(), 240); m.lookAt(camera.position); m.scale.setScalar(moon.scale ?? 1); m.renderOrder = -1; } } // before the trees: a faded tree's depth would otherwise cut the moon into fragments
-      landscape.updateTreeDetail(camera); cullForCamera();
-      if (item.outdoor) { // the department alone, as log depth: where the trees are in its way (fadeTrees)
-        const dept = scene.getObjectByName('Reference-built department'), hidden = scene.children.filter(o => o !== dept && o.visible);
-        const bg = scene.background, fog = scene.fog;
-        hidden.forEach(o => { o.visible = false; }); scene.background = new THREE.Color(0); scene.fog = null; scene.overrideMaterial = depthMaterial;
-        renderer.setRenderTarget(building); renderer.render(scene, camera); renderer.setRenderTarget(null);
-        scene.overrideMaterial = null; scene.background = bg; scene.fog = fog; hidden.forEach(o => { o.visible = true; });
-      }
-      if (shadows || item.fly < 1) renderer.shadowMap.needsUpdate = true;
-      renderer.render(scene, camera);
-      const colour = renderer.domElement.toDataURL('image/webp', quality);
-      if (!depth) return [colour, null];
-      // the depth image (the snapshot page's parallax): the faded trees are left out of it, so they do not warp
-      const hidden = item.outdoor ? faded.flatMap(([m]) => { const out = []; scene.traverse(o => { if (o.material === m && o.visible) { o.visible = false; out.push(o); } }); return out; }) : [];
-      const bg = scene.background, fog = scene.fog; scene.background = new THREE.Color(0); scene.fog = null; scene.overrideMaterial = depthMaterial;
-      renderer.render(scene, camera);
-      scene.overrideMaterial = null; scene.background = bg; scene.fog = fog; hidden.forEach(o => { o.visible = true; });
-      const half = document.createElement('canvas'); half.width = size.w / 2; half.height = size.h / 2;
-      half.getContext('2d').drawImage(renderer.domElement, 0, 0, half.width, half.height);
-      return [colour, half.toDataURL('image/webp', .9)];
-    },
-  };
-})();
 
 function animate(now) {
   requestAnimationFrame(animate);
-  if (snapshotting) return; // tools/snapshots.mjs owns the camera and the canvas
   const frameDuration = now - previous;
   const dt = Math.min(frameDuration / 1000, .06); previous = now;
   if (document.hidden || !ready) return;
   const modalOpen = !!document.querySelector('dialog[open]');
   if (modalOpen) return;
-  panoramaLook.update(Math.min(frameDuration / 1000, .1));
   if (portfolio?.active) {
     if (portfolio.update(Math.min(frameDuration / 1000, .1), { light: 1 - .8 * sunlight.night })) needsRender = true;
-  } else if (avatar?.active) {
-    avatar.update(Math.min(frameDuration / 1000, .1)); needsRender = true;
-    if (frames % 6 === 0) $('#avatar-readout').textContent = avatar.text().replace(/^Avatar: /, '');
-    // The panel steps out of the way while walking, turning or looking, and returns once the guide stands still.
-    const i = avatar.input; if (i.forward || i.strafe || i.turn || dragging) avatarMovedAt = now;
-    $('#avatar-panel').classList.toggle('quiet', now - avatarMovedAt < 1200);
-  } else if (entranceWalk?.active) {
-    entranceWalk.update(Math.min(frameDuration / 1000, .1));
-  } else if (transition) {
-    const raw = THREE.MathUtils.clamp((now - transition.start) / transition.duration, 0, 1), t = raw * raw * raw * (raw * (raw * 6 - 15) + 10);
-    camera.position.lerpVectors(transition.from, transition.to, t); controls.target.lerpVectors(transition.fromTarget, transition.toTarget, t);
-    if (raw >= 1) transition = null;
-    needsRender = true;
-  } else if (journey) {
-    // A queued RAF timestamp can precede a click handler on a busy device.
-    const elapsed = Math.max(0, now - journeyStart), t = (elapsed / 56000) % 1;
-    const eye = tourCurve.getPoint(t), look = lookCurve.getPoint(t);
-    if (small()) eye.sub(look).multiplyScalar(1.45).add(look);
-    const blend = THREE.MathUtils.smoothstep(elapsed, 0, 2200);
-    camera.position.lerpVectors(tourFrom, eye, blend); controls.target.lerpVectors(tourLookFrom, look, blend);
-    const chapter = t < .23 ? 0 : t < .36 ? 1 : t < .62 ? 2 : t < .9 ? 3 : 0;
-    if (chapter !== selected) updateChapter(chapter);
-    $('#journey-track span').style.transform = `scaleX(${t})`; needsRender = true;
-  } else if (drift && !interactive && !isOrbiting && !reduced) {
-    const base = new THREE.Vector3(...cameraFor(selected)); const look = new THREE.Vector3(...chapters[selected].target);
-    const theta = Math.sin(now * .00007) * .014;
-    base.sub(look).applyAxisAngle(new THREE.Vector3(0, 1, 0), theta).add(look);
-    camera.position.lerp(base, 1 - Math.exp(-dt * 1.5)); needsRender = true;
   }
   if (liveClock && now - lastClockSync > 15000) { lastClockSync = now; setHour(localHour(), { manual: false }); updateMoon(); }
   if (Date.now() - moonState.updatedAt > 30000) updateMoon();
@@ -858,18 +555,15 @@ function animate(now) {
       }
     }
   }
-  // Orbit speed follows wall time, including slower devices; damping is for pointer input.
-  if (!entranceWalk?.active && !panorama && !avatar?.active && !portfolio?.active) controls.update(Math.min(frameDuration / 1000, 1));
   const windSpeed = updateWind(landscape, weatherState, dt, reduced);
   hallFanSpeed += ((hallSwitch.fan ? 1 : 0) - hallFanSpeed) * Math.min(1, dt * (hallSwitch.fan ? .8 : .35)); // spins up, coasts down
   if (!reduced && hallFanSpeed > .002) architecture.interior.fan.rotation.y += hallFanSpeed * 12 * dt;
-  if (!reduced && entranceWalk?.active) for (const fan of architecture.classroomFans) fan.rotation.y += dt * 4;
   rain.update(dt, weatherState, reduced, windSpeed);
   puddles?.update(dt, weatherState, reduced, scene.environmentIntensity);
   // Hall lights only while the camera is inside the entrance hall; elsewhere they cost every lit pixel for nothing.
-  const inHall = entranceWalk?.active || Math.abs(camera.position.x) < 4.2 && camera.position.z > -7.2 && camera.position.z < 7.6 && camera.position.y < 4.4;
+  const inHall = Math.abs(camera.position.x) < 4.2 && camera.position.z > -7.2 && camera.position.z < 7.6 && camera.position.y < 4.4;
   const hallOn = inHall && hallSwitch.lights; // the wall tubes are lit only when switched on (and drawn only inside the hall)
-  if (hallLit !== hallOn) { hallLit = hallOn; architecture.interior.lights.forEach(light => { light.intensity = hallOn ? light.userData.on : 0; light.shadow.needsUpdate = true; }); renderer.shadowMap.needsUpdate = true; needsRender = true; }
+  if (hallLit !== hallOn) { hallLit = hallOn; architecture.interior.lights.forEach(light => { light.intensity = hallOn ? light.userData.on : 0; }); needsRender = true; } // their maps don't change with the switch: redrawn here, entering the hall froze ~0.45 s
   if (weatherState.storm && !reduced) {
     nextStrike ||= now + 5000 + Math.random() * 15000;
     if (now > nextStrike) {
@@ -896,7 +590,7 @@ function animate(now) {
   sky.update(now / 1000, sunlight.night, weatherState, reduced);
   // Even pacing: draw every Nth display frame so motion advances in equal steps.
   // While a finger or mouse is dragging the view, draw every frame the display offers: input must track the hand.
-  if ((needsRender || !reduced) && !(quality === 'auto' && !dragging && now - lastRendered < cadence * 1000 / 60 - 4)) {
+  if ((needsRender || !reduced) && !(!dragging && now - lastRendered < cadence * 1000 / 60 - 4)) {
     const interval = now - lastRendered;
     if (landscape) landscape.lodBias = portfolio?.flying ? 2.4 : 1; // coarser trees while the arrival flight sweeps round
     landscape.updateTreeDetail?.(camera);
@@ -906,8 +600,8 @@ function animate(now) {
     cullForCamera();
     renderer.render(scene, camera);
     portfolio?.afterRender(); // the story's live windows onto other rooms
-    if (++frames % 60 === 0) drawPlan();
-    if (quality === 'auto' && !reduced && frames > 12 && interval < 250) adaptResolution(interval, now);
+    ++frames;
+    if (!reduced && frames > 12 && interval < 250) adaptResolution(interval, now);
     needsRender = false; lastRendered = now;
   }
 }
@@ -918,151 +612,25 @@ function animate(now) {
   let device, visit;
   try { device = localStorage.getItem('visitor-id') || (localStorage.setItem('visitor-id', device = rid()), device); } catch { device = rid(); }
   try { visit = sessionStorage.getItem('visit-id') || (sessionStorage.setItem('visit-id', visit = rid()), visit); } catch { visit = rid(); }
-  const send = () => fetch('/api/visit', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' }, body: JSON.stringify({
-    d: device, v: visit, p: location.pathname, r: document.referrer ? new URL(document.referrer).host : '', s: `${screen.width}x${screen.height}`,
-    l: navigator.language, tz: Intl.DateTimeFormat().resolvedOptions().timeZone }) }).catch(() => {});
-  send(); setInterval(() => { if (!document.hidden) send(); }, 30000); // keeps 'online now' current on the dashboard
-  addEventListener('pagehide', send);
+  const body = () => JSON.stringify({ d: device, v: visit, p: location.pathname, r: document.referrer ? new URL(document.referrer).host : '',
+    s: `${screen.width}x${screen.height}`, l: navigator.language, tz: Intl.DateTimeFormat().resolvedOptions().timeZone });
+  let fails = 0; // two failures in a row and the log stops for this visit (E2E 2026-11-01: a failing API was asked every 30 s)
+  const send = () => fetch('/api/visit', { method: 'POST', keepalive: true, headers: { 'content-type': 'application/json' }, body: body() })
+    .then(r => { fails = r.ok ? 0 : fails + 1; }, () => { fails++; });
+  send();
+  const beat = setInterval(() => { if (fails >= 2) clearInterval(beat); else if (!document.hidden) send(); }, 30000); // keeps 'online now' current on the dashboard
+  addEventListener('pagehide', () => { if (fails < 2 && !navigator.sendBeacon?.('/api/visit', new Blob([body()], { type: 'application/json' }))) send(); });
 })();
-window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get entranceWalk() { return entranceWalk; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get controls() { return controls; }, get selected() { return selected; }, get journey() { return journey; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get avatar() { return avatar; }, get puddles() { return puddles; }, get rise() { return rise; }, get portfolio() { return portfolio; }, snapshot, get riseDust() { return riseDust; }, playRise() { riseStart = 1; riseClock = 0; rise.set(0); }, RISE_LENGTH, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
-boot().catch(e => { console.error(e); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
+window.__portrait = { ready: false, scene, camera, footprint, sound, weather: weatherState, moon: moonState, refreshWeather: loadWeather, get rain() { return rain; }, get lightning() { return { light: lightning, strike, nextStrike }; }, get architecture() { return architecture; }, get landscape() { return landscape; }, get surroundings() { return surroundings; }, get renderer() { return renderer; }, get doorsOpen() { return doorsOpen; }, get hour() { return hour; }, get liveClock() { return liveClock; }, get lastRendered() { return lastRendered; }, get cadence() { return cadence; }, get puddles() { return puddles; }, get rise() { return rise; }, get portfolio() { return portfolio; }, get riseDust() { return riseDust; }, playRise() { riseStart = 1; riseClock = 0; rise.set(0); }, RISE_LENGTH, tuning: { setRatio: r => setRatio(r), setCadence: n => { cadence = n; } }, THREE };
+boot().catch(e => { console.error(e); loading.finish(); $('#loader').innerHTML = '<p>The scene could not load.</p><button class="primary-btn" onclick="location.reload()">Try again</button>'; });
 
 let toastTimer;
 function toast(message) { $('#toast').textContent = message; $('#toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').hidden = true, 3300); }
-document.querySelectorAll('[data-chapter]').forEach(b => b.addEventListener('click', () => selectChapter(+b.dataset.chapter)));
-$('#next').onclick = () => selectChapter((selected + 1) % chapters.length);
-$('#explore').onclick = () => selectChapter(1);
-function leaveHall(returnToEntrance = true) {
-  entranceWalk.exit(); controls.enabled = true;
-  camera.fov = 43; camera.updateProjectionMatrix();
-  $('#experience').classList.remove('interior-view');
-  $('#scene-mode').textContent = 'LIVE EXPLORATION';
-  if (returnToEntrance) { selectChapter(1); $('#enter-hall').focus(); }
-}
-$('#enter-hall').onclick = () => { if (avatar?.active) leaveAvatar();
-  if (!ready) return;
-  stopJourney(); setOrbit(false); setPanorama(false); transition = null; interactive = true;
-  $('#experience').classList.remove('footprint-view');
-  doorsOpen = true; $('#door span').textContent = 'Close the doors'; $('#door').setAttribute('aria-pressed', 'true');
-  architecture.doors.forEach(d => { d.pivot.rotation.y = d.openAngle; });
-  renderer.shadowMap.needsUpdate = entranceLight.shadow.needsUpdate = true;
-  architecture.interior.lights.forEach(light => { light.shadow.needsUpdate = true; });
-  controls.enabled = false; camera.fov = 68; camera.updateProjectionMatrix();
-  $('#experience').classList.add('interior-view'); $('#scene-mode').textContent = 'ENTRANCE HALL';
-  entranceWalk.enter(); entranceWalk.update(0); needsRender = true;
-};
-$('.brand').onclick = e => { e.preventDefault(); selectChapter(0); };
-$('#reset').onclick = () => { if (entranceWalk?.active) { entranceWalk.resetLook(); camera.fov = 68; camera.updateProjectionMatrix(); } else selectChapter(0); };
-$('#film').onclick = startJourney;
-$('#sound').onclick = async () => {
-  $('#sound').disabled = true;
-  try {
-    await sound.setEnabled(!sound.enabled);
-    updateSoundButton();
-  } catch { toast('Ambient sound could not start. Please try again.'); }
-  finally { $('#sound').disabled = false; }
-};
-$('#ambient-volume').oninput = e => {
-  sound.setVolume(+e.target.value / 100); $('#volume-output').textContent = `${e.target.value}%`;
-};
 function syncSound() {
   sound.setMuted(document.hidden).catch(() => {});
 }
 document.addEventListener('visibilitychange', syncSound);
-$('#orbit').onclick = () => { if (avatar?.active) leaveAvatar(); if (entranceWalk?.active) return; setPanorama(false); stopJourney(); transition = null; interactive = true; setOrbit(!isOrbiting); };
-$('#panorama').onclick = () => { if (avatar?.active) leaveAvatar();
-  if (entranceWalk?.active) {
-    entranceWalk.exit();
-    $('#experience').classList.remove('interior-view');
-    $('#scene-mode').textContent = 'LIVE EXPLORATION';
-    setPanorama(true);
-    renderer.domElement.focus({ preventScroll: true });
-    needsRender = true;
-    return;
-  }
-  stopJourney(); transition = null; interactive = true; setOrbit(false);
-  setPanorama(!panorama);
-  if (panorama) {
-    $('#experience').classList.remove('footprint-view');
-    renderer.domElement.focus({ preventScroll: true });
-    needsRender = true;
-  }
-};
-for (const [id, factor] of [['zoom-in', .8], ['zoom-out', 1.25]]) $(`#${id}`).onclick = () => {
-  if (!controls) return;
-  if (entranceWalk?.active) { camera.fov = THREE.MathUtils.clamp(camera.fov * factor, 48, 90); camera.updateProjectionMatrix(); needsRender = true; return; }
-  if (panorama) { panoramaLook.move(factor < 1 ? 1 : -1); return; }
-  stopJourney(); interactive = true; setOrbit(false);
-  const v = camera.position.clone().sub(controls.target); v.setLength(THREE.MathUtils.clamp(v.length() * factor, controls.minDistance, controls.maxDistance));
-  fly(v.add(controls.target).toArray(), controls.target.toArray(), 600);
-};
-$('#plan').onclick = $('#mobile-plan').onclick = () => { if (avatar?.active) leaveAvatar(); setPanorama(false); stopJourney(); interactive = true; setOrbit(false); $('#experience').classList.add('footprint-view'); fly([0, small() ? 210 : 100, .1], [0, 0, 0]); };
-$('#door').onclick = () => { doorsOpen = !doorsOpen; $('#door span').textContent = doorsOpen ? 'Close the doors' : 'Open the doors'; $('#door').setAttribute('aria-pressed', doorsOpen); };
-$('#light').onclick = () => { const open = $('#light-panel').hidden; $('#light-panel').hidden = !open; $('#light').setAttribute('aria-expanded', open); };
-$('#light-close').onclick = () => { $('#light-panel').hidden = true; $('#light').setAttribute('aria-expanded', false); $('#light').focus(); };
-$('#hour').oninput = e => setHour(+e.target.value);
-$('#live-clock').onchange = e => { liveClock = e.target.checked; if (liveClock) setHour(localHour(), { manual: false }); updateMoon(); };
-document.querySelectorAll('[data-hour]').forEach(b => b.onclick = () => setHour(+b.dataset.hour));
-$('#motion').onchange = e => { drift = e.target.checked; interactive = !drift; };
-$('#quality').onchange = e => { quality = e.target.value; frameSamples.length = 0; resolutionCap = Infinity; cadence = cadenceFloor = 1; if (renderer) { setRatio(quality === 'high' ? Math.min(devicePixelRatio, 2) : quality === 'low' ? .9 : defaultPixelRatio()); needsRender = true; } };
-$('#capture').onclick = () => { if (!renderer) return; renderer.render(scene, camera); renderer.domElement.toBlob(blob => { if (!blob) return toast('Could not save the photograph.'); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'instrument-technology.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); toast('Your campus photograph is ready.'); }); };
-$('#fullscreen').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else goFullscreen(); } catch { toast('Full screen is unavailable in this browser.'); } };
-document.addEventListener('fullscreenchange', () => { $('#fullscreen').innerHTML = icon(document.fullscreenElement ? 'minimize' : 'maximize'); $('#fullscreen').setAttribute('aria-label', document.fullscreenElement ? 'Exit full screen' : 'Full screen'); refreshIcons(); });
 window.addEventListener('resize', resize);
-renderer?.domElement.addEventListener('keydown', e => {
-  if (entranceWalk?.active || avatar?.active || portfolio?.active) return;
-  if (['+', '=', '-', 'Home', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
-  if (e.key === '+' || e.key === '=') $('#zoom-in').click();
-  if (e.key === '-') $('#zoom-out').click();
-  if (e.key === 'Home') selectChapter(0);
-  if (!panorama && e.key.startsWith('Arrow')) {
-    stopJourney(); transition = null; setOrbit(false); interactive = true;
-    const s = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
-    if (e.key === 'ArrowLeft') s.theta -= .09; if (e.key === 'ArrowRight') s.theta += .09;
-    if (e.key === 'ArrowUp') s.phi -= .07; if (e.key === 'ArrowDown') s.phi += .07;
-    s.phi = THREE.MathUtils.clamp(s.phi, controls.minPolarAngle, controls.maxPolarAngle);
-    camera.position.setFromSpherical(s).add(controls.target); needsRender = true;
-  }
-});
 renderer?.domElement.addEventListener('webglcontextlost', e => { e.preventDefault(); ready = false; toast('The graphics context was interrupted. Recovering...'); });
 renderer?.domElement.addEventListener('webglcontextrestored', () => location.reload());
 
-$('#about').onclick = () => { stopJourney(); $('#about-dialog').showModal(); };
-$('#to-story').onclick = () => showStory();
-document.querySelectorAll('.close-dialog').forEach(b => b.onclick = () => b.closest('dialog').close());
-document.querySelectorAll('dialog').forEach(d => {
-  d.addEventListener('click', e => { if (e.target !== d) return; const r = d.getBoundingClientRect(); if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) d.close(); });
-  d.addEventListener('close', () => { needsRender = true; });
-});
-
-// Walk as a person: a guide figure the visitor steers to show exactly where a photo was taken.
-async function enterAvatar() {
-  if (!ready || !avatar) return;
-  if (entranceWalk?.active) leaveHall(false);
-  stopJourney(); setOrbit(false); setPanorama(false); transition = null; interactive = true; controls.enabled = false;
-  doorsOpen = true; $('#door span').textContent = 'Close the doors'; $('#door').setAttribute('aria-pressed', 'true'); // so the guide can walk in
-  camera.fov = 60; camera.updateProjectionMatrix();
-  $('#experience').classList.add('avatar-view'); $('#experience').classList.remove('footprint-view');
-  $('#avatar-panel').hidden = false; $('#avatar-mode').setAttribute('aria-pressed', 'true');
-  $('#avatar-readout').textContent = 'Preparing the guide…';
-  try { await avatar.enter(); renderer.domElement.focus({ preventScroll: true }); }
-  catch (e) { console.error(e); toast('The guide could not load. Please try again.'); leaveAvatar(); }
-}
-function leaveAvatar() {
-  avatar?.exit(); controls.enabled = true; camera.fov = 43; camera.updateProjectionMatrix();
-  $('#experience').classList.remove('avatar-view'); $('#avatar-panel').hidden = true; $('#avatar-mode').setAttribute('aria-pressed', 'false');
-}
-$('#avatar-mode').onclick = () => avatar?.active ? (leaveAvatar(), selectChapter(1)) : enterAvatar();
-$('#avatar-exit').onclick = () => { leaveAvatar(); selectChapter(1); };
-$('#avatar-eye').onclick = () => { const on = !avatar.state.eye; avatar.setEye(on); $('#avatar-eye').setAttribute('aria-pressed', on); $('#avatar-eye span').textContent = on ? 'Follow view' : 'Eye view'; camera.fov = on ? 68 : 60; camera.updateProjectionMatrix(); };
-$('#avatar-copy').onclick = async () => {
-  const text = avatar.text();
-  try { await navigator.clipboard.writeText(text); toast('Position copied. Paste it into our chat.'); }
-  catch { $('#avatar-readout').textContent = text; getSelection().selectAllChildren($('#avatar-readout')); toast('Select and copy the highlighted text.'); }
-};
-// Phone controls: hold an arrow to walk or turn.
-document.querySelectorAll('[data-move]').forEach(b => {
-  const set = on => { const k = b.dataset.move; if (k === 'forward') avatar.input.forward = on ? 1 : 0; if (k === 'back') avatar.input.forward = on ? -1 : 0; if (k === 'left') avatar.input.turn = on ? 1 : 0; if (k === 'right') avatar.input.turn = on ? -1 : 0; };
-  b.addEventListener('pointerdown', e => { e.preventDefault(); b.setPointerCapture?.(e.pointerId); set(true); });
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(type, () => set(false));
-});

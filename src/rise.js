@@ -1,5 +1,6 @@
 import * as T from 'three';
 import { tagPiece } from './merge-pieces.js';
+import { patchRoomLights } from './roomlights.js';
 
 // The arrival (owner's reference video, 2026-10-18): the department rises out of the land in construction order.
 // Every merged piece (wall, slab, column, pane, door, sign; tagged with its centre by merge-pieces.js) rises rigidly from
@@ -47,6 +48,7 @@ export function createRise() {
   const patched = new WeakSet(), depthByClass = new Map();
   function patch(material, cls) {
     if (patched.has(material)) return; patched.add(material);
+    patchRoomLights(material); // switched off: one program with the room materials (roomlights.js)
     const before = material.onBeforeCompile, key = material.customProgramCacheKey;
     const uRiseClass = { value: cls };
     material.customProgramCacheKey = () => (key && key !== T.Material.prototype.customProgramCacheKey ? key.call(material) : '') + '|rise';

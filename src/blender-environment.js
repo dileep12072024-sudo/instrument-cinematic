@@ -1,9 +1,8 @@
 import * as T from 'three';
 import { groundContinuation } from './regrade.js';
-import { campusMonth, shedFraction, thinFoliage } from './seasons.js';
+import { campusMonth, shedFraction } from './seasons.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { footprint } from './footprint.js';
 import { terraceCovers, terraceLevels } from './stair-layout.js';
 
@@ -15,7 +14,8 @@ export function environmentObstacles(scene) {
   return boxes;
 }
 
-export const modelWindReach = height => 1.5 * Math.max(.035, (height / 12) ** 2) + .053;
+import { modelWindReach, buildLods } from './tree-lod.js';
+export { modelWindReach };
 
 export function clearModelVegetation(mesh, obstacles, height) {
   const reach = modelWindReach(height);
@@ -165,16 +165,34 @@ export function pruneDetached(tree) {
 }
 
 export function applyModelWind(material, state, height) {
-  material.customProgramCacheKey = () => 'blender-vegetation-wind-1';
+  material.customProgramCacheKey = () => 'blender-vegetation-wind-2';
   material.onBeforeCompile = shader => {
-    Object.assign(shader.uniforms, { uWind: state.wind, uWindStrength: state.windStrength, uWindDirection: state.windDirection, uBendScale: { value: Math.max(.035, (height / 12) ** 2) } });
-    shader.vertexShader = 'attribute vec3 _wind; uniform float uWind; uniform float uWindStrength; uniform vec2 uWindDirection; uniform float uBendScale;\n' + shader.vertexShader;
+    Object.assign(shader.uniforms, { uWind: state.wind, uWindStrength: state.windStrength, uWindDirection: state.windDirection, uBendScale: { value: Math.max(.035, (height / 12) ** 2) }, uNearFade: state.nearFade });
+    shader.vertexShader = 'attribute vec3 _wind; uniform float uWind; uniform float uWindStrength; uniform vec2 uWindDirection; uniform float uBendScale; varying vec3 vWindWorld;\n' + shader.vertexShader;
+    // in the walk, leaves right at the camera dissolve (owner, 2026-10-27: nothing in the way of the view); never in shadows
+    if (shader.fragmentShader.includes('#include <opaque_fragment>')) shader.fragmentShader = 'uniform float uNearFade; varying vec3 vWindWorld;\n' + shader.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
+      if (uNearFade > 0.0) { float near = 1.0 - smoothstep(uNearFade * 0.45, uNearFade, distance(vWindWorld, cameraPosition));
+        if (near > 0.0 && fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) < near) discard; }`);
+    else shader.fragmentShader = 'varying vec3 vWindWorld;\n' + shader.fragmentShader;
+    // a batched tree sharing its species' geometry (batchTrees): its own place from the instance matrix, and its own
+    // bend (by its height) from the instance colour, which is then not a colour (the leaves stay their own)
+    shader.vertexShader = shader.vertexShader.replace('#include <color_vertex>', `#include <color_vertex>
+      #ifdef USE_BATCHING_COLOR
+        vColor.xyz = vec3(1.0); // vec3 or vec4 by three's defines
+      #endif`);
     shader.vertexShader = shader.vertexShader.replace('#include <project_vertex>', `
-      vec4 windWorld = modelMatrix * vec4(transformed, 1.0);
+      vec4 windLocal = vec4(transformed, 1.0); float bendHere = 1.0;
+      #ifdef USE_BATCHING
+        windLocal = batchingMatrix * windLocal;
+      #endif
+      #ifdef USE_BATCHING_COLOR
+        bendHere = getBatchingColor(getIndirectIndex(gl_DrawID)).r;
+      #endif
+      vec4 windWorld = modelMatrix * windLocal; vWindWorld = windWorld.xyz;
       float phase = windWorld.x * .12 + windWorld.z * .09;
       float wave = .60 + .28 * sin(uWind * .72 + phase) + .12 * sin(uWind * 1.63 + phase * 2.3 + windWorld.y * .14);
       float flutter = (.65 * sin(uWind * 5.1 + _wind.z * 6.283 + phase) + .35 * sin(uWind * 8.3 + _wind.z * 10.68)) * _wind.y * .035 * uWindStrength;
-      windWorld.xz += uWindDirection * (uWindStrength * uBendScale * _wind.x * wave + flutter);
+      windWorld.xz += uWindDirection * (uWindStrength * uBendScale * bendHere * _wind.x * wave + flutter);
       windWorld.y += flutter * .4;
       vec4 mvPosition = viewMatrix * windWorld;
       gl_Position = projectionMatrix * mvPosition;
@@ -182,68 +200,31 @@ export function applyModelWind(material, state, height) {
   };
 }
 
-// Distance detail for leaves: keep a stable share of whole leaf cards (connected triangles) and grow each kept card
-// about its own centre, so a far crown keeps its density and outline with a fraction of the triangles. Unused vertices
-// are dropped. Returns a new geometry.
-export function leafCards(source) { // each leaf card (connected triangles): its root vertex, centre and stable hash
-  const index = source.index.array, p = source.attributes.position.array, n = p.length / 3, parent = Int32Array.from({ length: n }, (_, i) => i);
-  const find = i => { while (parent[i] !== i) i = parent[i] = parent[parent[i]]; return i; };
-  for (let t = 0; t < index.length; t += 3) { const r = find(index[t]); parent[find(index[t + 1])] = r; parent[find(index[t + 2])] = r; }
-  const root = new Int32Array(n), centre = new Float64Array(n * 4), hash = new Float32Array(n);
-  for (let v = 0; v < n; v++) { const r = root[v] = find(v); centre[r * 4] += p[v * 3]; centre[r * 4 + 1] += p[v * 3 + 1]; centre[r * 4 + 2] += p[v * 3 + 2]; centre[r * 4 + 3]++; }
-  for (let v = 0; v < n; v++) if (root[v] === v) { const s = Math.sin(v * 91.3458 + 47.853) * 43758.5453; hash[v] = s - Math.floor(s); } // independent of the seasonal hash
-  return { root, centre, hash };
-}
-export function leafLod(source, keep, grow, cards = leafCards(source)) {
-  const index = source.index.array, n = source.attributes.position.count, { root, centre, hash } = cards;
-  const remap = new Int32Array(n).fill(-1), used = new Int32Array(n), kept = []; let count = 0;
-  for (let t = 0; t < index.length; t += 3) {
-    if (hash[root[index[t]]] >= keep) continue;
-    for (let k = 0; k < 3; k++) { const v = index[t + k]; if (remap[v] < 0) { remap[v] = count; used[count++] = v; } kept.push(remap[v]); }
-  }
-  const out = new T.BufferGeometry();
-  for (const [name, attribute] of Object.entries(source.attributes)) {
-    const size = attribute.itemSize, from = attribute.array, array = new Float32Array(count * size);
-    for (let k = 0; k < count; k++) for (let c = 0, v = used[k]; c < size; c++) array[k * size + c] = from[v * size + c];
-    out.setAttribute(name, new T.BufferAttribute(array, size));
-  }
-  const q = out.attributes.position.array;
-  for (let k = 0; k < count; k++) { const r = root[used[k]] * 4, w = centre[r + 3]; for (let c = 0; c < 3; c++) { const m = centre[r + c] / w; q[k * 3 + c] = m + (q[k * 3 + c] - m) * grow; } }
-  out.setIndex(kept);
-  return out;
-}
-
-// Distance detail for wood: the bark is modelled with 1-3 cm triangles, far finer than a distant tree shows. Merge
-// vertices on a grid of the given cell size (averaging their attributes) and drop the triangles that collapse.
-export function woodLod(source, cell) {
-  const p = source.attributes.position.array, n = p.length / 3, cells = new Map(), remap = new Int32Array(n), weight = [];
-  for (let v = 0; v < n; v++) {
-    const key = ((Math.floor(p[v * 3] / cell) + 8192) * 16384 + Math.floor(p[v * 3 + 1] / cell) + 8192) * 16384 + Math.floor(p[v * 3 + 2] / cell) + 8192;
-    let id = cells.get(key); if (id === undefined) { id = weight.length; cells.set(key, id); weight.push(0); }
-    remap[v] = id; weight[id]++;
-  }
-  const out = new T.BufferGeometry(), m = weight.length;
-  for (const [name, attribute] of Object.entries(source.attributes)) {
-    const size = attribute.itemSize, from = attribute.array, array = new Float32Array(m * size);
-    for (let v = 0; v < n; v++) { const k = remap[v] * size, w = 1 / weight[remap[v]]; for (let c = 0; c < size; c++) array[k + c] += from[v * size + c] * w; }
-    if (name === 'normal') for (let k = 0; k < m * 3; k += 3) { const l = Math.hypot(array[k], array[k + 1], array[k + 2]) || 1; array[k] /= l; array[k + 1] /= l; array[k + 2] /= l; }
-    out.setAttribute(name, new T.BufferAttribute(array, size));
-  }
-  const index = source.index.array, kept = [];
-  for (let t = 0; t < index.length; t += 3) { const a = remap[index[t]], b = remap[index[t + 1]], c = remap[index[t + 2]]; if (a !== b && b !== c && a !== c) kept.push(a, b, c); }
-  out.setIndex(kept);
-  return out;
-}
-
-// Trees: one batched draw per material (the per-draw CPU cost on ANGLE/D3D11 limited the frame rate with ~94 separate
-// tree meshes), with each tree an instance of it, so trees outside the view are skipped and far trees draw fewer leaves.
-// The merged-forest version drew all 3.5 million tree triangles every frame: ~28 ms of 45 on the owner's laptop.
-// Each tree's bend scale is baked into its _wind.x weights so one shared material (bend 1) moves every vertex as before.
-const LOD_LEAVES = [[1, 1], [.42, 1.42], [.2, 1.95], [.08, 2.9]]; // [share of leaf cards kept, card growth] by detail level
-const LOD_WOOD = [.06, .16, .3]; // vertex grid (m) for wood at each level beyond the first
 const LOD_STEPS = [15, 32, 60], LOD_SLACK = 3; // metres from the camera where each level starts; slack stops a tree flipping at a boundary
-export function batchTrees(state) {
-  const batches = new Map(), matrix = new T.Matrix4();
+
+// The trees' detail levels are made in a worker (tree-worker.js) while the main thread builds the rest of the campus:
+// planTrees, right after the trimming, groups the parts and sends their geometry off; batchTrees, once the distant belt
+// has captured the trees, takes the results and builds the batched meshes. One geometry per kind of part: the untrimmed
+// trunks, branches and crowns of a species share theirs, each placed by its own instance matrix with its own bend (by
+// its height) in the instance colour (applyModelWind), so the GPU holds a crown once, not once per tree (the
+// jacaranda's 388,000 vertices were held eleven times, with every detail level). A part trimmed clear of the building
+// keeps its own, built in place.
+let worker = null, jobId = 0; const waiting = new Map();
+function lodsOf(job) {
+  try {
+    worker ||= new Worker(new URL('./tree-worker.js', import.meta.url), { type: 'module' });
+    worker.onmessage ||= ({ data }) => { waiting.get(data.id)?.(data.result); waiting.delete(data.id); };
+    const id = ++jobId; worker.postMessage({ id, job });
+    return new Promise(resolve => waiting.set(id, resolve));
+  } catch { return Promise.resolve(buildLods(job)); } // no worker: the same work, here
+}
+const attributesOf = node => Object.fromEntries(['position', 'normal', 'uv', '_wind'].filter(n => node.geometry.attributes[n]).map(n => {
+  const a = node.geometry.attributes[n], out = new Float32Array(a.count * a.itemSize);
+  for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) out[i * a.itemSize + c] = a.getComponent(i, c);
+  return [n, [out, a.itemSize]];
+}));
+export function planTrees(state) {
+  const batches = new Map();
   for (const node of state.vegetation) {
     let owner = node; while (owner && !owner.userData.tree) owner = owner.parent;
     if (!owner || !node.visible) continue;
@@ -253,44 +234,52 @@ export function batchTrees(state) {
     if (!batch.trees.has(owner)) batch.trees.set(owner, []);
     batch.trees.get(owner).push(node);
   }
-  const batched = [], instances = new Map(); // tree -> { centre, lod, slots: [[mesh, instanceId, geometryIds]] }
+  const plan = [];
   for (const [key, { trees, material, count }] of batches) {
+    const shed = shedFraction(key, state.month ?? campusMonth()), foliage = !!material.userData.foliage, kinds = new Map(), entries = [];
+    for (const [tree, nodes] of trees) {
+      tree.updateMatrixWorld(true);
+      for (const node of nodes) {
+        const bend = Math.max(.035, (node.userData.windHeight / 12) ** 2), index = node.geometry.index?.array.slice();
+        if (node.userData.untrimmedIndex) { entries.push([tree, lodsOf({ foliage, shed, matrix: node.matrixWorld.toArray(), bend, attributes: attributesOf(node), index }), new T.Matrix4(), 1]); continue; }
+        const kind = node.geometry.uuid;
+        if (!kinds.has(kind)) kinds.set(kind, lodsOf({ foliage, shed, matrix: null, bend: 0, attributes: attributesOf(node), index }));
+        entries.push([tree, kinds.get(kind), node.matrixWorld.clone(), bend]);
+      }
+    }
+    plan.push({ key, material, count, shed, foliage, entries, nodes: [...trees.values()].flat() });
+  }
+  state.treePlan = plan;
+}
+export async function batchTrees(state) {
+  const batched = [], instances = new Map(); // tree -> { centre, lod, slots: [[mesh, instanceId, geometryIds]] }
+  for (const { key, material, count, shed, foliage, entries, nodes } of state.treePlan) {
     // Leaves and bark are matte (roughness ~0.9): diffuse (Lambert) shading looks the same as the PBR clone and costs
     // ~7 ms (leaves) and ~4 ms (wood) less per frame on the owner's integrated GPU.
     const shared = new T.MeshLambertMaterial({ name: material.name, map: material.map, normalMap: material.normalMap, normalScale: material.normalScale, alphaTest: material.alphaTest, side: material.side, color: material.color });
     shared.userData = { ...material.userData };
-    applyModelWind(shared, state, 12); // bend scale 1: baked per vertex below
+    applyModelWind(shared, state, 12); // bend scale 1: each part's own is in its instance colour, or baked
     const depth = new T.MeshDepthMaterial({ depthPacking: T.RGBADepthPacking, map: shared.map, alphaTest: shared.alphaTest, side: shared.side });
     applyModelWind(depth, state, 12);
-    const shed = shedFraction(key, state.month ?? campusMonth()), perTree = [];
-    for (const [tree, nodes] of trees) {
-      const parts = nodes.map(node => {
-        const g = node.geometry.clone();
-        g.applyMatrix4(matrix.copy(node.matrixWorld));
-        const wind = g.getAttribute('_wind'), bend = Math.max(.035, (node.userData.windHeight / 12) ** 2);
-        for (let i = 0; i < wind.count; i++) wind.setX(i, wind.getX(i) * bend);
-        for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', '_wind'].includes(name)) g.deleteAttribute(name);
-        if (!g.index) g.setIndex([...Array(g.attributes.position.count).keys()]);
-        return g;
-      });
-      const full = parts.length > 1 ? mergeGeometries(parts, false) : parts[0];
-      if (material.userData.foliage && shed > 0) state.shedCards = (state.shedCards || 0) + thinFoliage(full, shed); // seasonal canopy
-      full.computeBoundingSphere(); full.boundingSphere.radius += modelWindReach(12 * 1.3);
-      const cards = material.userData.foliage && leafCards(full);
-      const lods = material.userData.foliage ? LOD_LEAVES.map(([keep, grow]) => keep === 1 ? full : leafLod(full, keep, grow, cards)) : [full, ...LOD_WOOD.map(cell => woodLod(full, cell))];
-      for (const g of lods) g.boundingSphere = full.boundingSphere.clone(); // the same culling sphere at every level
-      perTree.push([tree, lods]);
-      for (const node of nodes) { node.removeFromParent(); node.geometry.dispose(); }
+    // the worker's results as geometries, one set per kind (the same promise for every part of a kind)
+    const built = new Map();
+    for (const [, job] of entries) if (!built.has(job)) {
+      const result = await job; state.shedCards = (state.shedCards || 0) + result.shedCards;
+      const sphere = new T.Sphere(new T.Vector3(...result.sphere.slice(0, 3)), result.sphere[3]);
+      built.set(job, result.lods.map(l => { const g = new T.BufferGeometry(); for (const [n, [a, size]] of Object.entries(l.attributes)) g.setAttribute(n, new T.BufferAttribute(a, size)); g.setIndex(new T.BufferAttribute(l.index, 1)); g.boundingSphere = sphere.clone(); return g; }));
     }
-    const all = perTree.flatMap(([, lods]) => lods);
-    const mesh = new T.BatchedMesh(perTree.length, all.reduce((n, g) => n + g.attributes.position.count, 0), all.reduce((n, g) => n + g.index.count, 0), shared);
-    for (const [tree, lods] of perTree) {
-      const ids = lods.map(g => mesh.addGeometry(g)), id = mesh.addInstance(ids[0]);
+    for (const node of nodes) { node.removeFromParent(); node.geometry.dispose(); }
+    const unique = [...built.values()], all = unique.flat();
+    const mesh = new T.BatchedMesh(entries.length, all.reduce((n, g) => n + g.attributes.position.count, 0), all.reduce((n, g) => n + g.index.count, 0), shared);
+    const idsOf = new Map(unique.map(lods => [lods, lods.map(g => mesh.addGeometry(g))])), bendColour = new T.Color();
+    for (const [tree, job, place, bend] of entries) {
+      const ids = idsOf.get(built.get(job)), id = mesh.addInstance(ids[0]);
+      mesh.setMatrixAt(id, place); mesh.setColorAt(id, bendColour.setRGB(bend, bend, bend, T.LinearSRGBColorSpace));
       if (!instances.has(tree)) { const c = new T.Vector3(); new T.Box3().setFromObject(tree).getCenter(c); instances.set(tree, { centre: c, lod: 0, slots: [] }); }
       instances.get(tree).slots.push([mesh, id, ids]);
     }
     all.forEach(g => g.dispose());
-    if (material.userData.foliage && shed > 0) shared.color.lerp(new T.Color('#c8b26a'), Math.min(.45, shed * .7)); // a little yellower while shedding
+    if (foliage && shed > 0) shared.color.lerp(new T.Color('#c8b26a'), Math.min(.45, shed * .7)); // a little yellower while shedding
     Object.assign(mesh, { name: `Batched trees: ${key}`, castShadow: true, receiveShadow: true, customDepthMaterial: depth });
     mesh.userData = { batchedTrees: count, windHeight: 12, sourceObject: key };
     mesh.computeBoundingSphere();
@@ -333,6 +322,40 @@ export function prefetchEnvironment(onProgress) {
   });
 }
 
+// the saved trimming (see loadBlenderEnvironment), fetched alongside the environment
+const trimsDownload = fetch('/media/tree-trims.json').then(r => r.ok ? r.json() : null).catch(() => null);
+function trimSignature(obstacles, parts) { // FNV-1a over the obstacle boxes and each part's place and size
+  let h = 2166136261; const mix = v => { h ^= Math.round(v * 1000) | 0; h = Math.imul(h, 16777619) >>> 0; };
+  for (const b of obstacles) for (const v of [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z]) mix(v);
+  for (const [node, height] of parts) { node.updateWorldMatrix(true, false); node.matrixWorld.elements.forEach(mix); mix(node.geometry.attributes.position.count); mix(node.geometry.index?.count ?? 0); mix(height); }
+  return h.toString(36);
+}
+function exportTrims(parts) { // per trimmed part (by its order): the runs of triangles it lost, [first, count, first, count...]
+  const out = {};
+  parts.forEach(([node], k) => {
+    const before = node.userData.untrimmedIndex; if (!before) return;
+    const after = node.geometry.index.array, lost = []; let j = 0;
+    for (let t = 0; t < before.length; t += 3) {
+      if (j < after.length && after[j] === before[t] && after[j + 1] === before[t + 1] && after[j + 2] === before[t + 2]) j += 3; else lost.push(t / 3);
+    }
+    const runs = []; for (let i = 0; i < lost.length; i++) { if (runs.length && runs[runs.length - 2] + runs[runs.length - 1] === lost[i]) runs[runs.length - 1]++; else runs.push(lost[i], 1); }
+    out[k] = runs;
+  });
+  return out;
+}
+function applyTrims(saved, parts) {
+  let total = 0;
+  for (const [k, runs] of Object.entries(saved)) {
+    const lost = []; for (let r = 0; r < runs.length; r += 2) for (let i = 0; i < runs[r + 1]; i++) lost.push(runs[r] + i);
+    const [node] = parts[+k], geometry = node.geometry, before = geometry.index ? geometry.index.array : Uint32Array.from({ length: geometry.attributes.position.count }, (_, i) => i);
+    const kept = new Uint32Array(before.length - lost.length * 3); let w = 0, l = 0;
+    for (let t = 0, tri = 0; t < before.length; t += 3, tri++) { if (l < lost.length && lost[l] === tri) { l++; continue; } kept[w++] = before[t]; kept[w++] = before[t + 1]; kept[w++] = before[t + 2]; }
+    node.userData.untrimmedIndex = before; node.geometry = geometry.clone(); node.geometry.setIndex(new T.BufferAttribute(kept, 1));
+    node.visible = kept.length > 0; node.userData.trimmedTriangles = lost.length; total += lost.length;
+  }
+  return total;
+}
+
 export async function loadBlenderEnvironment(scene, adjust, download = prefetchEnvironment()) {
   const draco = new DRACOLoader().setDecoderPath('/media/draco/').setWorkerLimit(2);
   let gltf;
@@ -341,12 +364,12 @@ export async function loadBlenderEnvironment(scene, adjust, download = prefetchE
   finally { draco.dispose(); }
   const group = gltf.scene;
   group.name = 'Blender campus environment';
-  const state = { group, wind: { value: 0 }, windStrength: { value: 0 }, windDirection: { value: new T.Vector2(0, 1) }, vegetation: [], trees: [], materials: [], trimmedTriangles: 0 };
+  const state = { group, nearFade: { value: 0 }, wind: { value: 0 }, windStrength: { value: 0 }, windDirection: { value: new T.Vector2(0, 1) }, vegetation: [], trees: [], materials: [], trimmedTriangles: 0 };
   performance.mark('env-parsed');
   adjust?.(group);
   performance.mark('env-trees-placed');
   group.updateMatrixWorld(true);
-  const obstacles = environmentObstacles(scene);
+  const obstacles = environmentObstacles(scene), toTrim = [];
   group.traverse(node => {
     if (node.userData.tree) state.trees.push(node);
     if (!node.isMesh) return;
@@ -367,7 +390,7 @@ export async function loadBlenderEnvironment(scene, adjust, download = prefetchE
     if (!node.geometry.getAttribute('_wind')) throw new Error(`Missing Blender wind weights: ${node.name}`);
     const height = owner.userData.wind_height;
     node.userData.windHeight = height;
-    state.trimmedTriangles += clearModelVegetation(node, obstacles, height);
+    toTrim.push([node, height]); // trimmed clear of the building below: from the saved result when it is still this scene's
     if (material.userData.foliage) {
       material.transparent = false; material.alphaTest = .45; material.depthWrite = true; // alpha-to-coverage dithers into noise on ANGLE/D3D11
       material.side = T.DoubleSide;
@@ -385,9 +408,20 @@ export async function loadBlenderEnvironment(scene, adjust, download = prefetchE
     node.geometry.boundingSphere.radius += modelWindReach(height) / Math.max(.01, node.getWorldScale(new T.Vector3()).length() / Math.sqrt(3));
     state.vegetation.push(node);
   });
-  for (const tree of state.trees) state.trimmedTriangles += pruneDetached(tree);
+  // Trimming the trees clear of the building took ~9 s of every load, for a result that only changes with the building
+  // or the trees: it is computed once (open the site with ?trims and save window.__trims, a JSON string) and saved as the triangles each part loses
+  // (public/media/tree-trims.json), keyed by a signature of the obstacles and the parts; a load whose signature differs
+  // (the building or the trees changed) computes it here as before, so a stale file can never be applied.
+  const signature = trimSignature(obstacles, toTrim), saved = await trimsDownload;
+  if (saved?.signature === signature) state.trimmedTriangles += applyTrims(saved.parts, toTrim);
+  else {
+    for (const [node, height] of toTrim) state.trimmedTriangles += clearModelVegetation(node, obstacles, height);
+    for (const tree of state.trees) state.trimmedTriangles += pruneDetached(tree);
+    if (/[?&]trims\b/.test(location.search)) window.__trims = JSON.stringify({ signature, parts: exportTrims(toTrim) });
+  }
   performance.mark('env-trimmed');
-  state.batchTrees = () => batchTrees(state); // called by main.js once the impostor belt has been captured
+  planTrees(state); // the trees' detail levels start in the worker now; batchTrees takes them once the belt is captured
+  state.batchTrees = () => batchTrees(state); // called (and awaited) by main.js once the impostor belt has been captured
   if (state.trees.length < 23 || !state.groundMaterial || !state.soilMaterial || !state.pavingMaterial) throw new Error('Incomplete Blender environment export');
   // Distant continuation sits below the authored terrain, never over the roads; vegetated, as in the site videos.
   const horizon = new T.Mesh(new T.PlaneGeometry(2000, 2000), state.groundMaterial.clone());

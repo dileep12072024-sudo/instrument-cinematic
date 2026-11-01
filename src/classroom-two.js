@@ -78,12 +78,13 @@ export function buildClassTwo(parent, m, floorY) {
   group.userData.benchLines = benchLines.map(([x]) => x); group.userData.deskCount = benchLines.reduce((n, [, r]) => n + r, 1); group.userData.benchWidth = 1.55;
   const board = new T.MeshStandardMaterial({ name: 'Class II green chalkboards', color: '#244e43', roughness: .86 });
   for (const x of [-8.6, -5]) {
-    box(x, floorY + 2.0, backZ + .18, 1.65, 1.45, .06, m.aluminium);
-    box(x, floorY + 2.0, backZ + .22, 1.58, 1.38, .025, board);
-    box(x, floorY + 1.27, backZ + .27, 1.65, .035, .16, m.aluminium);
+    // on the back wall's face (backZ + .04: .24 thick on backZ - .08); they stood 11-16 cm off it (owner, 2026-11-01)
+    box(x, floorY + 2.0, backZ + .07, 1.65, 1.45, .06, m.aluminium);
+    box(x, floorY + 2.0, backZ + .11, 1.58, 1.38, .025, board);
+    box(x, floorY + 1.27, backZ + .16, 1.65, .035, .16, m.aluminium);
   }
-  box(-6.8, floorY + 2.13, backZ + .24, 1.95, 1.60, .07, m.aluminium);
-  box(-6.8, floorY + 2.13, backZ + .282, 1.89, 1.54, .025, cream);
+  box(-6.8, floorY + 2.13, backZ + .075, 1.95, 1.60, .07, m.aluminium);
+  box(-6.8, floorY + 2.13, backZ + .117, 1.89, 1.54, .025, cream);
   box(-6.8, floorY + platform + .77, -28.95, 1.1, .055, .65, m.wood);
   for (const dx of [-.48, .48]) for (const dz of [-.25, .25]) box(-6.8 + dx, floorY + platform + .38, -28.95 + dz, .06, .76, .06, m.wood);
   box(-6.8, floorY + platform + .46, -29.45, .44, .055, .43, m.wood);

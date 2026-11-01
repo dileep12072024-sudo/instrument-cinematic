@@ -313,20 +313,22 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
   box(inE - .16, at(ceilingLow / 2), -3.48, .32, ceilingLow, .36, plaster);
   box(inE - .14, at(ceilingLow - .19), (ZB + corridorNorth) / 2, .28, .38, corridorNorth - ZB, plaster);
   // West wall: lab doors, windows and high windows; front passage door; the Process Control lab straight ahead of the steps.
-  const doors = { labA: -.95, instruments: -2.75, control: -8.0, endBay: -13.97 };
+  // Between the Sensors and Machines doors the windows come first, then the Control Systems door (owner, 2026-10-26: the
+  // two had been exchanged); everything in that stretch is the mirror of the first layout, u' = -8.95 - u, spacing kept.
+  const doors = { labA: -.95, instruments: -6.2, control: -8.0, endBay: -13.97 };
   const westHoles = [
     { u0: 1.55, u1: 2.85, v0: F, v1: at(2.15) },                 // Process Control lab double door, end of the main corridor
     { u0: 1.6, u1: 2.8, v0: at(2.6), v1: at(2.98) },             // its ventilator above the tube light and clock
     { u0: doors.labA - .55, u1: doors.labA + .55, v0: F, v1: at(2.12) },
     { u0: doors.instruments - .55, u1: doors.instruments + .55, v0: F, v1: at(2.12) },
-    { u0: -4.55, u1: -4.05, v0: at(1.0), v1: at(2.0) },         // narrow barred window (frame 99)
-    { u0: -6.3, u1: -5.0, v0: at(.85), v1: at(2.15) },          // two-leaf barred window (frames 102-104)
+    { u0: -4.9, u1: -4.4, v0: at(1.0), v1: at(2.0) },           // narrow barred window (frame 99)
+    { u0: -3.95, u1: -2.65, v0: at(.85), v1: at(2.15) },        // two-leaf barred window (frames 102-104)
     { u0: doors.control - .55, u1: doors.control + .55, v0: F, v1: at(2.12) },
     { u0: doors.endBay - .52, u1: doors.endBay + .52, v0: F, v1: at(2.12) },
     { u0: 3.65, u1: 4.65, v0: F, v1: at(2.1) },                  // toran door, front passage (frames 54-55)
     { u0: 13.7, u1: 14.66, v0: F, v1: at(2.12) },                // D C S LAB door at the gate corner (frame 57)
   ];
-  const highWindows = [-.95, -2.75, -5.6, -8.0, -10.6, -12.3];
+  const highWindows = [-.95, -3.35, -6.2, -8.0, -10.6, -12.3];
   for (const u of highWindows) westHoles.push({ u0: u - .36, u1: u + .36, v0: at(2.5), v1: at(2.9), high: true });
   wall('x', XW, ZN, ZC, F - .02, F + ceilingHigh, westHoles.filter(o => o.u1 <= ZC + .01));
   wall('x', XW, ZC, corridorSouth, F - .02, F + ceilingLow, westHoles.filter(o => o.u0 >= ZC && o.u1 <= corridorSouth));
@@ -364,19 +366,21 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
       hands[0].rotation.x = -turn * t / 43200; hands[1].rotation.x = -turn * (t % 3600) / 3600; hands[2].rotation.x = -turn * Math.floor(t % 60) / 60; }; }
   W(doors.labA, () => { labDoor(0, 1.1, 2.12, { arched: true }); darkRoom(0, 1.1, 2.12); });
   W(doors.instruments, () => { labDoor(0, 1.1, 2.12, { arched: true, garland: true }); darkRoom(0, 1.1, 2.12); });
-  W(-4.3, () => { for (let k = 0; k <= 4; k++) rod([-.25 + k * .125, at(1.0), .02], [-.25 + k * .125, at(2.0), .02], .01, grille); for (const y of [1.0, 1.5, 2.0]) rod([-.25, at(y), .02], [.25, at(y), .02], .012, grille);
+  W(-4.65, () => { for (let k = 0; k <= 4; k++) rod([-.25 + k * .125, at(1.0), .02], [-.25 + k * .125, at(2.0), .02], .01, grille); for (const y of [1.0, 1.5, 2.0]) rod([-.25, at(y), .02], [.25, at(y), .02], .012, grille);
     placed(new T.Matrix4().makeTranslation(.25, at(1.0), -.05), () => doorLeaf(1, .5, 1.0, 2, doorWood)); }); // its timber shutter, shut
-  W(-5.65, () => { // two-leaf window: green frame, horizontal bars (frames 102-104)
+  W(-3.3, () => { // two-leaf window: green frame, horizontal bars (frames 102-104)
     for (const x of [-.65, 0, .65]) box(x, at(1.5), .0, .06, 1.3, .08, grille);
     for (const y of [.85, 2.15]) box(0, at(y), 0, 1.36, .06, .08, grille);
     for (let k = 1; k < 7; k++) rod([-.65, at(.85 + k * 1.3 / 7), .03], [.65, at(.85 + k * 1.3 / 7), .03], .01, grille);
     for (const x of [-.32, .32]) rod([x, at(.85), .03], [x, at(2.15), .03], .01, grille);
     for (const side of [-1, 1]) placed(new T.Matrix4().makeTranslation(side * .62, at(.88), -.05), () => doorLeaf(side, .615, 1.24, 2, doorWood)); // two timber leaves, shut (lab doors' wood)
   });
-  W(doors.control, () => { labDoor(0, 1.1, 2.12, { arched: true, garland: true, panels: 5 }); darkRoom(0, 1.1, 2.12); // gate and door closed (owner, 2026-10-18)
-    // Meter boxes high between the window and the door (frames 109-112), each clear of the others, the window and the sign.
-    for (const [x, h, w, hh] of [[-1.35, 2.95, .5, .44], [-.8, 3.08, .34, .34], [-1.37, 2.4, .42, .28]]) { const f = P.fuseBox(w, hh, .16); put(f.body, metalBox, x, at(h), .08); put(f.metal, steel, x, at(h), .08); }
-    for (const x of [-1.5, -1.2, -.8]) rod([x, at(3.2), .03], [x, at(3.6), .03], .018, pvc, 5); });
+  W(doors.control, () => { labDoor(0, 1.1, 2.12, { arched: true, garland: true, panels: 5 }); darkRoom(0, 1.1, 2.12); }); // gate and door closed (owner, 2026-10-18)
+  // Meter boxes high between the window and the door (frames 109-112), each clear of the others, the window and the
+  // sign; mirrored with the windows, now between the Sensors door and the two-leaf window.
+  W(-2.0, () => {
+    for (const [x, h, w, hh] of [[.3, 2.95, .5, .44], [-.25, 3.08, .34, .34], [.32, 2.4, .42, .28]]) { const f = P.fuseBox(w, hh, .16); put(f.body, metalBox, x, at(h), .08); put(f.metal, steel, x, at(h), .08); }
+    for (const x of [.45, .15, -.25]) rod([x, at(3.2), .03], [x, at(3.6), .03], .018, pvc, 5); });
   W(doors.endBay, () => { labDoor(0, 1.05, 2.12, { arched: true }); darkRoom(0, 1.05, 2.12); });
   W(4.15, () => { // toran door: shut panelled leaves (owner, 2026-10-18: every door closed), mango leaves and a marigold string across its head
     for (const side of [-1, 1]) placed(new T.Matrix4().makeTranslation(side * .5, F, -.06), () => doorLeaf(side, .495, 2.1, 4, doorWood));
@@ -384,7 +388,7 @@ export function buildWestWing(parent, m, southCeiling = 3.83) {
     for (let i = 0; i < 34; i++) { const len = .22 + (i % 4) * .07 + (i < 12 ? .18 : 0), g = new T.PlaneGeometry(.07, len); g.rotateZ((i % 5 - 2) * .12); g.translate(-.55 + i * .033, at(2.12) - len / 2, .12 + (i % 2) * .02); add(g, leaf); } // bushier on the hinge side (frame 55)
     for (let i = 0; i <= 14; i++) { const g = new T.SphereGeometry(.035, 6, 4); g.translate(-.5 + i / 14, at(2.17), .13); add(g, i % 2 ? marigold : marigoldRed); }
   });
-  W(.45, () => { fuseBoxes(0, 1.9); extinguisher(.5, 1.25); }); // meter and fuse boxes at the junction (photo 38)
+  W(.45, () => { fuseBoxes(0, 1.9); extinguisher(.5, .83); }); // meter and fuse boxes at the junction (photo 38); the extinguisher hangs below the lower boxes (it sat inside one; owner, 2026-11-01)
   W(14.18, () => { labDoor(0, .96, 2.12, { grilleGate: false, panels: 5, material: greyDoor }); }); // DCS lab (closed: the leaves show from both sides)
   W(11.6, () => { const c = canvasMap(128, 256, (g, w, h) => { g.fillStyle = '#f3efe4'; g.fillRect(0, 0, w, h); g.fillStyle = '#b22a2a'; g.fillRect(8, 8, w - 16, 70); g.fillStyle = '#333'; for (let r = 0; r < 6; r++) for (let k = 0; k < 7; k++) g.fillRect(12 + k * 15, 96 + r * 24, 10, 14); }, false);
     const g = new T.PlaneGeometry(.32, .6); g.translate(0, at(1.55), .012); add(g, new T.MeshStandardMaterial({ name: 'Wall calendar', map: c, roughness: .9 })); }); // calendar (frame 57)

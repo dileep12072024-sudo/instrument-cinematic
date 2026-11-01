@@ -71,6 +71,7 @@ export function createRain(scene, camera) {
   const splashGeometry = new T.PlaneGeometry(1, 1); splashGeometry.translate(0, .5, 0);
   const splashes = new T.InstancedMesh(splashGeometry, new T.MeshBasicMaterial({ map: new T.CanvasTexture(crown), color: '#cfdde3', transparent: true, depthWrite: false, blending: T.AdditiveBlending, fog: false }), 320);
   splashes.name = 'Rain splashes'; splashes.frustumCulled = false; splashes.visible = false; splashes.count = 0; scene.add(splashes);
+  splashes.setColorAt(0, new T.Color()); // its colours exist from the start: made by the first splash, they changed its program, compiled mid-visit when rain began
   const splashPool = [], NEAR = 18, LIFE = .26;
   const splashColor = new T.Color();
   const wrap = (v, centre) => v - centre < -radius ? v + radius * 2 : v - centre > radius ? v - radius * 2 : v;

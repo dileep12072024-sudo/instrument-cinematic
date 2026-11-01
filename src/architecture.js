@@ -197,7 +197,7 @@ export function buildArchitecture(scene) {
         }
       }
       const g = new T.ExtrudeGeometry(shape, { depth: .09, bevelEnabled: false, curveSegments: 1 }); g.translate(0, 0, -.045);
-      const flat = g.toNonIndexed(); for (const n of Object.keys(flat.attributes)) if (!['position', 'normal', 'uv', 'aPiece'].includes(n)) flat.deleteAttribute(n);
+      const flat = g.index ? g.toNonIndexed() : g; for (const n of Object.keys(flat.attributes)) if (!['position', 'normal', 'uv', 'aPiece'].includes(n)) flat.deleteAttribute(n);
       const uv = flat.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 2, uv.getY(i) / 2);
       screenTemplates.set(key, flat);
     }

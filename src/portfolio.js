@@ -17,25 +17,27 @@ gsap.ticker.lagSmoothing(500, 1000 / 30); // the arrival keeps wall time through
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const tel = n => `<a href="tel:${n.replace(/[^0-9+]/g, '')}" data-cursor>${esc(n)}</a>`;
+// dialable from anywhere (E.164): Indian numbers get +91 in place of the trunk 0
+const e164 = n => { const d = n.replace(/[^0-9+]/g, ''); return d.startsWith('+') ? d : '+91' + d.replace(/^0/, ''); };
+const tel = n => `<a href="tel:${e164(n)}" data-cursor>${esc(n)}</a>`;
 const linkify = s => esc(s).replace(/[\w.]+@[\w.]+\w/g, m => `<a href="mailto:${m}" data-cursor>${m}</a>`).replace(/\b(0891 \d{7}|0891 \d{6,7}|\d{10})\b/g, m => tel(m));
-const arrow = '<svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 11 11 3M5 3h6v6" stroke="currentColor" stroke-width="1.3"/></svg>';
 const angle = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 const lerpAngle = (a, b, k) => a + angle(a, b) * k;
 const OVERLAY = 3; // camera layer for the cursor wisps and the leaves: the main view only, never the live windows
+const PER_COST = .13; // screens of scroll per unit of walk cost (a metre indoors, 6 frames): the one walking speed of the story
 
 // ---------------------------------------------------------------------------------------------------------- markup
 function markup() {
   const { hero, heritage, admissions, labs, guide, faculty, enter, footer, credits, chapters, people, labRooms, classroomRooms } = C;
   // header links: the first stop of each group
-  const groups = [['heritage', 'Heritage'], ['admissions', 'Admissions'], ['labs', 'Laboratories'], ['faculty', 'Faculty'], ['classrooms', 'Classrooms'], ['enter', 'Step inside']];
+  const groups = [['heritage', 'Heritage'], ['admissions', 'Admissions'], ['labs', 'Laboratories'], ['faculty', 'Faculty'], ['classrooms', 'Classrooms'], ['enter', 'Overview']];
   const firstOf = g => chapters.find(c => c.group === g);
-  const where = { heritage: 'Entrance hall', admissions: 'West corridor', labs: 'Ten laboratories', faculty: 'Faculty offices', classrooms: 'End of the classroom wing', enter: 'Over the north campus' };
+  const where = { heritage: 'Entrance hall', admissions: 'West corridor', labs: 'Eleven laboratories', faculty: 'Faculty offices', classrooms: 'End of the classroom wing', enter: 'Over the north campus' };
   let n = 0;
   const head = c => `<div class="pf-sec-head" data-rv="fade"><span class="k"><b>${String(++n).padStart(2, '0')}</b> ${esc(c.nav)}</span><span class="rule"></span><span class="k">${esc(c.where)}</span></div>`;
   const walk = i => `<div class="pf-walk" data-walk="${i}"></div>`;
   // the plate's own entrance is the genie out of the door's sign (portfolio.js plates): only its caption fades in
-  const photo = p => p.photo ? `<div class="pf-side-lens"><figure class="pf-view pf-photo" data-photo="${p.photo}" data-cursor><span class="pf-view-fr" data-frame></span><figcaption data-rv="fade"><b>${esc(p.name)}</b>${p.role ? `<i>${esc(p.role)}</i>` : ''}</figcaption></figure></div>` : '';
+  const photo = p => p.photo ? `<div class="pf-side-lens"><figure class="pf-view pf-photo" data-photo="${p.photo}" role="img" aria-label="Photo of ${esc(p.name)}" data-cursor><span class="pf-view-fr" data-frame></span><figcaption data-rv="fade"><b>${esc(p.name)}</b>${p.role ? `<i>${esc(p.role)}</i>` : ''}</figcaption></figure></div>` : '';
   const person = (c, p, extra = '') => `${head(c)}
       <div class="pf-copy"><div class="pf-lean">
         <h2 class="pf-display">${esc(c.id === 'hod' ? 'Head of the Department.' : p.name)}</h2>
@@ -68,7 +70,6 @@ function markup() {
     if (classroomRooms[c.id]) return stop(c, classroomRooms[c.id].title, classroomRooms[c.id].lead);
     if (c.id === 'guide') return stop(c, guide.title, guide.lead, guide.groups.map(g => `<div class="pf-group" data-rv="up"><h3>${esc(g.title)}</h3>${g.items ? `<ul>${g.items.map(t => `<li>${linkify(t)}</li>`).join('')}</ul>` : ''}${g.contacts ? `<dl class="pf-calls">${g.contacts.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${tel(v)}</dd></div>`).join('')}</dl>` : ''}</div>`).join(''));
     if (c.id === 'hod') return person(c, people[c.person], `
-        <p class="pf-note" data-rv="up">${esc(faculty.alsoNote)}</p>
         <details class="pf-more" data-rv="up"><summary data-cursor>${esc(faculty.staffTitle)}</summary><ul class="pf-staff">${faculty.staff.map(([k, r]) => `<li><b>${esc(k)}</b><span>${esc(r)}</span></li>`).join('')}</ul></details>
         <details class="pf-more" data-rv="up"><summary data-cursor>${esc(faculty.headsTitle)}</summary><ol class="pf-staff">${faculty.heads.map(([k, r]) => `<li><b>${esc(k)}</b><span>${esc(r)}</span></li>`).join('')}</ol><p class="pf-note">${esc(faculty.headsNote)}</p></details>`);
     if (c.person) return person(c, people[c.person]);
@@ -81,7 +82,6 @@ function markup() {
       <p class="pf-eyebrow" data-rv="fade"><span class="dot"></span>${esc(c.where)}</p>
       <h2 class="pf-display pf-big">${esc(enter.title)}</h2>
       <p class="pf-lead" data-rv="up">${esc(enter.lead)}</p>
-      <div class="pf-doors" data-rv="up"><button class="pf-cta" data-enter="explore" data-cursor><i></i><span>${esc(enter.explore)}</span>${arrow}</button><button class="pf-cta pf-alt" data-enter="walk" data-cursor><i></i><span>${esc(enter.walk)}</span>${arrow}</button></div>
     </section>`;
     if (c.id === 'foot') return `${walk(i)}
     <footer class="pf-foot" data-cam="${i}">
@@ -91,7 +91,7 @@ function markup() {
         <div><h4>Contact</h4><ul>${footer.phones.map(([l, k]) => `<li>${esc(l)} ${tel(k)}</li>`).join('')}</ul></div>
         <div><h4>Credits</h4><ul><li>Made by ${esc(credits.maker.name)}, <a href="${credits.maker.link}" target="_blank" rel="noopener" data-cursor>${esc(credits.maker.linkText)}</a></li><li>Guided by ${esc(credits.guide.name)}, <a href="${credits.guide.link}" target="_blank" rel="noopener" data-cursor>${esc(credits.guide.org)}</a></li></ul></div>
       </div>
-      <div class="pf-foot-base"><span>${esc(footer.note)}</span><span>Three.js, live sky over Visakhapatnam</span></div>
+      <div class="pf-foot-base"><span>${esc(footer.note)} <a href="/about/" data-cursor>About the department</a></span><span>Three.js, live sky over Visakhapatnam</span><span>Anonymous visit counts only: no names or IP addresses are stored.</span></div>
     </footer>`;
     return `${walk(i)}
     <section id="${c.id}" class="pf-sec" data-cam="${i}">
@@ -103,14 +103,16 @@ function markup() {
   <div class="pf-scrim" aria-hidden="true"></div>
   <div class="pf-veil" aria-hidden="true"></div>
   <div class="pf-vignette" aria-hidden="true"></div>
+  <a class="pf-skiplink" href="#heritage">Skip to content</a>
   <header class="pf-nav">
     <a class="pf-brand" href="#arrival" data-cursor aria-label="${esc(C.department.name)}, back to the start"><span class="pf-brand-tx"><b>Instrument Technology</b><i>Andhra University</i></span></a>
     <nav class="pf-links" id="pf-links" aria-label="Chapters">${groups.map(([g, t]) => `<a class="pf-link" href="#${firstOf(g).id}" data-group="${g}" data-cursor><span>${esc(t)}</span><span class="alt" aria-hidden="true">${esc(where[g])}</span></a>`).join('')}</nav>
-    <button class="pf-skip" data-enter="explore" data-cursor>Explore the campus</button>
+    <button class="pf-skip pf-sound" id="sound" type="button" aria-pressed="true" aria-label="Mute ambient sound" data-cursor>Sound on</button>
     <button class="pf-burger" aria-label="Chapters" aria-controls="pf-links" aria-expanded="false" data-cursor><i></i><i></i></button>
   </header>
   <nav class="pf-rail" aria-label="Chapter position">${chapters.slice(0, -1).map((c, i) => `<button data-rail="${i}" aria-label="${esc(c.nav)}" title="${esc(c.nav)}"><i></i></button>`).join('')}</nav>
   <p class="pf-where" aria-live="polite"><span class="pf-where-dot"></span><span class="pf-where-tx"></span></p>
+  <button class="pf-skip-intro" type="button" data-cursor>Skip intro</button>
   <main class="pf-doc">
     <section id="arrival" class="pf-sec pf-hero" data-cam="0">
       <div class="pf-hero-top">
@@ -205,7 +207,10 @@ function buildSegment(a, b, aspect) {
     // a turn costs more than a step: the frames are spaced by cost, so turns get more of them (each re-aimed exactly);
     // out in front of the building (z beyond the porch) a metre costs 0.4: all in view is far off, so the glide in from
     // the overview and the climb out over the campus go by in fewer frames and fewer screens of scrolling
-    if (prev) cost += P[i].distanceTo(prev.p) * (P[i].z > 8.5 ? .4 : 1) + 2.2 * Math.abs(angle(prev.yaw, yaw)) + Math.abs(pitch - prev.pitch) + .02 * Math.abs(fov - prev.fov);
+    // through a wall under the veil (b.through) a metre costs next to nothing: that stretch is a breath of scroll, not
+    // screens of a dark page (owner, 2026-10-27: the screen went dark for a long scroll before Step inside)
+    const veiled = b.through && P[i].z > b.through[0] - .8 && P[i].z < b.through[1] + 1.2;
+    if (prev) cost += (P[i].distanceTo(prev.p) * (veiled ? 1 : P[i].z > 8.5 ? .4 : 1) + 2.2 * Math.abs(angle(prev.yaw, yaw)) + Math.abs(pitch - prev.pitch) + .02 * Math.abs(fov - prev.fov)) * (veiled ? .04 : 1);
     rows.push(prev = { p: P[i], s, yaw, pitch, fov, cost });
   }
   return {
@@ -216,7 +221,7 @@ function buildSegment(a, b, aspect) {
       out.p.copy(r0.p).lerp(r1.p, k); out.yaw = lerpAngle(r0.yaw, r1.yaw, k); out.pitch = r0.pitch + (r1.pitch - r0.pitch) * k; out.fov = r0.fov + (r1.fov - r0.fov) * k;
       out.outdoors = (f < .5 ? a : b).outdoors || (a.outdoors && b.outdoors);
       const s = r0.s + (r1.s - r0.s) * k;
-      out.veil = cross ? smooth(cross[0] - 1.2, cross[0], s) * (1 - smooth(cross[1], cross[1] + 1.6, s)) : 0;
+      out.veil = cross ? smooth(cross[0] - .6, cross[0], s) * (1 - smooth(cross[1], cross[1] + .8, s)) : 0;
       return out;
     },
   };
@@ -227,7 +232,8 @@ function buildSegment(a, b, aspect) {
 // wind, and pushed out where the cursor touches it; folds catch the light. A height field on a 48 x 48 grid (wave
 // equation, 120 steps a second), drawn with perspective so a fold lifts toward the viewer.
 const CL_SEG = 48, CL_N = CL_SEG + 1, CL_DT = 1 / 120, CL_WAVE = 15, CL_STIFF = .55, CL_GAIN = 5, CL_BLEED = 40;
-const CLOTH = { wind: 1.6, speed: .5, amplitude: 34, drape: 26, brush: 2.05, brushSize: 64, damping: 1, light: .85, sheen: .22, focal: 800 }; // scaled to these ~200 px plates
+const CLOTH = { wind: 1.6, speed: .5, amplitude: 26, drape: 26, brush: 1.05, brushSize: 50, damping: 1.4, // calmer under the hand (owner, 2026-10-27)
+   light: .85, sheen: .22, focal: 800 }; // scaled to these ~200 px plates
 const clothVertex = /* glsl */`
   attribute vec4 aData; attribute vec2 aOffset;
   uniform vec2 uRes, uOut, uSrc, uPad; uniform float uFocal, uGenie;
@@ -410,8 +416,10 @@ function createPlates(renderer) {
         if (!near(p.el) && p.alpha <= .001 && (p.kind === 'card' || p.genie <= .001)) { p.box = null; p.calm = 0; continue; } // far off and out: nothing to do
         // where the plate is: measured (a layout) when it comes near and after the layout changes, and between those
         // carried by the scroll alone; a photo's opacity (a style walk) every 30th frame
-        const fresh = !p.box;
-        if (fresh) { const r = p.frame.getBoundingClientRect(), d = p.pad ?? 0; p.box = { left: r.left - d, top: r.top + sy - d, width: r.width + 2 * d, height: r.height + 2 * d }; }
+        const fresh = !p.box || p.kind === 'photo'; // a photo's frame is sticky (it stays put while its chapter scrolls): measured every frame
+        // measured against the page's real scroll at that moment (the layout is fresh, so it costs nothing); the smooth
+        // scroll's own figure can lag a touch fling by a few pixels, and a plate measured with it snapped later (E2E)
+        if (fresh) { const r = p.frame.getBoundingClientRect(), d = p.pad ?? 0, real = window.scrollY; p.box = { left: r.left - d, top: r.top + real - d, width: r.width + 2 * d, height: r.height + 2 * d }; }
         if (p.kind === 'photo' && (fresh || frame % 30 === 0)) p.alpha = measureAlpha(p.el);
         const top = p.box.top - sy;
         p.rect = { left: p.box.left, top, width: p.box.width, height: p.box.height, right: p.box.left + p.box.width, bottom: top + p.box.height };
@@ -452,6 +460,8 @@ function createPlates(renderer) {
       }
       return moving;
     },
+    // the cloth's program, compiled with the campus's (the first card drawn compiled it mid-scroll; E2E 2026-11-01)
+    compile: () => list[0] && renderer.compileAsync(list[0].cloth.scene, flatCam),
     // after the main view: each plate over its rectangle, drawn with a margin so a fold can lift past the frame
     draw() {
       const keepClear = renderer.autoClear; renderer.autoClear = false;
@@ -567,17 +577,15 @@ function createLeaves(scene) {
 }
 
 // ---------------------------------------------------------------------------------------------------- the layer
-// snapshot: { aspect, swayGate(k), reach(k, prog), rate(k, dir), ready(stop) } when the story is shown as pre-rendered
-// frames (story.js); reach and rate keep the camera on frames that are in. The poses are the frames'
-// own (their aspect), the overlay camera's lens matches the frame as it is cropped to the screen, and the hand-held sway
-// is held to the stops whose depth image is in (swayGate). flightClock: the flight's 0..1 from the frames' video.
-export function createPortfolio({ scene, camera, renderer, reduced, onEnter, changed, snapshot = null, flightClock = null }) {
-  const root = document.createElement('div'); root.id = 'portfolio'; root.innerHTML = markup(); document.body.append(root);
+// The story over the live campus: the page, its scroll, and the camera that follows it.
+export function createPortfolio({ scene, camera, renderer, reduced, changed }) {
+  // hidden and idle until shown (wait, show): the campus page opened for explore or walk never shows it (E2E N2, N3)
+  const root = document.createElement('div'); root.id = 'portfolio'; root.hidden = true; root.innerHTML = markup(); document.body.append(root);
   const $ = s => root.querySelector(s), $$ = s => [...root.querySelectorAll(s)];
   const coarse = matchMedia('(pointer: coarse)').matches;
   const sections = $$('[data-cam]'), walks = $$('[data-walk]'), chapters = C.chapters;
   const rig = { prog: 0, smooth: 0, mx: 0, my: 0, tmx: 0, tmy: 0, intro: 1, fly: 1, nx: 0, ny: 0 }; // fly: the arrival flight, 0..1 (1: done)
-  let flightOn = false, segments = [], holds = [], maxScroll = 1, active = true, wordmark = null, wordT = reduced ? 99 : -1, lastChapter = -1, aspect = innerWidth / innerHeight;
+  let segments = [], holds = [], drift = [], maxScroll = 1, active = false, wordmark = null, wordT = reduced ? 99 : -1, lastChapter = -1, aspect = innerWidth / innerHeight;
   const pose = { p: new T.Vector3(), yaw: 0, pitch: 0, fov: 50, outdoors: true, veil: 0 };
   const dir = new T.Vector3(), right = new T.Vector3();
   if (!camera.parent) scene.add(camera); // the wisps hang from the camera
@@ -585,14 +593,15 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
 
   // ------------------------------------------------------------------ the path and the scroll
   function build() {
-    aspect = snapshot ? snapshot.aspect : innerWidth / innerHeight;
+    aspect = innerWidth / innerHeight;
     segments = chapters.map((c, i) => i ? buildSegment(chapters[i - 1], c, aspect) : null);
   }
   function measure() {
     const vh = innerHeight;
-    // each walk's scroll distance follows its cost: about a screen per 9 m, never less than half a screen
-    // a screen of scroll for about every 6 m walked (owner, 2026-10-19: slower, so a newcomer never loses the path)
-    walks.forEach(w => { const s = segments[+w.dataset.walk]; w.style.height = `${Math.round(clamp(s.cost * .165, .6, 4) * vh)}px`; });
+    // each walk's scroll distance is its cost, the same everywhere (owner, 2026-10-26: every frame matches every tiny
+    // scroll at every point): a screen for about every 7.7 m walked (48 frames), long walks too; the copy's own
+    // margins give each walk 0.17 of a screen besides its spacer
+    walks.forEach(w => { const s = segments[+w.dataset.walk]; w.style.height = `${Math.round(Math.max(.05, s.cost * PER_COST - .17) * vh)}px`; });
     maxScroll = Math.max(1, document.documentElement.scrollHeight - vh);
     holds = sections.map((el, i) => {
       if (i === 0) return [0, Math.max(0, el.offsetTop + el.offsetHeight - vh * 1.02)];
@@ -600,17 +609,28 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       return [a, Math.max(a, b)];
     });
     for (let i = 1; i < holds.length; i++) { holds[i][0] = Math.max(holds[i][0], holds[i - 1][1] + 1); holds[i][1] = Math.max(holds[i][1], holds[i][0]); }
+    // while a chapter is read the camera still drifts on, a few centimetres into the next walk, so no scroll is ever
+    // without its movement
+    drift = holds.map(([a, b], i) => i + 1 < holds.length ? Math.min(.1, (chapters[i].outdoors ? .2 : .1) * clamp((b - a) / vh) / Math.max(.5, segments[i + 1].cost)) : 0); // by the hold's length: none where there is none
     lenis?.resize(); // the walks changed the page's height: Lenis must not clamp to the old one
   }
   function progressFor(y) {
     for (let i = 0; i < holds.length; i++) {
       if (y <= holds[i][1]) {
-        if (y >= holds[i][0] || i === 0) return i;
-        const k = i - 1 + (y - holds[i - 1][1]) / Math.max(1, holds[i][0] - holds[i - 1][1]);
-        return Math.abs(k - Math.round(k)) < .002 ? Math.round(k) : k; // a pixel off a stop is on it (a resize left 9.9991)
+        const [a, b] = holds[i];
+        if (y >= a || i === 0) return i + drift[i] * clamp((y - a) / Math.max(1, b - a));
+        const d = drift[i - 1], e = holds[i - 1][1];
+        if (a - y < .5) return i; // under a pixel off a stop is on it (a resize left 9.9991); no more, or a tiny scroll shows nothing
+        return i - 1 + d + (1 - d) * (y - e) / Math.max(1, a - e);
       }
     }
     return holds.length - 1;
+  }
+  // the scroll position that shows progress k (the inverse of progressFor)
+  function scrollAt(k) {
+    const i = clamp(Math.floor(k), 0, holds.length - 1), f = k - i, [a, b] = holds[i], d = drift[i];
+    if (i === holds.length - 1 || f <= d) return a + (b - a) * (d ? clamp(f / d) : 0);
+    return b + (holds[i + 1][0] - b) * (f - d) / (1 - d);
   }
   const scrollFor = i => holds[i] ? holds[i][0] + (i === 0 ? 0 : Math.min(innerHeight * .12, (holds[i][1] - holds[i][0]) * .5)) : 0;
 
@@ -643,7 +663,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     };
   })();
   // The camera's pose without the hand-held parallax: at scroll position k (chapters) or, while fly < 1, on the arrival
-  // flight. The snapshot frames are rendered from exactly these poses (renderPlan below).
+  // flight.
   function basePose(k, fly, out = pose) {
     const N = chapters.length - 1; k = clamp(k, 0, N);
     const i = Math.min(N - 1, Math.floor(k)), f = k - i;
@@ -666,53 +686,99 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     // hand-held parallax: generous outdoors, a breath indoors
     const out = pose.outdoors ? 1 : 0, still = flying ? 0 : 1 - Math.min(1, Math.abs(rig.smooth - rig.prog) * 3);
     const shift = flying ? 0 : (out ? .55 : .07) * (1 - smooth(0, 1.4, rig.smooth) * .5 * out), turn = (out ? .012 : .022) * still;
-    const gate = snapshot ? snapshot.swayGate(rig.smooth) : 1;
-    sway.x = rig.mx * shift * gate; sway.y = rig.my * shift * .5 * gate; sway.yaw = -rig.mx * turn * gate; sway.pitch = rig.my * turn * .6 * gate;
+    sway.x = rig.mx * shift; sway.y = rig.my * shift * .5; sway.yaw = -rig.mx * turn; sway.pitch = rig.my * turn * .6;
     right.set(-Math.cos(pose.yaw), 0, Math.sin(pose.yaw));
     lookFrom(pose.p.clone().addScaledVector(right, sway.x).add(new T.Vector3(0, sway.y, 0)), pose.yaw + sway.yaw, pose.pitch + sway.pitch);
-    const fov = snapshot ? coverFov(pose.fov) : pose.fov;
+    const fov = pose.fov;
     if (Math.abs(camera.fov - fov) > 1e-4) { camera.fov = fov; camera.updateProjectionMatrix(); }
   }
-  // the vertical lens of a frame (rendered at snapshot.aspect) as the screen shows it, cover-fitted: a wider screen crops
-  // the frame's top and bottom
-  // (and the backdrop's 4% overscan, story.js)
-  const coverFov = f => { const W = view.w / view.h, A = snapshot.aspect, t = Math.tan(f * Math.PI / 360) / 1.04; return 2 * Math.atan(W > A ? t * A / W : t) * 180 / Math.PI; };
 
   // ------------------------------------------------------------------ smooth scroll (Lenis), driven per frame from update()
-  const lenis = new Lenis({ autoRaf: false, lerp: reduced ? 1 : .065, wheelMultiplier: .75, touchMultiplier: 1.2, syncTouch: false });
-  let scrollY = 0;
+  // touch through it as well (a fling is its glide, not the browser's), so the camera can hold every scroll to its frames
+  // A turn of the wheel (or the finger) against a scroll still held back drops what was left of it: the page turns at once
+  const lenis = new Lenis({ autoRaf: false, lerp: reduced ? 1 : .065, wheelMultiplier: .75, touchMultiplier: 1.2, syncTouch: !reduced,
+    virtualScroll: ({ deltaY }) => { if (lenis && deltaY * (lenis.targetScroll - lenis.animatedScroll) < 0) lenis.targetScroll = lenis.animatedScroll; } });
+  let scrollY = 0, steadyY = 0, nativeScroll = false; // nativeScroll: the last scroll was the browser's own (update) // steadyY: where the page was at the last frame (the browser's own jump to a link comes between frames)
   lenis.on('scroll', () => { scrollY = lenis.animatedScroll; rig.prog = progressFor(scrollY); });
   // A jump from the menu: to a near stop the camera walks there; further (over pre-rendered frames, which a long fast
   // walk would outrun) the view fades through the veil, the page lands on the stop, and the view comes back up there.
   let leap = null;
   const goTo = i => {
+    if (introTl) skipIntro(); // a jump during the arrival ends it
     const y = scrollFor(i), d = Math.abs(y - scrollY) / innerHeight;
-    if (snapshot && !reduced && Math.abs(i - rig.smooth) > 1.5) { leap = { to: i, y, veil: 0, phase: 'out' }; return; }
     lenis.scrollTo(y, { duration: reduced ? 0 : clamp(1.2 + d * .22, 1.2, 4.2), easing: x => x < .5 ? 4 * x ** 3 : 1 - (-2 * x + 2) ** 3 / 2, force: true });
   };
   function leapStep(dt) {
     if (!leap) return;
-    if (leap.phase === 'out') { leap.veil = Math.min(1, leap.veil + dt / .32); if (leap.veil >= 1) { lenis.scrollTo(leap.y, { immediate: true, force: true }); rig.prog = progressFor(leap.y); rig.smooth = rig.prog; leap.phase = 'land'; } }
-    else if (leap.phase === 'land') { if (snapshot.ready(Math.round(rig.smooth))) leap.phase = 'in'; } // the stop's frame up first
+    if (leap.phase === 'out') { leap.veil = Math.min(1, leap.veil + dt / .32); if (leap.veil >= 1) { const y = leap.y ?? scrollY; lenis.scrollTo(y, { immediate: true, force: true }); rig.prog = progressFor(y); rig.smooth = rig.prog; leap.phase = 'land'; } } // y null: where the page is (a native scroll)
+    else if (leap.phase === 'land') { leap.wait = (leap.wait || 0) + dt; leap.phase = 'in'; } // the frames there up first
     else { leap.veil = Math.max(0, leap.veil - dt / .45); if (leap.veil <= 0) leap = null; }
   }
+  // the keys through it too (the browser's own key scroll could not be held to the frames); Home and End are a leap
+  addEventListener('keydown', e => {
+    if (!active || reduced || e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || $('.pf-nav')?.classList.contains('menu-open')) return;
+    if (e.target.closest?.('input, textarea, select, [contenteditable]') || (e.key === ' ' && e.target.closest?.('button, a, summary, [role="button"]'))) return;
+    if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); goTo(e.key === 'Home' ? 0 : sections.length - 1); return; }
+    const page = innerHeight * .85, d = { ArrowDown: 60, ArrowUp: -60, PageDown: page, PageUp: -page, ' ': e.shiftKey ? -page : page }[e.key];
+    if (d === undefined) return;
+    const from = d * (lenis.targetScroll - lenis.animatedScroll) < 0 ? lenis.animatedScroll : lenis.targetScroll; // a turn back drops what was held
+    e.preventDefault(); lenis.scrollTo(from + d, { programmatic: false, lerp: lenis.options.lerp });
+  });
   function relayout() { build(); measure(); rig.prog = progressFor(scrollY); wisps?.resize(); plates?.invalidate(); }
   addEventListener('resize', relayout);
   new ResizeObserver(() => { measure(); rig.prog = progressFor(scrollY); plates?.invalidate(); }).observe($('.pf-doc')); // opening a <details> moves the holds
   root.addEventListener('click', e => {
-    const door = e.target.closest('[data-enter]'); if (door) { onEnter(door.dataset.enter); return; }
+    if (e.target.closest('.pf-skip-intro')) { skipIntro(); return; }
     const rail = e.target.closest('[data-rail]'); if (rail) { goTo(+rail.dataset.rail); return; }
     const jump = e.target.closest('a[href^="#"]'); if (!jump) return;
     const el = document.getElementById(jump.getAttribute('href').slice(1)); if (!el) return;
     e.preventDefault(); closeMenu(); const i = sections.indexOf(el); goTo(i >= 0 ? i : 0);
+    // the chapter can be shared and bookmarked, and Back steps through the chapters visited (E2E report M2)
+    if (location.hash !== '#' + el.id) history.pushState(null, '', '#' + el.id);
+    seenHash = location.hash;
   });
+  // Back, Forward, or a link to a chapter of this page already open: the story goes there. A link has the browser jump
+  // the page to the chapter first, taking the copy and its cards with it; that jump is undone at once and the story
+  // makes its own (veiled) way there. Checked at the start of each frame too: a frame can come between the jump and
+  // its hashchange event, and would take the jumped scroll for where the page was; and popstate comes before the jump,
+  // so hashchange undoes a jump even for a chapter already set off for.
+  let seenHash = location.hash;
+  function onHash(e) {
+    if (!active) return; // the campus is open in this page: its own address is not a chapter
+    const fresh = location.hash !== seenHash;
+    if (!fresh && e?.type !== 'hashchange') return;
+    seenHash = location.hash;
+    const i = location.hash.length > 1 ? sections.findIndex(s => s.id === decodeURIComponent(location.hash.slice(1))) : 0;
+    const jumped = Math.abs(window.scrollY - steadyY) > 2;
+    if (i < 0 || (!fresh && !jumped) || Math.abs(i - rig.smooth) <= .01) return;
+    // the window itself: the smooth scroll has not heard of the jump yet, and takes the page to be there already
+    if (jumped) { window.scrollTo({ top: steadyY, behavior: 'instant' }); lenis.scrollTo(steadyY, { immediate: true, force: true }); scrollY = steadyY; rig.prog = progressFor(steadyY); }
+    goTo(i);
+  }
+  addEventListener('popstate', onHash);
+  addEventListener('hashchange', onHash);
 
   // ------------------------------------------------------------------ nav, burger, rail, where-am-I line
   const nav = $('.pf-nav'), burger = $('.pf-burger'), links = $$('.pf-link'), rails = $$('[data-rail]');
-  const closeMenu = () => { nav.classList.remove('menu-open'); burger.setAttribute('aria-expanded', 'false'); };
-  burger.addEventListener('click', () => { const open = !nav.classList.contains('menu-open'); nav.classList.toggle('menu-open', open); burger.setAttribute('aria-expanded', String(open)); if (open) nav.classList.remove('hide'); });
+  // the menu (phones, narrow windows): focus goes into it on opening and is kept there, and back to the button on
+  // closing (E2E report L5)
+  const closeMenu = () => { const was = nav.classList.contains('menu-open'); nav.classList.remove('menu-open'); burger.setAttribute('aria-expanded', 'false'); if (was && nav.contains(document.activeElement)) burger.focus(); };
+  burger.addEventListener('click', () => { const open = !nav.classList.contains('menu-open'); nav.classList.toggle('menu-open', open); burger.setAttribute('aria-expanded', String(open)); if (open) { nav.classList.remove('hide'); links[0]?.focus(); } else burger.focus(); });
+  nav.addEventListener('keydown', e => {
+    if (e.key !== 'Tab' || !nav.classList.contains('menu-open')) return;
+    const ring = [burger, ...links], i = ring.indexOf(document.activeElement);
+    if (i < 0) return; e.preventDefault(); ring[(i + (e.shiftKey ? ring.length - 1 : 1)) % ring.length].focus();
+  });
   addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
   const where = $('.pf-where'), whereTx = $('.pf-where-tx');
+  // the caption hides where the page's own copy, the stats, the doors or the footer come within 24 px of it (E2E report
+  // M4): the blocks of the two chapters the walk is between, against the caption's own box, each frame it shows (an
+  // observer on that band let one through, twice)
+  const blocksOf = new Map(), blocks = i => { if (!blocksOf.has(i)) blocksOf.set(i, sections[i] ? [...sections[i].querySelectorAll('.pf-copy, .pf-stats, .pf-foot, .pf-chips, .pf-doors, .pf-side-lens'), ...(sections[i].matches('.pf-foot') ? [sections[i]] : [])] : []); return blocksOf.get(i); };
+  const captionCovered = () => {
+    const c = where.getBoundingClientRect(), top = c.top - 24, bottom = c.bottom + 24;
+    return [Math.floor(rig.smooth), Math.ceil(rig.smooth)].some(i => blocks(i).some(e => { const r = e.getBoundingClientRect(); return r.height && r.bottom > top && r.top < bottom && r.right > c.left - 24 && r.left < c.right + 24; }));
+  };
   let lastY = 0;
   function chrome() {
     nav.classList.toggle('stuck', scrollY > 40);
@@ -725,20 +791,22 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       rails.forEach((r, i) => r.classList.toggle('on', i === k));
       links.forEach(l => l.classList.toggle('on', l.dataset.group === chapters[k]?.group));
     }
+    // the address follows the chapter, so a copied link opens where it was copied (E2E N4); no history entry each
+    if (rig.fly >= 1 && !leap && !introTl) {
+      const want = k > 0 && sections[k]?.id ? '#' + sections[k].id : '';
+      if (location.hash !== want) { history.replaceState(history.state, '', want || location.pathname + location.search); seenHash = location.hash; }
+    }
     // between chapters, a line says where the walk is going
     const walking = Math.abs(rig.smooth - Math.round(rig.smooth)) > .06 && rig.smooth < chapters.length - 1.5;
-    if (walking) { const to = chapters[Math.ceil(rig.smooth)]; if (to?.where) whereTx.textContent = `To ${to.where.charAt(0).toLowerCase()}${to.where.slice(1)}`; }
+    if (walking) { const to = chapters[Math.ceil(rig.smooth)]; if (to?.where) whereTx.textContent = `Next: ${to.where}`; } // "To over the north campus" read wrong (E2E N6)
     where.classList.toggle('on', walking && rig.intro >= 1);
+    where.classList.toggle('covered', walking && captionCovered());
   }
 
   // ------------------------------------------------------------------ live status (the real time of the department)
   let waiting = false;
   function status() {
     if (waiting) return;
-    if (snapshot) { // no live scene: the time in Visakhapatnam, from the visitor's own clock
-      const t = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()), h = +t.slice(0, 2);
-      $('.pf-live-tx').textContent = `Visakhapatnam, ${t} IST, ${h < 5 ? 'night' : h < 12 ? 'morning' : h < 16 ? 'afternoon' : h < 19 ? 'evening' : 'night'}`; return;
-    }
     const time = document.querySelector('#time-label')?.textContent || '', weather = document.querySelector('#weather-label')?.textContent || '';
     const [clock, , period] = time.split(' / '), [sky, moon] = weather.split(' / ');
     if (!clock) return;
@@ -797,7 +865,9 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   const stopOf = new WeakMap(), kOf = el => { let k = stopOf.get(el); if (k === undefined) stopOf.set(el, k = +el.closest('[data-cam]').dataset.cam); return k; };
   const plateNear = el => rig.fly >= 1 && Math.abs(rig.smooth - kOf(el)) < 1.2;
   const plateHere = el => {
-    const k = kOf(el), on = Math.abs(rig.smooth - k) < .35 && rig.fly >= 1;
+    // out once the camera has arrived at the stop, not on the way to it (owner, 2026-10-27: the next professor's photo had
+    // poured out before the walk reached the door, and the genie went unseen); back in as the walk on begins
+    const k = kOf(el), on = rig.fly >= 1 && rig.smooth > k - .04 && rig.smooth < k + (drift[k] ?? 0) + .12;
     if (on) signAt.set(...(chapters[k].sign ?? chapters[k].anchor)).project(camera);
     return { on, x: (signAt.x + 1) / 2 * view.w, y: (1 - signAt.y) / 2 * view.h };
   };
@@ -842,23 +912,30 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
   if (loading) new MutationObserver(() => { if (waiting && loading.textContent) $('.pf-live-tx').textContent = `Raising the department: ${loading.textContent.charAt(0).toLowerCase()}${loading.textContent.slice(1)}`; })
     .observe(loading, { childList: true, characterData: true, subtree: true });
 
+  // The arrival can be skipped at any moment (E2E report H1): everything it would still do happens at once.
+  let introTl = null;
+  function skipIntro() {
+    if (!introTl) return;
+    rig.fly = 1; wordT = Math.max(wordT, 3);
+    introTl.progress(1); // runs every step left: the hero copy, the nav, scrolling back on
+    root.classList.remove('flying');
+  }
   function play(riseLength, delay = 0) {
     const heroParts = $$('#arrival [data-rv]');
     const heroShown = waiting; // the hero already came in during the wait
     if (waiting) { waiting = false; root.classList.remove('waiting'); status(); }
     if (reduced) { rig.intro = 1; wordT = 99; root.classList.add('arrived'); ring(true); heroParts.forEach(e => e.classList.add('rv-in')); return; }
     lenis.stop(); root.classList.remove('arrived');
-    const tl = gsap.timeline({ delay, onComplete: () => { lenis.start(); root.classList.add('arrived'); ring(true); } });
+    const tl = introTl = gsap.timeline({ delay, onComplete: () => { introTl = null; lenis.start(); root.classList.add('arrived'); ring(true); } });
     // the hero steps aside for the flight and comes back as the camera settles
     root.classList.add('flying');
-    if (flightClock) { flightOn = true; tl.to({}, { duration: riseLength + .6 }, 0); } // the video sets the pace (update)
-    else tl.fromTo(rig, { fly: 0 }, { fly: 1, duration: riseLength + .6, ease: 'none' }, 0);
+    tl.fromTo(rig, { fly: 0 }, { fly: 1, duration: riseLength + .6, ease: 'none' }, 0);
     tl
       .call(() => root.classList.remove('flying'), null, riseLength - 1.4)
       .call(() => { wordT = 0; }, null, riseLength - .9)
       .call(() => { if (!heroShown) reveals.get($('#arrival .pf-display'))?.(); }, null, riseLength - .2)
       .call(() => heroParts.forEach((e, i) => setTimeout(() => e.classList.add('rv-in'), 120 + i * 95)), null, riseLength + .1);
-    // the nav steps aside and returns with the hero through the .flying class (portfolio.css), not a tween of its own
+    // the hero steps aside and returns through the .flying class (portfolio.css); the nav stays up throughout
   }
 
   let last = performance.now();
@@ -869,6 +946,20 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     goTo,
     // The visitor pressed Enter before the building was ready: the hero over the night, the load's progress on the live
     // line; play() takes over when the campus is ready.
+    skipIntro,
+    get introPlaying() { return !!introTl; },
+    // straight to a scroll position (a return from the campus, a deep link): under the veil, which lifts once the
+    // frames there are in
+    jumpTo(y) {
+      skipIntro();
+      lenis.scrollTo(y, { immediate: true, force: true }); rig.prog = progressFor(y); rig.smooth = rig.prog;
+    },
+    scrollFor: i => scrollFor(i),
+    compile: () => plates.compile(),
+    // where to come back to: a chapter being read at its own reading position, below the header (E2E N5); between
+    // chapters, the scroll itself
+    placeY() { const c = Math.round(rig.smooth); return Math.abs(rig.smooth - c) < .1 && c > 0 ? scrollFor(c) : scrollY; },
+    sectionIndex: id => sections.findIndex(s => s.id === id),
     wait() {
       this.show(); waiting = true; root.classList.add('waiting'); lenis.stop();
       $('.pf-live-tx').textContent = 'Raising the department';
@@ -876,22 +967,41 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
       splitReady.then(() => reveals.get($('#arrival .pf-display'))?.now());
     },
     // the exploration canvas is not a stop in the story's tab order
-    show() { active = true; document.documentElement.classList.add('portfolio-mode'); ring(root.classList.contains('arrived')); root.hidden = false; renderer.domElement.tabIndex = -1; lenis.start(); relayout(); },
+    // shown: the address it is shown at is not a link to follow
+    show() { active = true; seenHash = location.hash; document.documentElement.classList.add('portfolio-mode'); ring(root.classList.contains('arrived')); root.hidden = false; renderer.domElement.tabIndex = -1; lenis.start(); relayout(); },
     hide() { active = false; ring(false); lenis.stop(); closeMenu(); renderer.domElement.tabIndex = 0; document.documentElement.classList.remove('portfolio-mode'); root.hidden = true; if (wordmark) wordmark.group.visible = false; if (wisps) wisps.points.visible = false; leaves.update(1, camera, false, 1); },
     // the page's own frame: called from main.js's loop before it draws; true while anything moves
     update(dt, { light = 1 } = {}) {
       if (!active) return false;
-      const now = performance.now(); lenis.raf(now); last = now;
+      onHash(); // before the smooth scroll reads a link's jump of the page
+      const now = performance.now(); lenis.raf(now); last = now; steadyY = scrollY;
       const before = rig.smooth;
-      if (flightOn) { rig.fly = clamp(flightClock()); if (rig.fly >= 1) flightOn = false; }
-      // the camera follows the scroll; over pre-rendered frames it never outruns them (owner 2026-10-26: flicker and
-      // skipped frames when the scroll sped up or slowed down): it goes no further than the frames on the GPU reach,
-      // and no faster than they can come, so a quick flick is a glide that catches up, never a freeze or a jump
+      // The camera is the scroll (owner, 2026-10-26: every frame matches every tiny scroll at every point): no lag of
+      // its own, the smooth scroll's easing is the only one. Over pre-rendered frames it never outruns them (owner,
+      // 2026-10-26: flicker and skipped frames when the scroll sped up): no further than the frames on the GPU reach
+      // and no faster than they can come; where it would, the scroll itself is held there, its target kept, so the
+      // page and the picture go on together, a quick flick a glide that catches up. A scroll the browser makes itself
+      // (the scroll bar, find in page) cannot be held: the camera follows that one as it can.
       let target = rig.prog;
-      if (snapshot && !reduced && !leap) { const r = snapshot.reach(rig.smooth, rig.prog); target = clamp(target, r.lo, r.hi); }
-      let next = reduced ? target : T.MathUtils.damp(rig.smooth, target, 5.2, dt);
-      if (snapshot && !reduced && !leap) { const max = snapshot.rate(rig.smooth, Math.sign(target - rig.smooth)) * dt; next = rig.smooth + clamp(next - rig.smooth, -max, max); }
-      rig.smooth = clamp(next, 0, chapters.length - 1); // never before the start or past the end (a scroll during the flight left it at -0.002)
+      // while a leap's veil closes, the camera stays put (a link's own jump of the page had it chase frames not yet in)
+      if (leap?.phase === 'out') target = rig.smooth;
+      // a scroll the browser made itself (Tab to a link, find in page, the scroll bar) is the camera's to catch, unheld,
+      // through the veil when it is further than a walk; the page is held to the camera again once it has (E2E N1: a
+      // wheel turn after Tab had pulled the page back 45,000 px, to the camera still on its way)
+      if (lenis.isScrolling === 'native') nativeScroll = true;
+      else if (nativeScroll && Math.abs(rig.smooth - rig.prog) < 1e-4) nativeScroll = false;
+      const held = !nativeScroll && !leap && !reduced;
+      let next = reduced || held ? target : T.MathUtils.damp(rig.smooth, target, 5.2, dt);
+      next = clamp(next, 0, chapters.length - 1); // never before the start or past the end (a scroll during the flight left it at -0.002)
+      if (held && Math.abs(next - rig.prog) > 1e-5) {
+        // what the hand asked for beyond the picture plays out after it, at most half a screen of it (the page does not
+        // run on for seconds after the hand has stopped)
+        const y = scrollAt(next), to = y + clamp(lenis.targetScroll - y, -innerHeight * .5, innerHeight * .5);
+        lenis.scrollTo(y, { immediate: true, force: true });
+        lenis.scrollTo(to, { programmatic: false, lerp: lenis.options.lerp, force: true });
+        scrollY = y; rig.prog = next;
+      }
+      rig.smooth = next;
       if (Math.abs(rig.smooth - rig.prog) < 1e-4) rig.smooth = rig.prog;
       leapStep(dt);
       rig.mx = T.MathUtils.damp(rig.mx, reduced ? 0 : rig.tmx, 2.6, dt); rig.my = T.MathUtils.damp(rig.my, reduced ? 0 : rig.tmy, 2.6, dt);
@@ -923,7 +1033,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
             const f = reduced ? 0 : smooth(.6, 1.6, wordT - g.delay), t = wordT * g.rate + g.phase;
             g.mesh.position.y = g.base - 10 * (1 - back) + f * (.16 * Math.sin(t) + .05 * Math.sin(t * 2.3));
             g.mesh.rotation.z = f * .018 * Math.sin(t * .8 + 1); g.mesh.rotation.y = f * .05 * Math.sin(t * .6);
-            g.material.opacity = near;
+            g.material.opacity = near * (view.w < 600 ? .38 : 1); // on a phone it would sit over the chapter cards (E2E L1)
           }
         }
       }
@@ -934,37 +1044,7 @@ export function createPortfolio({ scene, camera, renderer, reduced, onEnter, cha
     get fly() { return rig.fly; },
     // anything moving because of the visitor or the story (not the ambient leaves and cloth): drawn at full rate
     get busy() { return rig.fly < 1 || Math.abs(rig.smooth - rig.prog) > 1e-4 || lenis.isScrolling || !!leap; },
-    get sway() { return sway; },
     get pose() { return pose; },
-    // the pose a frame at scroll position k was shot from (story.js re-projects the frames to the pose between them)
-    poseAt: (k, out) => basePose(k, 1, out),
-    // For the snapshot renderer: every frame of the story at one aspect. The arrival flight at fps over its length,
-    // then each walk sampled every `spacing` of its cost (metres walked, plus turning), both ends included; a stop's
-    // hold is its walk's last frame. Each item carries what poseFor needs.
-    renderPlan({ aspect: a, spacing = .2, flightSeconds, fps = 30 }) {
-      const keep = aspect; aspect = a; const segs = chapters.map((c, i) => i ? buildSegment(chapters[i - 1], c, a) : null);
-      const plan = { aspect: a, flight: Math.round(flightSeconds * fps), segments: [], frames: [] };
-      for (let j = 0; j < plan.flight; j++) plan.frames.push({ key: `fly/${String(j).padStart(3, '0')}`, fly: j / (plan.flight - 1), k: 0, outdoor: true, first: true });
-      segs.forEach((g, i) => {
-        if (!g) return;
-        const n = Math.max(2, Math.ceil(g.cost / spacing) + 1);
-        plan.segments[i] = n;
-        // hold: a stop's frame (the walk's end, and the hero at the first walk's start), where the page rests
-        const outdoor = i === 1 || !!chapters[i].outdoors; // the walk up to the porch, and out over the campus
-        for (let j = 0; j < n; j++) plan.frames.push({ key: `w${String(i).padStart(2, '0')}/${String(j).padStart(3, '0')}`, fly: 1, k: i - 1 + j / (n - 1), first: i === 1, outdoor, hold: j === n - 1 || (i === 1 && j === 0) });
-      });
-      aspect = keep;
-      return plan;
-    },
-    // put the camera on a plan item's pose (no parallax), at aspect a
-    poseFor(item, a) {
-      if (a !== aspect) { aspect = a; segments = chapters.map((c, i) => i ? buildSegment(chapters[i - 1], c, a) : null); }
-      const q = basePose(item.k, item.fly, { p: new T.Vector3() });
-      lookFrom(q.p, q.yaw, q.pitch); camera.fov = q.fov; camera.aspect = a; camera.updateProjectionMatrix(); camera.updateMatrixWorld();
-      return q;
-    },
-    // what the snapshot page needs to draw: the overlays it hides while frames are shot
-    overlays() { return [wordmark?.group, wisps?.points, leaves.mesh].filter(Boolean); },
     // the flight's opening view, drawn once while the page is still covered (the driver finishes a shader on its first
     // draw; a whole new side of the campus otherwise stalls the first frames of the rise)
     warm(draw) {

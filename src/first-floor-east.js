@@ -110,7 +110,9 @@ export function buildFirstFloorEast(parent, m, { level = 1 } = {}) {
     const t = canvas(512, 190, (g, w, h) => {
       g.fillStyle = bg; g.fillRect(0, 0, w, h); if (border) { g.strokeStyle = border; g.lineWidth = 6; g.strokeRect(5, 5, w - 10, h - 10); }
       g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.font = 'bold 54px "Times New Roman", Times, serif'; g.fillText(lines[0], w / 2, h * .38, w - 36);
+      let size = 54; g.font = `bold ${size}px "Times New Roman", Times, serif`; // a long name a size smaller, not squeezed
+      while (size > 40 && g.measureText(lines[0]).width > w - 36) g.font = `bold ${size -= 2}px "Times New Roman", Times, serif`;
+      g.fillText(lines[0], w / 2, h * .38, w - 36);
       g.font = 'bold 30px "Times New Roman", Times, serif'; g.textAlign = 'right'; g.fillText(lines[1], w - 30, h * .74);
     });
     const material = new T.MeshStandardMaterial({ map: t, roughness: .6 });
@@ -189,12 +191,12 @@ export function buildFirstFloorEast(parent, m, { level = 1 } = {}) {
   const Mz0 = frameAt('x', Z0, 1, 0);
   if (!second) {
   // Room side, from the landing: lab door (vision panel, black plate, notice), green barred window, Prof. M. Ramesh
-  // Patnaik, Prof. Y. Srinivasa Rao (meter boxes above), a plain door, Prof. A. Bhujanga Rao, GENTS TOILETS (111121).
+  // Patnaik, Prof. Y. Srinivasa Rao (meter boxes above), Prof. D.V. Rama Koti Reddy, Prof. A. Bhujanga Rao, GENTS TOILETS (111121).
   const doorsZ0 = [
     { x: 5.45, sign: 'LAB', vision: true, notice: true },
     { x: 9.3, garland: true, signal: { lines: ['Prof. M.Ramesh Patnaik', 'M.Tech., Ph.D., F.I.E'], bg: '#f4f3ee', fg: '#c4161c', border: '#8a8a86' } },
     { x: 11.9, garland: true, signal: { lines: ['Prof.Y.Srinivasa Rao', 'Ph.D'], bg: '#f4f3ee', fg: '#151515', border: '#9a9a96' } },
-    { x: 14.0 },
+    { x: 14.0, signal: { lines: ['Prof. D.V. Rama Koti Reddy', 'Ph.D'], bg: '#f4f3ee', fg: '#151515', border: '#9a9a96' } }, // his room (owner, 2026-10-26)
     { x: 16.4, garland: true, signal: { lines: ['Prof. A.BHUJANGA RAO', 'Ph.d'], bg: '#1f4c9c', fg: '#f4f4f4', border: '#13306a' } },
     { x: 19.7, gents: true },
   ];

@@ -1,0 +1,7 @@
+# IST: Department of Instrument Technology, Andhra University
+
+> An independent 3D portrait of the Department of Instrument Technology (IST), AU College of Engineering (A), Andhra University, Visakhapatnam, India. Not an official university website.
+
+- [About the department](https://instrument-technology-au.pages.dev/about/): history since 1937, B.Tech, M.Tech and Ph.D programmes and admissions, eleven laboratories, research areas, faculty, student information and contacts, as plain text.
+- [3D walk](https://instrument-technology-au.pages.dev/): the story and first-person exploration of the building (needs WebGL).
+- [Official Andhra University site](https://www.andhrauniversity.edu.in/)

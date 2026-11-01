@@ -18,9 +18,14 @@ export function merge(list) {
   }));
   return pieces.tagging ? tagPiece(merged) : merged; // a prop rises as one piece (rise.js), not part by part
 }
+// Each size of rounded box is made once and copied after (doors, panels and frames repeat by the hundred: making them
+// afresh cost ~2 s of the load)
+const rounded = new Map();
 export function rbox(w, h, d, r, x = 0, y = 0, z = 0) {
-  const g = new RoundedBoxGeometry(w, h, d, 2, Math.max(.0005, Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4, d / 2 - 1e-4)));
-  g.translate(x, y, z); return g;
+  r = Math.max(.0005, Math.min(r, w / 2 - 1e-4, h / 2 - 1e-4, d / 2 - 1e-4));
+  const key = `${w},${h},${d},${r}`;
+  let base = rounded.get(key); if (!base) rounded.set(key, base = new RoundedBoxGeometry(w, h, d, 2, r));
+  const g = base.clone(); g.translate(x, y, z); return g;
 }
 // Tapered member from a (radius r0) to b (radius r1); squash flattens the section (1 = round).
 export function member(a, b, r0, r1 = r0, sides = 8, squash = 1) {
