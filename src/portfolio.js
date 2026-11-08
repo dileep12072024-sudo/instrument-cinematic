@@ -89,7 +89,7 @@ function markup() {
         <div class="pf-foot-brand"><address>${footer.address.map(esc).join('<br>')}</address></div>
         <div><h4>Chapters</h4><ul>${groups.map(([g, t]) => `<li><a href="#${firstOf(g).id}" data-cursor>${esc(t)}</a></li>`).join('')}</ul></div>
         <div><h4>Contact</h4><ul>${footer.phones.map(([l, k]) => `<li>${esc(l)} ${tel(k)}</li>`).join('')}</ul></div>
-        <div><h4>Credits</h4><ul><li>Made by ${esc(credits.maker.name)}, <a href="${credits.maker.link}" target="_blank" rel="noopener" data-cursor>${esc(credits.maker.linkText)}</a></li><li>Guided by ${esc(credits.guide.name)}, <a href="${credits.guide.link}" target="_blank" rel="noopener" data-cursor>${esc(credits.guide.org)}</a></li></ul></div>
+        <div><h4>Credits</h4><ul><li>Made by ${esc(credits.maker.name)}, <a href="${credits.maker.link}" target="_blank" rel="noopener" data-cursor>${esc(credits.maker.linkText)}</a>, <a href="https://www.instagram.com/${credits.maker.instagram}/" target="_blank" rel="noopener" data-cursor>@${esc(credits.maker.instagram)}</a></li><li>Guided by ${esc(credits.guide.name)}, <a href="${credits.guide.link}" target="_blank" rel="noopener" data-cursor>${esc(credits.guide.org)}</a></li></ul></div>
       </div>
       <div class="pf-foot-base"><span>${esc(footer.note)} <a href="/about/" data-cursor>About the department</a></span><span>Three.js, live sky over Visakhapatnam</span><span>Anonymous visit counts only: no names or IP addresses are stored.</span></div>
     </footer>`;
