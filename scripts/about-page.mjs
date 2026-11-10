@@ -1,6 +1,6 @@
 // Writes public/about/index.html: the story's words as one plain page that search engines read without running the
 // 3D site. Run after editing src/portfolio-content.js: node scripts/about-page.mjs
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { people, labRooms, classroomRooms, heritage, admissions, labs, guide, footer } from '../src/portfolio-content.js';
 
 const SITE = 'https://instrument-technology-au.pages.dev';
@@ -94,3 +94,10 @@ const html = `<!doctype html>
 mkdirSync(new URL('../public/about/', import.meta.url), { recursive: true });
 writeFileSync(new URL('../public/about/index.html', import.meta.url), html);
 console.log('wrote public/about/index.html', html.length, 'bytes');
+// The same words in the home page's own HTML, inside #app (the app replaces it when it starts): a search engine reads
+// the department without running the 3D scene, and a browser without scripts shows it (index.html hides the loader).
+const home = new URL('../index.html', import.meta.url), page = readFileSync(home, 'utf8');
+const text = html.slice(html.indexOf('<main>'), html.indexOf('</main>') + 7).replace('<a class="walk" href="/">Walk through the department in 3D</a>', '<a href="/about/">About the department</a>');
+if (!/<!--story-text-->[\s\S]*?<!--\/story-text-->/.test(page)) throw new Error('index.html: the story-text markers are missing');
+writeFileSync(home, page.replace(/<!--story-text-->[\s\S]*?<!--\/story-text-->/, () => `<!--story-text-->${text}<!--/story-text-->`));
+console.log('wrote the story text into index.html', text.length, 'bytes');

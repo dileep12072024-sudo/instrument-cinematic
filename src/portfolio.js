@@ -112,7 +112,6 @@ function markup() {
   </header>
   <nav class="pf-rail" aria-label="Chapter position">${chapters.slice(0, -1).map((c, i) => `<button data-rail="${i}" aria-label="${esc(c.nav)}" title="${esc(c.nav)}"><i></i></button>`).join('')}</nav>
   <p class="pf-where" aria-live="polite"><span class="pf-where-dot"></span><span class="pf-where-tx"></span></p>
-  <button class="pf-skip-intro" type="button" data-cursor>Skip intro</button>
   <main class="pf-doc">
     <section id="arrival" class="pf-sec pf-hero" data-cam="0">
       <div class="pf-hero-top">
@@ -394,7 +393,8 @@ function createPlates(renderer) {
     attach(el, onIn, onOut) {
       const p = { kind: 'photo', cloth: createCloth(), el, frame: el.querySelector('[data-frame]') || el, tex: null, rect: null, alpha: 0, genie: 0, want: 0, src: new T.Vector2(), onIn, onOut };
       // the photo's bytes go straight to the screen, like the copied frames the cloth was written for: no colour conversion
-      loader.load(el.dataset.photo, t => { t.colorSpace = T.NoColorSpace; t.anisotropy = 4; p.tex = t; });
+      // decoded off the main thread and on the GPU before its plate first shows (on first show it cost ~0.1 s mid-scroll)
+      loader.load(el.dataset.photo, async t => { t.colorSpace = T.NoColorSpace; t.anisotropy = 4; try { await t.image.decode(); } catch {} renderer.initTexture(t); p.tex = t; });
       list.push(p); return p;
     },
     // a description's card: a sheet of the night's ink behind the text, hung from its top edge, giving way under the
@@ -728,7 +728,6 @@ export function createPortfolio({ scene, camera, renderer, reduced, changed }) {
   addEventListener('resize', relayout);
   new ResizeObserver(() => { measure(); rig.prog = progressFor(scrollY); plates?.invalidate(); }).observe($('.pf-doc')); // opening a <details> moves the holds
   root.addEventListener('click', e => {
-    if (e.target.closest('.pf-skip-intro')) { skipIntro(); return; }
     const rail = e.target.closest('[data-rail]'); if (rail) { goTo(+rail.dataset.rail); return; }
     const jump = e.target.closest('a[href^="#"]'); if (!jump) return;
     const el = document.getElementById(jump.getAttribute('href').slice(1)); if (!el) return;
@@ -1045,14 +1044,14 @@ export function createPortfolio({ scene, camera, renderer, reduced, changed }) {
     // anything moving because of the visitor or the story (not the ambient leaves and cloth): drawn at full rate
     get busy() { return rig.fly < 1 || Math.abs(rig.smooth - rig.prog) > 1e-4 || lenis.isScrolling || !!leap; },
     get pose() { return pose; },
-    // the flight's opening view, drawn once while the page is still covered (the driver finishes a shader on its first
-    // draw; a whole new side of the campus otherwise stalls the first frames of the rise)
+    // every stop's view, drawn once while the page is still covered (the driver finishes a shader on its first draw):
+    // last to first, so the hero's is the frame left standing
     warm(draw) {
       const keep = camera.position.clone(), q = camera.quaternion.clone(), fov = camera.fov;
-      flight(0, pose); camera.position.copy(pose.p); camera.lookAt(pose.p.clone().add(new T.Vector3(Math.sin(pose.yaw) * Math.cos(pose.pitch), Math.sin(pose.pitch), Math.cos(pose.yaw) * Math.cos(pose.pitch)))); camera.fov = pose.fov; camera.updateProjectionMatrix();
-      draw();
+      for (let i = chapters.length - 1; i >= 0; i--) { basePose(i, 1); lookFrom(pose.p, pose.yaw, pose.pitch); camera.fov = pose.fov; camera.updateProjectionMatrix(); camera.updateMatrixWorld(); draw(i); }
       camera.position.copy(keep); camera.quaternion.copy(q); camera.fov = fov; camera.updateProjectionMatrix();
     },
+    get scrolling() { return Math.abs(rig.smooth - rig.prog) > 1e-3; }, // the camera is between where it is and where the scroll wants it
     // after main.js has drawn the frame: the photo plates over it
     afterRender() { if (active) plates.draw(); },
   };

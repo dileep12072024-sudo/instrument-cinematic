@@ -42,14 +42,6 @@ body:has(> .story-canvas) { margin: 0; background: #0b1322; }
 #portfolio .pf-hero, #portfolio .pf-rail, #portfolio .pf-scrim { transition: opacity 1.4s var(--ease); }
 /* the nav stays up through the arrival, usable at once (E2E report H1) */
 #portfolio.flying .pf-hero, #portfolio.flying .pf-rail, #portfolio.flying .pf-scrim { opacity: 0 !important; transition-duration: .7s; pointer-events: none; }
-.pf-skip-intro { position: fixed; z-index: 55; right: max(24px, env(safe-area-inset-right)); bottom: max(28px, env(safe-area-inset-bottom)); padding: 11px 20px; border-radius: 999px;
-  font: 500 13px/1 'Instrument Sans', system-ui, sans-serif; letter-spacing: .06em; color: #f3eee2; background: rgb(8 13 22 / .55); border: 1px solid rgb(243 238 226 / .35);
-  backdrop-filter: blur(6px); cursor: pointer; opacity: 0; pointer-events: none; visibility: hidden; transition: opacity .5s var(--ease), visibility 0s .5s; }
-#portfolio.flying .pf-skip-intro { opacity: 1; pointer-events: auto; visibility: visible; transition: opacity .5s var(--ease); } /* hidden, it leaves the Tab order too */
-.pf-skiplink { position: fixed; z-index: 60; left: var(--pad); top: 8px; padding: 10px 16px; border-radius: 999px; background: rgb(8 13 22 / .92); color: #f3eee2;
-  font: 500 13px/1 'Instrument Sans', system-ui, sans-serif; transform: translateY(-160%); }
-.pf-skiplink:focus-visible { transform: none; outline: 2px solid var(--accent); outline-offset: 2px; }
-.pf-skip-intro:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 #portfolio.waiting #portfolio.waiting .pf-cue { visibility: hidden; }
 #portfolio.waiting .pf-live .dot { animation: pf-pulse 1.4s var(--ease) infinite; }
 .pf-scrim { position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
@@ -66,6 +58,9 @@ body:has(> .story-canvas) { margin: 0; background: #0b1322; }
 .pf-cursor.away { opacity: 0 !important; }
 
 /* ------------------------------------------------------------------ nav */
+.pf-skiplink { position: fixed; z-index: 60; left: var(--pad); top: 8px; padding: 10px 16px; border-radius: 999px; background: rgb(8 13 22 / .92); color: #f3eee2;
+  font: 500 13px/1 'Instrument Sans', system-ui, sans-serif; transform: translateY(-160%); }
+.pf-skiplink:focus-visible { transform: none; outline: 2px solid var(--accent); outline-offset: 2px; }
 .pf-nav { position: fixed; z-index: 50; top: 0; left: 0; right: 0; height: var(--nav-h); display: flex; align-items: center; gap: clamp(18px, 2.6vw, 44px);
   padding: env(safe-area-inset-top) var(--pad) 0; transition: transform .7s var(--ease-out), background .5s, border-color .5s; border-bottom: 1px solid transparent; }
 .pf-nav { background: linear-gradient(rgb(8 13 22 / .55), rgb(8 13 22 / 0)); text-shadow: 0 1px 8px rgb(0 0 0 / .55); }

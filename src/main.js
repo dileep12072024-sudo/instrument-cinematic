@@ -76,7 +76,7 @@ const loadBar = () => $('.load-track>span');
 const environmentDownload = renderer ? prefetchEnvironment(p => {
   const bar = loadBar(); if (bar) { bar.style.animation = 'none'; bar.style.transform = `scaleX(${p.toFixed(3)})`; }
   if (p < 1) $('#loading-status').textContent = `Downloading the campus ${Math.round(p * 100)}%`;
-  if (p < 1) loading.status('Downloading the department');
+  if (p < 1 && !performance.getEntriesByName('architecture-built').length) loading.status('Downloading the department'); // never over a later stage's words
 }) : null;
 environmentDownload?.catch(() => {}); // handled where it is awaited
 const skyDownload = renderer ? new HDRLoader().loadAsync('/media/sky.hdr') : null;
@@ -87,7 +87,7 @@ const camera = new THREE.PerspectiveCamera(43, innerWidth / innerHeight, .15, 50
 let architecture, landscape, surroundings;
 let doorsOpen = false, hour = 16.5, targetHour = 16.5;
 const hallSwitch = { lights: true, fan: true, porch: true }; // entrance hall switch box: wall tubes, fan, porch tube
-let ready = false, needsRender = true, lastRendered = 0, lastShadowUpdate = 0, dragging = 0;
+let ready = false, needsRender = true, lastRendered = 0, lastShadowUpdate = 0;
 const sun = new THREE.DirectionalLight('#ffe8c5', 3.5);
 sun.position.set(-34, 39, 30); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = -55; sun.shadow.camera.right = 55; sun.shadow.camera.top = 40; sun.shadow.camera.bottom = -40; sun.shadow.camera.far = 180;
@@ -122,42 +122,23 @@ const defaultPixelRatio = () => Math.min(devicePixelRatio, 1.35);
 const frameSamples = [];
 let lastResolutionChange = 0;
 // Previously this only ever lowered the pixel ratio, so every tab switch (one huge frame) blurred the scene for good.
-let readyAt = Infinity, cadence = 1, cadenceFloor = 1; // render every Nth display frame (1 = 60 fps, 2 = 30, 3 = 20); floor = fastest that held
-let resolutionCap = Infinity; // highest pixel ratio this device has proven it can sustain (session-long)
+let readyAt = Infinity, cadence = 1; // render every Nth 60 Hz frame (1 = 60 fps, 2 = 30, 3 = 20)
 // A new pixel ratio resizes, and so clears, the canvas that was just drawn: draw it again at once, or the browser shows
 // a blank frame (a grey flash mid-walk).
 const setRatio = ratio => { renderer.setPixelRatio(ratio); if (ready) { renderer.render(scene, camera); portfolio?.afterRender(); } };
-// Adaptive quality for weak GPUs. Goal: one steady state, never oscillation (sharp/soft switching reads as flashing).
-// Under load: (1) even 30 fps, (2) small resolution steps (x0.88) down to 0.8, (3) even 20 fps.
-// Every 20 s of stability it tries one step better; a step that fails becomes a permanent limit, so nothing flips back.
+// Frame pace for weak GPUs: even 60, 30 or 20 frames a second, never a mix (uneven frames read as flutter). The canvas
+// is never resized during a visit (each resize stalled 0.3-0.7 s and showed; 2026-11-10): its sharpness is settled once
+// behind the loader (boot), and only the pace adapts here. A faster pace that fails is retried at doubling intervals,
+// from six seconds again after the next scroll (a new view).
+let retryWait = 6000, steppedUpAt = -1e9;
 function adaptResolution(interval, now) {
   frameSamples.push(interval); if (frameSamples.length > 40) frameSamples.shift();
   if (frameSamples.length < 40 || now - lastResolutionChange < 2000 || now - readyAt < 4000) return; // skip shader warm-up
-  const average = frameSamples.slice().sort((a, b) => a - b)[20], ratio = renderer.getPixelRatio(); // median: one-off stalls do not count
-  const budget = cadence * 1000 / 60, best = defaultPixelRatio();
+  const average = frameSamples.slice().sort((a, b) => a - b)[20], budget = cadence * 1000 / 60; // median: one-off stalls do not count
   const change = () => { frameSamples.length = 0; lastResolutionChange = now; needsRender = true; };
-  // The story's camera moves with the scroll, so it sheds sharpness before frames, down to Kage's floor (.55 of the
-  // display's pixels): skipped frames read as a stutter in the walk, softness during it does not.
-  const story = portfolio?.active;
   if (average > budget * (cadence > 1 ? 1.12 : 1.2)) {
-    if (cadence < 2 && !story) { cadence = cadenceFloor = 2; return change(); }
-    // Phones have few CSS pixels; below ~1.1 they turn visibly soft, so they shed frames before sharpness.
-    const floor = story ? .55 * Math.min(devicePixelRatio, 1.5) : small() ? Math.min(1.1, best) : .8;
-    // One step straight to the estimated ratio: every resize stalls ~0.15 s here, and four small steps in a row read
-    // as stutter right after the scene appears (cost ~ pixels, so scale the pixel ratio by the square root).
-    if (ratio > floor + .01) { resolutionCap = Math.max(floor, Math.min(ratio * .88, ratio * Math.sqrt(budget / average) * .95)); setRatio(resolutionCap); return change(); }
-    if (cadence < 2) { cadence = cadenceFloor = 2; return change(); }
-    if (cadence < 3) { cadence = cadenceFloor = 3; return change(); }
-  } else if (story && cadence > 1 && now - lastResolutionChange > 6000) {
-    // The story moves between heavy outdoor views and light interiors. The samples are render intervals, which at a
-    // slower pace say nothing about whether a faster one fits, so it tries one: frames on pace for six seconds step up,
-    // and the rule above steps back if it does not hold.
-    cadence--; cadenceFloor = Math.min(cadenceFloor, cadence); return change();
-  } else if (now - lastResolutionChange > 20000) {
-    const up = Math.min(best, resolutionCap, ratio / .88);
-    if (up > ratio + .01) { setRatio(up); return change(); }
-    if (cadence > cadenceFloor) { cadence--; return change(); }
-  }
+    if (cadence < 3) { if (now - steppedUpAt < 8000) retryWait = Math.min(retryWait * 2, 96000); cadence++; return change(); }
+  } else if (cadence > 1 && now - lastResolutionChange > retryWait) { cadence--; steppedUpAt = now; return change(); }
 }
 // Live weather point supplied for the Andhra University campus.
 const LOCATION = { latitude: 17.6801, longitude: 83.2016, timezone: 'Asia/Kolkata', label: 'ANDHRA UNIVERSITY / VISAKHAPATNAM' };
@@ -305,9 +286,6 @@ async function boot() {
   // settings. Made first: its noise buffers took 15 ms alone but ~15 s next to the GPU's shader compiles (2026-11-01 profile).
   sound.setEnabled(true).then(updateSoundButton).catch(updateSoundButton); updateSoundButton();
   renderer.setPixelRatio(defaultPixelRatio()); renderer.setSize(innerWidth, innerHeight);
-  { const pointers = new Set(), canvas = renderer.domElement, up = e => { pointers.delete(e.pointerId); dragging = pointers.size; };
-    canvas.addEventListener('pointerdown', e => { pointers.add(e.pointerId); dragging = pointers.size; });
-    for (const type of ['pointerup', 'pointercancel']) addEventListener(type, up); addEventListener('blur', () => { pointers.clear(); dragging = 0; }); }
   renderer.debug.checkShaderErrors = false; // its info-log reads are a GPU round trip per program; the shaders are fixed
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
@@ -349,6 +327,7 @@ async function boot() {
   await painted();
   $('#loading-status').textContent = 'Growing the Blender landscape';
   performance.mark('architecture-built');
+  window.__stageNow();
   const reflectionFilter = new THREE.PMREMGenerator(renderer);
   try {
     const hdr = await skyDownload; hdr.mapping = THREE.EquirectangularReflectionMapping;
@@ -360,6 +339,10 @@ async function boot() {
   reflectionFilter.dispose();
   performance.mark('sky-ready');
   rise = createRise(); rise.attach(architecture.group); rise.attach(litWindowGroup); rise.set(-1); // patched before any shader compiles: no stall later
+  // The building's programs start compiling here, on the GPU's own threads, while this thread loads and plants the land
+  // (10-15 s through which the GPU sat idle; 2026-11-10). Same lights, sky and fog as the full compile below, so the
+  // same programs: that one then finds them made and adds the land's.
+  compileShadowShaders().catch(() => {}); renderer.compileAsync(scene, camera).catch(() => {});
   landscape = await loadBlenderEnvironment(scene, group => { rectangularAprons(group); regradeGround(group); placeFacadeTrees(group); }, environmentDownload);
   const breathe = painted; // let the page paint between stages
   await breathe();
@@ -423,7 +406,21 @@ async function boot() {
     while (!done) { finish(false); window.__stageNow(); await new Promise(r => setTimeout(r, 16)); }
     await compiled; finish(true); }
   performance.mark('shaders-compiled');
-  if (!reduced && !window.__noRise) { landscape.lodBias = 2.4; portfolio.warm(() => { landscape.updateTreeDetail(camera); renderer.shadowMap.needsUpdate = true; staticShadows(); renderer.render(scene, camera); }); }
+  // Every stop of the story drawn once behind the loader, the building standing: a view's first draw finishes its
+  // shaders and buffers on this GPU, which showed as a 0.1-0.5 s hitch on first scrolling to it (E2E 2026-11-01).
+  { rise.set(1e6); let first = true; portfolio.warm(i => { landscape.updateTreeDetail(camera); cullForCamera(); if (first) { first = false; renderer.shadowMap.needsUpdate = true; staticShadows();
+      // and every object once, in or out of view, shown or not: the driver finishes an object's shader the first time it
+      // is drawn, and the flights between stops pass things no stop looks at (GPU-side hitches of 0.2-0.9 s; 2026-11-10)
+      const was = []; scene.traverse(o => { if (o.isLight) return; was.push([o, o.visible, o.frustumCulled]); o.visible = true; o.frustumCulled = false; });
+      try { renderer.render(scene, camera); } finally { for (const [o, visible, culled] of was) { o.visible = visible; o.frustumCulled = culled; } } }
+    renderer.render(scene, camera);
+    // The sharpness this GPU can hold at 60 frames a second is settled here, on the hero's own view (the last drawn): a
+    // step taken later resizes the canvas, a ~0.3 s stall and a visible change mid-visit (2026-11-10 profile).
+    if (i === 0 && !reduced) { const gl = renderer.getContext(), px = new Uint8Array(4), times = [];
+      for (let k = 0; k < 5; k++) { const t = performance.now(); renderer.render(scene, camera); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); times.push(performance.now() - t); } // the read waits for the GPU
+      const ms = times.sort((a, b) => a - b)[2], budget = 1000 / 60, ratio = renderer.getPixelRatio(), floor = .55 * Math.min(devicePixelRatio, 1.5);
+      if (ms > budget * 1.15 && ratio > floor + .01) { renderer.setPixelRatio(Math.max(floor, Math.min(ratio * .88, ratio * Math.sqrt(budget / ms) * .95))); renderer.render(scene, camera); }
+      performance.mark(`sharpness-${renderer.getPixelRatio().toFixed(2)}-from-${Math.round(ms)}ms`); } }); }
   ready = true; window.__portrait.ready = true; readyAt = performance.now();
   portfolio.show();
   renderer.render(scene, camera);
@@ -486,7 +483,8 @@ function openDoors() { doorsOpen = true; }
 function begin(gesture) {
   performance.mark('begin');
   if (gesture) { goFullscreen(); resumeDefaultSound(); }
-  if (reduced || window.__noRise) { rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = entranceLight.shadow.needsUpdate = true; architecture.interior.lights.forEach(l => { l.shadow.needsUpdate = true; }); } else { riseStart = 1; riseClock = -.75 * RISE_RATE; } // the arrival, once the loader has faded
+  // no arrival flight (owner, 2026-11-10): the building stands and the story opens on its hero
+  rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = entranceLight.shadow.needsUpdate = true; architecture.interior.lights.forEach(l => { l.shadow.needsUpdate = true; });
   // the story walks in through the front doors
   openDoors(); portfolio.play(RISE_LENGTH / RISE_RATE, .75); arrival();
   loading.finish(); // the view flies into the views as the building starts to rise (the campus page: once it is open)
@@ -507,9 +505,7 @@ function arrival() {
     portfolio.skipIntro(); rise.set(1e6); riseDust.set(1e6); renderer.shadowMap.needsUpdate = true; needsRender = true;
     if (returnY > 0 && hashIdx < 0) portfolio.jumpTo(returnY); else if (hashIdx > 0) portfolio.jumpTo(portfolio.scrollFor(hashIdx));
   };
-  if (reduced || sessionStorage.getItem('introSeen') === '1' || returnY > 0 || hashIdx > 0) end();
-  else for (const e of ['keydown', 'wheel', 'touchstart', 'pointerdown']) addEventListener(e, () => { if (portfolio.introPlaying) end(); }, { passive: true });
-  sessionStorage.setItem('introSeen', '1');
+  end();
 }
 addEventListener('pagehide', () => { if (portfolio?.active) sessionStorage.setItem('storyY', String(Math.round(portfolio.placeY()))); });
 let westFittings = null, dispensers = [], casements = [], clickables = [], roomUpdates = [], interiors = []; const smallParts = []; const westBox = new THREE.Box3(new THREE.Vector3(-34, -1, -15), new THREE.Vector3(-21, 5, 15));
@@ -589,8 +585,8 @@ function animate(now) {
   }
   sky.update(now / 1000, sunlight.night, weatherState, reduced);
   // Even pacing: draw every Nth display frame so motion advances in equal steps.
-  // While a finger or mouse is dragging the view, draw every frame the display offers: input must track the hand.
-  if ((needsRender || !reduced) && !(!dragging && now - lastRendered < cadence * 1000 / 60 - 4)) {
+  // Never above 60 frames a second, whatever the display offers (owner, 2026-11-10); below it only as the device needs.
+  if ((needsRender || !reduced) && now - lastRendered >= cadence * 1000 / 60 - 4) {
     const interval = now - lastRendered;
     if (landscape) landscape.lodBias = portfolio?.flying ? 2.4 : 1; // coarser trees while the arrival flight sweeps round
     landscape.updateTreeDetail?.(camera);
@@ -601,7 +597,8 @@ function animate(now) {
     renderer.render(scene, camera);
     portfolio?.afterRender(); // the story's live windows onto other rooms
     ++frames;
-    if (!reduced && frames > 12 && interval < 250) adaptResolution(interval, now);
+    if (!reduced && frames > 12 && interval < 250 && !portfolio.scrolling) adaptResolution(interval, now); // the pace changes at rest, never mid-scroll
+    if (portfolio.scrolling) retryWait = 6000;
     needsRender = false; lastRendered = now;
   }
 }
