@@ -33,7 +33,7 @@ const loading = loader3d({ reduced });
 { const stages = [['architecture-built', 'Growing the landscape'], ['env-trees-placed', 'Planting the trees'], ['surroundings-built', 'Setting the light'],
     ['lighting-set', 'Compiling the light'], ['textures-uploaded', 'Raising the walls'], ['models-uploaded', 'Finishing the light'], ['shaders-compiled', 'Opening the doors']];
   let reached = -1; // read at each paint (an observer's callback waited for an idle main thread: the late stages never showed)
-  window.__stageNow = () => { for (let i = stages.length - 1; i > reached; i--) if (performance.getEntriesByName(stages[i][0]).length) { reached = i; loading.status(stages[i][1]); break; } }; }
+  window.__stageNow = () => { for (let i = stages.length - 1; i > reached; i--) if (performance.getEntriesByName(stages[i][0]).length) { reached = i; loading.status(stages[i][1]); loading.progress((i + 2) / (stages.length + 1)); break; } }; }
 const small = () => innerWidth < 700;
 // The four viewpoints the distant tree belt keeps clear (surroundings.js): the old campus views, kept so the belt stands
 // exactly where it did.
@@ -76,7 +76,7 @@ const loadBar = () => $('.load-track>span');
 const environmentDownload = renderer ? prefetchEnvironment(p => {
   const bar = loadBar(); if (bar) { bar.style.animation = 'none'; bar.style.transform = `scaleX(${p.toFixed(3)})`; }
   if (p < 1) $('#loading-status').textContent = `Downloading the campus ${Math.round(p * 100)}%`;
-  if (p < 1 && !performance.getEntriesByName('architecture-built').length) loading.status('Downloading the department'); // never over a later stage's words
+  if (p < 1 && !performance.getEntriesByName('architecture-built').length) { loading.status('Downloading the department'); loading.progress(.06 + .06 * p); } // never over a later stage's words
 }) : null;
 environmentDownload?.catch(() => {}); // handled where it is awaited
 const skyDownload = renderer ? new HDRLoader().loadAsync('/media/sky.hdr') : null;
