@@ -279,7 +279,7 @@ export const enter = {
 };
 
 export const credits = {
-  maker: { name: 'Dileep', link: 'https://github.com/dileep12072024-sudo', linkText: 'GitHub', instagram: 'twelfth._string12' },
+  maker: { name: 'Dileep', link: 'https://github.com/dileep12072024-sudo', linkText: 'GitHub', instagram: 'Twelfth._string12' },
   guide: { name: 'Shivakaran', org: 'Sted.Space', link: 'https://sted.space/' },
 };
 
