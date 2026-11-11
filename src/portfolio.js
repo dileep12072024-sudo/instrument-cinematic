@@ -107,7 +107,7 @@ function markup() {
   <header class="pf-nav">
     <a class="pf-brand" href="#arrival" data-cursor aria-label="${esc(C.department.name)}, back to the start"><span class="pf-brand-tx"><b>Instrument Technology</b><i>Andhra University</i></span></a>
     <nav class="pf-links" id="pf-links" aria-label="Chapters">${groups.map(([g, t]) => `<a class="pf-link" href="#${firstOf(g).id}" data-group="${g}" data-cursor><span>${esc(t)}</span><span class="alt" aria-hidden="true">${esc(where[g])}</span></a>`).join('')}</nav>
-    <button class="pf-skip pf-sound" id="sound" type="button" aria-pressed="true" aria-label="Mute ambient sound" data-cursor>Sound on</button>
+    <button class="pf-sound" id="sound" type="button" aria-pressed="true" aria-label="Mute ambient sound" data-cursor><i></i><i></i><i></i><i></i></button>
     <button class="pf-burger" aria-label="Chapters" aria-controls="pf-links" aria-expanded="false" data-cursor><i></i><i></i></button>
   </header>
   <nav class="pf-rail" aria-label="Chapter position">${chapters.slice(0, -1).map((c, i) => `<button data-rail="${i}" aria-label="${esc(c.nav)}" title="${esc(c.nav)}"><i></i></button>`).join('')}</nav>

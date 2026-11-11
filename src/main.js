@@ -48,8 +48,7 @@ const sound = createAmbience();
 function updateSoundButton() {
   const active = sound.enabled;
   const b = $('#sound'); if (!b) return; // in the story's header (portfolio.js)
-  b.setAttribute('aria-pressed', active); b.setAttribute('aria-label', active ? 'Mute ambient sound' : 'Unmute ambient sound');
-  b.textContent = active ? 'Sound on' : 'Sound off';
+  b.setAttribute('aria-pressed', active); b.setAttribute('aria-label', active ? 'Mute ambient sound' : 'Unmute ambient sound'); b.title = active ? 'Sound on' : 'Sound off';
 }
 let soundActivationBound = true;
 function resumeDefaultSound() {
